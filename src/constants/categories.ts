@@ -1,4 +1,6 @@
-export const CATEGORIES = {
+import type { Category } from '../types';
+
+export const CATEGORIES: Record<string, Category> = {
   barco:  { label: "A bordo",   bg: "#E1F5EE", border: "#0F6E56", text: "#04342C", dot: "#1D9E75" },
   puerto: { label: "Puerto",    bg: "#E6F1FB", border: "#185FA5", text: "#042C53", dot: "#378ADD" },
   miami:  { label: "Miami",     bg: "#FAECE7", border: "#993C1D", text: "#4A1B0C", dot: "#D85A30" },

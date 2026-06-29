@@ -2,7 +2,7 @@ import { HOUR_START, HOUR_END, PX_PER_HOUR } from "../../constants/time";
 import { fmtHour } from "../../utils/time";
 
 export default function HourGutter() {
-  const hours = [];
+  const hours: number[] = [];
   for (let h = HOUR_START; h <= HOUR_END; h++) hours.push(h);
 
   return (

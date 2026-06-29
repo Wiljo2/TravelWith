@@ -1,10 +1,11 @@
 import { uid } from "../utils/uid";
+import type { Day, CalendarEvent } from '../types';
 
-const mk = (start, end, title, cat, note = "") => ({
+const mk = (start: number, end: number, title: string, cat: string, note = ""): CalendarEvent => ({
   id: uid(), start, end, title, cat, note,
 });
 
-export const initialDays = [
+export const initialDays: Day[] = [
   {
     id: "d0",
     label: "Sáb · Nov 28",

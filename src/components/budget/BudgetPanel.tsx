@@ -1,8 +1,14 @@
 import { CATEGORIES } from "../../constants/categories";
 import { inputStyle } from "../../utils/styles";
 import EventEditor from "../editor/EventEditor";
+import type { CalendarEvent, Extra } from "../../types";
 
-function Row({ label, value }) {
+interface RowProps {
+  label: string;
+  value: string;
+}
+
+function Row({ label, value }: RowProps) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, margin: "4px 0", color: "var(--text-secondary)" }}>
       <span>{label}</span>
@@ -11,7 +17,21 @@ function Row({ label, value }) {
   );
 }
 
-export default function BudgetPanel({ selectedEvent, onUpdateEvent, onDeleteEvent, extras, cruiseTotal, extrasTotal, grandTotal, pricePerPerson, onUpdateExtra }) {
+interface BudgetPanelProps {
+  selectedEvent: { ev: CalendarEvent; dayId: string } | null;
+  onUpdateEvent: (patch: Partial<CalendarEvent>) => void;
+  onDeleteEvent: () => void;
+  extras: Extra[];
+  cruiseTotal: number;
+  extrasTotal: number;
+  grandTotal: number;
+  pricePerPerson: number;
+  onUpdateExtra: (id: string, patch: Partial<Extra>) => void;
+}
+
+export default function BudgetPanel({ selectedEvent, onUpdateEvent, onDeleteEvent, extras, cruiseTotal, extrasTotal, grandTotal, pricePerPerson, onUpdateExtra }: BudgetPanelProps) {
+  // extrasTotal is displayed via grandTotal; reference it to satisfy noUnusedParameters
+  void extrasTotal;
   return (
     <div style={{ width: 270, flexShrink: 0, display: "flex", flexDirection: "column", gap: 12 }}>
       {/* event editor */}
@@ -61,7 +81,7 @@ export default function BudgetPanel({ selectedEvent, onUpdateEvent, onDeleteEven
             <input
               type="number"
               value={x.amount}
-              onChange={(e) => onUpdateExtra(x.id, { amount: e.target.value })}
+              onChange={(e) => onUpdateExtra(x.id, { amount: Number(e.target.value) })}
               style={inputStyle({ width: 58, fontSize: 11.5, textAlign: "right" })}
             />
           </div>

@@ -1,4 +1,12 @@
-export default function PriceChip({ label, value, sub, accent, strong }) {
+interface PriceChipProps {
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: boolean;
+  strong?: boolean;
+}
+
+export default function PriceChip({ label, value, sub, accent, strong }: PriceChipProps) {
   return (
     <div
       style={{

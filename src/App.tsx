@@ -8,11 +8,12 @@ import CalendarGrid from "./components/calendar/CalendarGrid";
 import BudgetPanel from "./components/budget/BudgetPanel";
 import PriceChip from "./components/budget/PriceChip";
 import Toast from "./components/Toast";
+import type { ToastAction } from "./types";
 
 export default function App() {
   const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent } = useItinerary();
   const { extras, cruiseTotal, extrasTotal, grandTotal, pricePerPerson, updateExtra } = useBudget();
-  const [toastAction, setToastAction] = useState(null);
+  const [toastAction, setToastAction] = useState<ToastAction | null>(null);
   const dismissToast = useCallback(() => setToastAction(null), []);
 
   const { onDragStart, onDragEnter, onDragMove, onDropInDay, onDragEnd, dragTarget, dragPreview } = useDragDrop(

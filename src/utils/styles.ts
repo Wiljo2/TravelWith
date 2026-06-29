@@ -1,4 +1,6 @@
-export function inputStyle(extra = {}) {
+import type { CSSProperties } from 'react';
+
+export function inputStyle(extra: CSSProperties = {}): CSSProperties {
   return {
     border: "1px solid var(--border-strong)",
     borderRadius: 6,

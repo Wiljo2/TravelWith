@@ -1,10 +1,25 @@
 import HourGutter from "./HourGutter";
 import DayColumn from "./DayColumn";
+import type { Day, CalendarEvent, DragPreview } from "../../types";
+
+interface CalendarGridProps {
+  days: Day[];
+  onDragStart: (e: React.DragEvent, ev: CalendarEvent, dayId: string, grabOffsetHours: number) => void;
+  onDragEnter: (dayId: string) => void;
+  onDragMove: (dayId: string, cursorHour: number) => void;
+  onDrop: (dayId: string, droppedHour: number) => void;
+  onDragEnd: (e: React.DragEvent) => void;
+  onSelect: (id: string | null) => void;
+  selectedId: string | null;
+  dragTarget: string | null;
+  dragPreview: DragPreview | null;
+  onAddEvent: (dayId: string) => void;
+}
 
 export default function CalendarGrid({
   days, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd,
   onSelect, selectedId, dragTarget, dragPreview, onAddEvent,
-}) {
+}: CalendarGridProps) {
   return (
     <div
       style={{

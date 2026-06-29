@@ -2,8 +2,15 @@ import { CATEGORIES } from "../../constants/categories";
 import { HOUR_START, HOUR_END } from "../../constants/time";
 import { fmtHour } from "../../utils/time";
 import { inputStyle } from "../../utils/styles";
+import type { CalendarEvent } from "../../types";
 
-export default function EventEditor({ ev, onChange, onDelete }) {
+interface EventEditorProps {
+  ev: CalendarEvent;
+  onChange: (patch: Partial<CalendarEvent>) => void;
+  onDelete: () => void;
+}
+
+export default function EventEditor({ ev, onChange, onDelete }: EventEditorProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
       <input
@@ -54,7 +61,13 @@ export default function EventEditor({ ev, onChange, onDelete }) {
   );
 }
 
-function TimeField({ label, value, onChange }) {
+interface TimeFieldProps {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}
+
+function TimeField({ label, value, onChange }: TimeFieldProps) {
   return (
     <label style={{ flex: 1, fontSize: 11, color: "var(--text-secondary)" }}>
       {label}

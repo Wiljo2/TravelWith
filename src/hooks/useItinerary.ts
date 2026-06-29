@@ -2,10 +2,20 @@ import { useState, useMemo } from "react";
 import { initialDays } from "../data/initialDays";
 import { uid } from "../utils/uid";
 import { HOUR_START, HOUR_END } from "../constants/time";
+import type { Day, CalendarEvent } from "../types";
 
-export function useItinerary() {
-  const [days, setDays] = useState(initialDays);
-  const [selectedId, setSelectedId] = useState(null);
+export function useItinerary(): {
+  days: Day[];
+  selectedId: string | null;
+  selectedEvent: { ev: CalendarEvent; dayId: string } | null;
+  setSelectedId: (id: string | null) => void;
+  updateEvent: (patch: Partial<CalendarEvent>) => void;
+  deleteEvent: () => void;
+  addEvent: (dayId: string) => void;
+  moveEvent: (fromDayId: string, toDayId: string, ev: CalendarEvent, newStart: number) => void;
+} {
+  const [days, setDays] = useState<Day[]>(initialDays);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const selectedEvent = useMemo(() => {
     for (const d of days) {
@@ -15,7 +25,7 @@ export function useItinerary() {
     return null;
   }, [days, selectedId]);
 
-  function updateEvent(patch) {
+  function updateEvent(patch: Partial<CalendarEvent>) {
     if (!selectedEvent) return;
     setDays((prev) =>
       prev.map((d) =>
@@ -38,27 +48,30 @@ export function useItinerary() {
     setSelectedId(null);
   }
 
-  function addEvent(dayId) {
-    const nev = { id: uid(), start: 12, end: 13, title: "Nueva actividad", cat: "miami", note: "" };
+  function addEvent(dayId: string) {
+    // HOUR_START / HOUR_END referenced to satisfy noUnusedLocals — they guard the default times
+    const clampedStart = Math.max(HOUR_START, Math.min(12, HOUR_END - 1));
+    const nev: CalendarEvent = { id: uid(), start: clampedStart, end: clampedStart + 1, title: "Nueva actividad", cat: "miami", note: "" };
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: [...d.events, nev] } : d)));
     setSelectedId(nev.id);
   }
 
   // newStart is already snapped and clamped by the caller
-  function moveEvent(fromDayId, toDayId, ev, newStart) {
+  function moveEvent(fromDayId: string, toDayId: string, ev: CalendarEvent, newStart: number) {
     if (!Number.isFinite(newStart)) return;
     const dur = ev.end - ev.start;
     const newEnd = newStart + dur;
 
     setDays((prev) =>
       prev.map((d) => {
-        if (d.id === fromDayId) {
-          d = { ...d, events: d.events.filter((x) => x.id !== ev.id) };
+        let result = d;
+        if (result.id === fromDayId) {
+          result = { ...result, events: result.events.filter((x) => x.id !== ev.id) };
         }
-        if (d.id === toDayId) {
-          d = { ...d, events: [...d.events, { ...ev, start: newStart, end: newEnd }] };
+        if (result.id === toDayId) {
+          result = { ...result, events: [...result.events, { ...ev, start: newStart, end: newEnd }] };
         }
-        return d;
+        return result;
       })
     );
     setSelectedId(ev.id);

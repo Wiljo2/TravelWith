@@ -1,14 +1,23 @@
 import { useEffect, useRef } from "react";
 import { fmtHour } from "../utils/time";
+import type { ToastAction } from "../types";
 
-export default function Toast({ action, onUndo, onDismiss }) {
-  const timerRef = useRef(null);
+interface ToastProps {
+  action: ToastAction | null;
+  onUndo: (() => void) | undefined;
+  onDismiss: () => void;
+}
+
+export default function Toast({ action, onUndo, onDismiss }: ToastProps) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!action) return;
-    clearTimeout(timerRef.current);
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(onDismiss, 5000);
-    return () => clearTimeout(timerRef.current);
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
   }, [action, onDismiss]);
 
   return (

@@ -3,10 +3,15 @@ import { HOUR_START, HOUR_END, PX_PER_HOUR } from "../../constants/time";
 import { CATEGORIES } from "../../constants/categories";
 import { EventCard } from "./EventBlock";
 import EventBlock from "./EventBlock";
+import type { Day, CalendarEvent, DragPreview } from "../../types";
 
-function GhostBlock({ preview }) {
+interface GhostBlockProps {
+  preview: DragPreview;
+}
+
+function GhostBlock({ preview }: GhostBlockProps) {
   const { ev, newStart, newEnd } = preview;
-  const cat    = CATEGORIES[ev.cat] || CATEGORIES.logist;
+  const cat    = CATEGORIES[ev.cat] ?? CATEGORIES.logist;
   const top    = (newStart - HOUR_START) * PX_PER_HOUR;
   const height = Math.max((newEnd - newStart) * PX_PER_HOUR, 26);
 
@@ -36,21 +41,34 @@ function GhostBlock({ preview }) {
   );
 }
 
-export default function DayColumn({ day, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd, onSelect, selectedId, isDragTarget, dragPreview }) {
-  const totalHeight = (HOUR_END - HOUR_START + 1) * PX_PER_HOUR;
-  const colRef = useRef(null);
+interface DayColumnProps {
+  day: Day;
+  onDragStart: (e: React.DragEvent, ev: CalendarEvent, dayId: string, grabOffsetHours: number) => void;
+  onDragEnter: (dayId: string) => void;
+  onDragMove: (dayId: string, cursorHour: number) => void;
+  onDrop: (dayId: string, droppedHour: number) => void;
+  onDragEnd: (e: React.DragEvent) => void;
+  onSelect: (id: string) => void;
+  selectedId: string | null;
+  isDragTarget: boolean;
+  dragPreview: DragPreview | null;
+}
 
-  const getCursorHour = (clientY) => {
-    const rect = colRef.current.getBoundingClientRect();
+export default function DayColumn({ day, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd, onSelect, selectedId, isDragTarget, dragPreview }: DayColumnProps) {
+  const totalHeight = (HOUR_END - HOUR_START + 1) * PX_PER_HOUR;
+  const colRef = useRef<HTMLDivElement>(null);
+
+  const getCursorHour = (clientY: number): number => {
+    const rect = colRef.current!.getBoundingClientRect();
     return HOUR_START + (clientY - rect.top) / PX_PER_HOUR;
   };
 
-  const handleDragOver = (e) => {
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     onDragMove(day.id, getCursorHour(e.clientY));
   };
 
-  const handleDrop = (e) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     onDrop(day.id, getCursorHour(e.clientY));
   };
@@ -142,7 +160,7 @@ export default function DayColumn({ day, onDragStart, onDragEnter, onDragMove, o
         ))}
 
         {/* drag ghost — full-fidelity preview that snaps in real time */}
-        {showPreview && <GhostBlock preview={dragPreview} />}
+        {showPreview && dragPreview && <GhostBlock preview={dragPreview} />}
       </div>
     </div>
   );

@@ -1,10 +1,22 @@
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import { CATEGORIES } from "../../constants/categories";
 import { HOUR_START, PX_PER_HOUR } from "../../constants/time";
 import { fmtHour, durLabel } from "../../utils/time";
+import type { CalendarEvent, Category } from "../../types";
+
+interface EventCardProps {
+  ev: CalendarEvent;
+  start: number;
+  end: number;
+  height: number;
+  selected: boolean;
+  cat: Category;
+  style?: CSSProperties;
+}
 
 // Shared card renderer used by both real blocks and the drag ghost
-export function EventCard({ ev, start, end, height, selected, cat, style = {} }) {
+export function EventCard({ ev, start, end, height, selected, cat, style = {} }: EventCardProps) {
   const punctual = end <= start;
   return (
     <div
@@ -52,9 +64,18 @@ export function EventCard({ ev, start, end, height, selected, cat, style = {} })
 const EMPTY_IMG = new Image();
 EMPTY_IMG.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
-export default function EventBlock({ ev, dayId, onDragStart, onDragEnd, onSelect, selected }) {
+interface EventBlockProps {
+  ev: CalendarEvent;
+  dayId: string;
+  onDragStart: (e: React.DragEvent, ev: CalendarEvent, dayId: string, grabOffsetHours: number) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
+  onSelect: (id: string) => void;
+  selected: boolean;
+}
+
+export default function EventBlock({ ev, dayId, onDragStart, onDragEnd, onSelect, selected }: EventBlockProps) {
   const [dragging, setDragging] = useState(false);
-  const cat    = CATEGORIES[ev.cat] || CATEGORIES.logist;
+  const cat    = CATEGORIES[ev.cat] ?? CATEGORIES.logist;
   const top    = (ev.start - HOUR_START) * PX_PER_HOUR;
   const rawH   = (ev.end - ev.start) * PX_PER_HOUR;
   const height = Math.max(rawH, 26);
