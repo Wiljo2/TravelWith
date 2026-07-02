@@ -1,32 +1,33 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { useItinerary } from "./hooks/useItinerary";
-import { useDragDrop } from "./hooks/useDragDrop";
-import { useBudget } from "./hooks/useBudget";
-import { useRoom } from "./hooks/useRoom";
-import type { RoomPayload, MockPerson } from "./hooks/useRoom";
-import { HOUR_START, HOUR_END } from "./constants/time";
-import { snapHour } from "./utils/time";
-import { usdToCop, fmtUSD, fmtCOP, extraGroupUSD } from "./utils/currency";
-import CalendarGrid from "./components/calendar/CalendarGrid";
-import BudgetPanel from "./components/budget/BudgetPanel";
-import BudgetView from "./components/budget/BudgetView";
-import TabBar from "./components/TabBar";
-import type { Tab } from "./components/TabBar";
-import AuthButton from "./components/auth/AuthButton";
-import PriceChip from "./components/budget/PriceChip";
-import Toast from "./components/Toast";
-import RoomGate from "./components/RoomGate";
-import TasksView from "./components/tasks/TasksView";
-import type { Task, ToastAction, TripSpan } from "./types";
-import { initialDays } from "./data/initialDays";
+import { useItinerary } from "@/hooks/useItinerary";
+import { useDragDrop } from "@/hooks/useDragDrop";
+import { useBudget } from "@/hooks/useBudget";
+import { useRoom } from "@/hooks/useRoom";
+import type { RoomPayload, MockPerson } from "@/hooks/useRoom";
+import { HOUR_START, HOUR_END } from "@/constants/time";
+import { snapHour } from "@/utils/time";
+import { extraGroupUSD } from "@/utils/currency";
+import CalendarGrid from "@/components/calendar/CalendarGrid";
+import SlotCreateModal from "@/components/calendar/SlotCreateModal";
+import BudgetPanel from "@/components/budget/BudgetPanel";
+import BudgetView from "@/components/budget/BudgetView";
+import TabBar from "@/components/TabBar";
+import type { Tab } from "@/components/TabBar";
+import AppHeader from "@/components/AppHeader";
+import Toast from "@/components/Toast";
+import RoomGate from "@/components/RoomGate";
+import TasksView from "@/components/tasks/TasksView";
+import type { Task, ToastAction, TripSpan } from "@/types";
+import { initialDays } from "@/data/initialDays";
 
 export default function App() {
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("calendar");
   const [pendingNew, setPendingNew] = useState<{ dayId: string; hour: number } | null>(null);
+  const [slotDraft, setSlotDraft] = useState<{ dayId: string; hour: number; x: number; y: number; task: Task | null } | null>(null);
 
-  const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, loadDays, addDaySpan, removeDaySpan, updateDaySpan } = useItinerary();
-  const { extras, exchangeRate, setExchangeRate, updateExtraUSD, updateExtraCOP, updateExtra, addExtra, removeExtra, loadBudget } = useBudget();
+  const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, loadDays, removeDaySpan, updateDaySpan } = useItinerary();
+  const { extras, exchangeRate, setExchangeRate, updateExtra, addExtra, removeExtra, loadBudget } = useBudget();
   const [mockPeople, setMockPeople] = useState<MockPerson[]>([]);
   const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -43,17 +44,14 @@ export default function App() {
   }
 
   // Task helpers
-  function addTask(title: string) {
-    setTasks((prev) => [...prev, { id: crypto.randomUUID(), title, done: false }]);
+  function addTask(partial: Partial<Task> & { title: string }) {
+    setTasks((prev) => [...prev, { id: crypto.randomUUID(), done: false, ...partial }]);
   }
   function toggleTask(id: string) {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, done: !t.done } : t));
   }
-  function updateTaskTitle(id: string, title: string) {
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, title } : t));
-  }
-  function updateTaskNote(id: string, note: string) {
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, note } : t));
+  function updateTask(id: string, patch: Partial<Task>) {
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, ...patch } : t));
   }
   function deleteTask(id: string) {
     setTasks((prev) => prev.filter((t) => t.id !== id));
@@ -70,7 +68,7 @@ export default function App() {
     if (Array.isArray(payload.tasks))      setTasks(payload.tasks);
   }, [loadDays, loadBudget]);
 
-  const { connected, members, save } = useRoom(roomCode, onRemoteUpdate);
+  const { connected, members, saveState, save } = useRoom(roomCode, onRemoteUpdate);
   const people = Math.max(1, members.length + mockPeople.length);
   // grandTotal depends on people: "perPerson" expenses scale up with the traveler count.
   const grandTotal = useMemo(
@@ -129,49 +127,20 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <div className="app-header">
-        <div>
-          <div className="app-eyebrow">Wonder of the Seas · Orlando · Miami · Bahamas · CocoCay</div>
-          <h1 className="app-title">Bahamas &amp; Perfect Day · Nov 26 – Dic 4, 2026</h1>
-          <div className="app-subtitle">
-            Arrastra cualquier bloque para reorganizar el plan · clic para editar horas
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {roomCode !== "LOCAL" && (
-            <div style={{
-              display: "flex", alignItems: "center", gap: 6,
-              background: "var(--surface-2)", border: "1px solid var(--border)",
-              borderRadius: 8, padding: "6px 12px", fontSize: 12,
-            }}>
-              <span style={{
-                width: 7, height: 7, borderRadius: "50%",
-                background: connected ? "#6EE7B7" : "#6b7280", flexShrink: 0,
-              }} />
-              <span style={{ color: "var(--text-muted)" }}>Sala</span>
-              <span style={{ fontFamily: "monospace", fontWeight: 700, letterSpacing: ".05em" }}>{roomCode}</span>
-              <button
-                title="Restablecer itinerario al default"
-                onClick={() => {
-                  if (confirm("¿Restablecer el itinerario al default? Se perderán los cambios guardados.")) {
-                    loadDays(initialDays);
-                    setTripSpans([]);
-                  }
-                }}
-                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 12, padding: "0 0 0 4px" }}
-              >↺</button>
-              <button
-                onClick={() => setRoomCode(null)}
-                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 13, padding: "0 0 0 4px" }}
-              >×</button>
-            </div>
-          )}
-          <div className="price-chips">
-            <PriceChip label="Total estimado" value={fmtUSD(grandTotal)} sub={fmtCOP(usdToCop(grandTotal, exchangeRate))} strong />
-          </div>
-          <AuthButton />
-        </div>
-      </div>
+      <AppHeader
+        roomCode={roomCode}
+        connected={connected}
+        saveState={saveState}
+        grandTotal={grandTotal}
+        exchangeRate={exchangeRate}
+        onReset={() => {
+          if (confirm("¿Restablecer el itinerario al default? Se perderán los cambios guardados.")) {
+            loadDays(initialDays);
+            setTripSpans([]);
+          }
+        }}
+        onLeaveRoom={() => setRoomCode(null)}
+      />
 
       <TabBar active={activeTab} onChange={setActiveTab} pendingTaskCount={pendingTaskCount} />
 
@@ -180,6 +149,7 @@ export default function App() {
           <CalendarGrid
             days={days}
             tripSpans={tripSpans}
+            tasks={tasks}
             onDragStart={onDragStart}
             onDragEnter={onDragEnter}
             onDragMove={onDragMove}
@@ -189,15 +159,14 @@ export default function App() {
             selectedId={selectedId}
             dragTarget={dragTarget}
             dragPreview={dragPreview}
-            onAddEvent={(dayId, h) => {
-              if (pendingNew !== null) {
-                setPendingNew(null);
-              } else {
-                setSelectedId(null);
-                setPendingNew({ dayId, hour: h });
-              }
+            onAddEvent={(dayId, h, x, y) => {
+              setPendingNew(null);
+              setSelectedId(null);
+              setSlotDraft({ dayId, hour: h, x, y, task: null });
             }}
-            pendingNew={pendingNew}
+            onToggleTask={toggleTask}
+            onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
+            pendingNew={pendingNew ?? (slotDraft && !slotDraft.task ? { dayId: slotDraft.dayId, hour: slotDraft.hour } : null)}
           />
           <BudgetPanel
             selectedEvent={selectedEvent}
@@ -208,17 +177,12 @@ export default function App() {
             grandTotal={grandTotal}
             exchangeRate={exchangeRate}
             people={people}
-            onSetExchangeRate={setExchangeRate}
-            onUpdateExtraUSD={updateExtraUSD}
-            onUpdateExtraCOP={updateExtraCOP}
-            onUpdateExtraLabel={(id, label) => updateExtra(id, { label })}
             onLinkExtra={linkExtra}
             onAddExtra={addExtra}
             onRemoveExtra={removeExtra}
             tripSpans={tripSpans}
             onAddTripSpan={addTripSpan}
             onRemoveTripSpan={removeTripSpan}
-            onAddDaySpan={addDaySpan}
             onRemoveDaySpan={removeDaySpan}
             onUpdateDaySpan={updateDaySpan}
             onUpdateTripSpan={updateTripSpan}
@@ -252,16 +216,37 @@ export default function App() {
 
       {activeTab === "tasks" && (
         <TasksView
+          days={days}
           tasks={tasks}
-          onAdd={addTask}
+          onAdd={(title) => addTask({ title })}
           onToggle={toggleTask}
-          onUpdateTitle={updateTaskTitle}
-          onUpdateNote={updateTaskNote}
+          onUpdateTask={updateTask}
           onDelete={deleteTask}
         />
       )}
 
       <Toast action={toastAction} onUndo={toastAction?.undo} onDismiss={dismissToast} />
+
+      {slotDraft && (
+        <SlotCreateModal
+          x={slotDraft.x}
+          y={slotDraft.y}
+          dayLabel={days.find((d) => d.id === slotDraft.dayId)?.label ?? ""}
+          hour={slotDraft.hour}
+          existing={slotDraft.task}
+          onSaveActivity={({ title, note, cat, start, end }) => {
+            addEvent(slotDraft.dayId, title, start, end, note, cat);
+            setSlotDraft(null);
+          }}
+          onSaveTask={(patch) => {
+            if (slotDraft.task) updateTask(slotDraft.task.id, patch);
+            else addTask({ ...patch, dayId: slotDraft.dayId, title: patch.title ?? "" });
+            setSlotDraft(null);
+          }}
+          onDeleteTask={slotDraft.task ? () => { deleteTask(slotDraft.task!.id); setSlotDraft(null); } : undefined}
+          onClose={() => setSlotDraft(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import { snapHour } from "../utils/time";
-import { HOUR_START, HOUR_END } from "../constants/time";
-import type { CalendarEvent, DragPreview } from "../types";
+import { snapHour } from "@/utils/time";
+import { HOUR_START, HOUR_END } from "@/constants/time";
+import type { CalendarEvent, DragPreview } from "@/types";
 
 interface DragData {
   ev: CalendarEvent;

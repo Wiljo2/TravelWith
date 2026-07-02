@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
-import { initialDays } from "../data/initialDays";
-import { uid } from "../utils/uid";
-import { HOUR_START, HOUR_END } from "../constants/time";
-import type { Day, CalendarEvent } from "../types";
+import { initialDays } from "@/data/initialDays";
+import { uid } from "@/utils/uid";
+import { HOUR_START, HOUR_END } from "@/constants/time";
+import type { Day, CalendarEvent } from "@/types";
 
 export function useItinerary(): {
   days: Day[];
@@ -11,7 +11,7 @@ export function useItinerary(): {
   setSelectedId: (id: string | null) => void;
   updateEvent: (patch: Partial<CalendarEvent>) => void;
   deleteEvent: () => void;
-  addEvent: (dayId: string, title: string, start: number, end: number, note?: string) => void;
+  addEvent: (dayId: string, title: string, start: number, end: number, note?: string, cat?: string) => void;
   moveEvent: (fromDayId: string, toDayId: string, ev: CalendarEvent, newStart: number) => void;
   loadDays: (days: Day[]) => void;
   addDaySpan: (dayId: string, span: import("../types").DaySpan) => void;
@@ -52,8 +52,8 @@ export function useItinerary(): {
     setSelectedId(null);
   }
 
-  function addEvent(dayId: string, title: string, start: number, end: number, note = "") {
-    const nev: CalendarEvent = { id: uid(), start, end, title, cat: "miami", note };
+  function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = "miami") {
+    const nev: CalendarEvent = { id: uid(), start, end, title, cat, note };
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: [...d.events, nev] } : d)));
     setSelectedId(nev.id);
   }

@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import { HOUR_START, HOUR_END, PX_PER_HOUR } from "../../constants/time";
-import { CATEGORIES } from "../../constants/categories";
-import { snapHour, fmtHour } from "../../utils/time";
+import { HOUR_START, HOUR_END, PX_PER_HOUR } from "@/constants/time";
+import { CATEGORIES } from "@/constants/categories";
+import { snapHour, fmtHour } from "@/utils/time";
 import { EventCard } from "./EventBlock";
 import EventBlock from "./EventBlock";
-import type { Day, CalendarEvent, DragPreview, DaySpan } from "../../types";
+import TaskBlock from "./TaskBlock";
+import type { Day, CalendarEvent, DragPreview, DaySpan, Task } from "@/types";
 
 // Computes side-by-side column layout for overlapping events (Google Calendar style)
 function computeLayout(events: CalendarEvent[]): Map<string, { col: number; total: number; conflict: boolean }> {
@@ -82,13 +83,16 @@ function GhostBlock({ preview }: { preview: DragPreview }) {
 
 interface DayColumnProps {
   day: Day;
+  tasks: Task[];
   onDragStart: (e: React.DragEvent, ev: CalendarEvent, dayId: string, grabOffsetHours: number) => void;
   onDragEnter: (dayId: string) => void;
   onDragMove: (dayId: string, cursorHour: number) => void;
   onDrop: (dayId: string, droppedHour: number) => void;
   onDragEnd: (e: React.DragEvent) => void;
   onSelect: (id: string | null) => void;
-  onAddEvent: (dayId: string, atHour: number) => void;
+  onAddEvent: (dayId: string, atHour: number, x: number, y: number) => void;
+  onToggleTask: (id: string) => void;
+  onEditTask: (task: Task, x: number, y: number) => void;
   selectedId: string | null;
   isDragTarget: boolean;
   dragPreview: DragPreview | null;
@@ -96,8 +100,8 @@ interface DayColumnProps {
 }
 
 export default function DayColumn({
-  day, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd,
-  onSelect, onAddEvent, selectedId, isDragTarget, dragPreview, pendingHour,
+  day, tasks, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd,
+  onSelect, onAddEvent, onToggleTask, onEditTask, selectedId, isDragTarget, dragPreview, pendingHour,
 }: DayColumnProps) {
   const totalHeight = (HOUR_END - HOUR_START + 1) * PX_PER_HOUR;
   const colRef  = useRef<HTMLDivElement>(null);
@@ -140,7 +144,7 @@ export default function DayColumn({
         onClick={(e) => {
           if (dragging.current) { dragging.current = false; return; }
           const h = snapHour(getHour(e.clientY), 1, HOUR_START, HOUR_END - 1);
-          onAddEvent(day.id, h);
+          onAddEvent(day.id, h, e.clientX, e.clientY);
         }}
         style={{
           position: "relative", height: totalHeight,
@@ -244,6 +248,15 @@ export default function DayColumn({
             );
           });
         })()}
+
+        {tasks.map((task) => (
+          <TaskBlock
+            key={task.id}
+            task={task}
+            onToggle={() => onToggleTask(task.id)}
+            onEdit={(x, y) => onEditTask(task, x, y)}
+          />
+        ))}
 
         {/* Drag ghost */}
         {dragPreview?.dayId === day.id && dragPreview && <GhostBlock preview={dragPreview} />}

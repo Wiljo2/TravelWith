@@ -24,8 +24,9 @@
 
 body {
   margin: 0;
-  padding: 16px;
+  padding: 10px;
   background: var(--surface-0);
+  zoom: 0.85;
 }
 
 h1 {

@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
-import { createServerClient, getUserFromToken } from "../../../../../lib/supabase-server";
-import type { RoomMember } from "../../../../../types";
+import { createServerClient, getUserFromToken } from "@/lib/supabase-server";
+import { normalizeRoomCode } from "@/lib/validate";
+import type { RoomMember } from "@/types";
 
 type Params = Promise<{ code: string }>;
 
 // GET /api/rooms/[code]/members — list members of a room
 export async function GET(_req: Request, { params }: { params: Params }) {
-  const { code } = await params;
+  const code = normalizeRoomCode((await params).code);
+  if (!code) return NextResponse.json({ error: "Código inválido" }, { status: 400 });
   const supabase = createServerClient();
 
   const { data, error } = await supabase
     .from("rooms")
     .select("members")
-    .eq("code", code.toUpperCase())
+    .eq("code", code)
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -23,7 +25,8 @@ export async function GET(_req: Request, { params }: { params: Params }) {
 
 // DELETE /api/rooms/[code]/members — remove the authenticated user from user_rooms
 export async function DELETE(req: Request, { params }: { params: Params }) {
-  const { code } = await params;
+  const code = normalizeRoomCode((await params).code);
+  if (!code) return NextResponse.json({ error: "Código inválido" }, { status: 400 });
 
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -37,7 +40,7 @@ export async function DELETE(req: Request, { params }: { params: Params }) {
     .from("user_rooms")
     .delete()
     .eq("user_id", user.id)
-    .eq("room_code", code.toUpperCase());
+    .eq("room_code", code);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -46,7 +49,8 @@ export async function DELETE(req: Request, { params }: { params: Params }) {
 
 // POST /api/rooms/[code]/members — add the authenticated user to this room's member list
 export async function POST(req: Request, { params }: { params: Params }) {
-  const { code } = await params;
+  const code = normalizeRoomCode((await params).code);
+  if (!code) return NextResponse.json({ error: "Código inválido" }, { status: 400 });
 
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -59,7 +63,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
   const { data: room, error: fetchError } = await supabase
     .from("rooms")
     .select("members")
-    .eq("code", code.toUpperCase())
+    .eq("code", code)
     .maybeSingle();
 
   if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
@@ -82,7 +86,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
   const { error: updateError } = await supabase
     .from("rooms")
     .update({ members: [...members, newMember] })
-    .eq("code", code.toUpperCase());
+    .eq("code", code);
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 

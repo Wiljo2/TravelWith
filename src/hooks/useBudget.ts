@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { Extra } from "../types";
-import { DEFAULT_RATE } from "../utils/currency";
+import type { Extra } from "@/types";
+import { DEFAULT_RATE } from "@/utils/currency";
 
 const DEFAULT_EXTRAS: Extra[] = [
   // Globales — costo fijo del viaje
@@ -18,14 +18,6 @@ export function useBudget() {
 
   function updateExtra(id: string, patch: Partial<Extra>) {
     setExtras((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-  }
-
-  function updateExtraUSD(id: string, usd: number) {
-    updateExtra(id, { amount: usd, currency: "USD" });
-  }
-
-  function updateExtraCOP(id: string, cop: number) {
-    updateExtra(id, { amount: cop, currency: "COP" });
   }
 
   function addExtra(partial: Partial<Extra> = {}) {
@@ -52,7 +44,7 @@ export function useBudget() {
   return {
     extras, exchangeRate,
     setExchangeRate,
-    updateExtra, updateExtraUSD, updateExtraCOP,
+    updateExtra,
     addExtra, removeExtra,
     loadBudget,
   };

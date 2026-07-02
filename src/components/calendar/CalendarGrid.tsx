@@ -2,9 +2,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import HourGutter from "./HourGutter";
 import DayColumn from "./DayColumn";
-import type { Day, CalendarEvent, DragPreview, TripSpan, DaySpan } from "../../types";
-import { CATEGORIES } from "../../constants/categories";
-import { HOUR_START, HOUR_END } from "../../constants/time";
+import type { Day, CalendarEvent, DragPreview, TripSpan, DaySpan, Task } from "@/types";
+import { CATEGORIES } from "@/constants/categories";
+import { HOUR_START, HOUR_END } from "@/constants/time";
 
 // Given all days and all trip-level spans, compute the DaySpan slices visible
 // in a specific day. A span crossing N days produces a slice in each of those days.
@@ -54,6 +54,7 @@ function calcVisible(containerWidth: number): number {
 interface CalendarGridProps {
   days: Day[];
   tripSpans: TripSpan[];
+  tasks: Task[];
   onDragStart: (e: React.DragEvent, ev: CalendarEvent, dayId: string, grabOffsetHours: number) => void;
   onDragEnter: (dayId: string) => void;
   onDragMove: (dayId: string, cursorHour: number) => void;
@@ -63,13 +64,15 @@ interface CalendarGridProps {
   selectedId: string | null;
   dragTarget: string | null;
   dragPreview: DragPreview | null;
-  onAddEvent: (dayId: string, atHour: number) => void;
+  onAddEvent: (dayId: string, atHour: number, x: number, y: number) => void;
+  onToggleTask: (id: string) => void;
+  onEditTask: (task: Task, x: number, y: number) => void;
   pendingNew?: { dayId: string; hour: number } | null;
 }
 
 export default function CalendarGrid({
-  days, tripSpans, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd,
-  onSelect, selectedId, dragTarget, dragPreview, onAddEvent, pendingNew,
+  days, tripSpans, tasks, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd,
+  onSelect, selectedId, dragTarget, dragPreview, onAddEvent, onToggleTask, onEditTask, pendingNew,
 }: CalendarGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(900);
@@ -173,6 +176,7 @@ export default function CalendarGrid({
           <DayColumn
             key={day.id}
             day={enriched}
+            tasks={tasks.filter((t) => t.dayId === day.id && t.start != null)}
             onDragStart={onDragStart}
             onDragEnter={onDragEnter}
             onDragMove={onDragMove}
@@ -180,6 +184,8 @@ export default function CalendarGrid({
             onDragEnd={onDragEnd}
             onSelect={onSelect}
             onAddEvent={onAddEvent}
+            onToggleTask={onToggleTask}
+            onEditTask={onEditTask}
             selectedId={selectedId}
             isDragTarget={dragTarget === day.id}
             dragPreview={dragPreview}

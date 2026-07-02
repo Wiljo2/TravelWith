@@ -1,5 +1,5 @@
-import { HOUR_START, HOUR_END, PX_PER_HOUR } from "../../constants/time";
-import { fmtHourShort } from "../../utils/time";
+import { HOUR_START, HOUR_END, PX_PER_HOUR } from "@/constants/time";
+import { fmtHourShort } from "@/utils/time";
 
 export default function HourGutter() {
   const hours: number[] = [];

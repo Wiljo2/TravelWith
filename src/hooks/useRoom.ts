@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { supabase } from "../lib/supabase";
-import type { Day, Extra, RoomMember, Task, TripSpan } from "../types";
+import { supabase } from "@/lib/supabase";
+import type { Day, Extra, RoomMember, Task, TripSpan } from "@/types";
 
 export interface MockPerson {
   id: string;
@@ -16,9 +16,12 @@ export interface RoomPayload {
   tasks?: Task[];
 }
 
+export type SaveState = "idle" | "saving" | "saved" | "error";
+
 interface UseRoomResult {
   connected: boolean;
   members: RoomMember[];
+  saveState: SaveState;
   save: (payload: RoomPayload) => void;
 }
 
@@ -28,7 +31,9 @@ export function useRoom(
 ): UseRoomResult {
   const [connected, setConnected] = useState(false);
   const [members, setMembers] = useState<RoomMember[]>([]);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   const skipSave = useRef(false);
+  const lastUpdatedAt = useRef<string | null>(null);
 
   const save = useCallback(
     async (payload: RoomPayload) => {
@@ -37,13 +42,39 @@ export function useRoom(
         skipSave.current = false;
         return;
       }
-      await fetch(`/api/rooms/${code}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      setSaveState("saving");
+      try {
+        const res = await fetch(`/api/rooms/${code}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, expectedUpdatedAt: lastUpdatedAt.current ?? undefined }),
+        });
+
+        if (res.status === 409) {
+          // Someone else saved first — adopt their version instead of overwriting it.
+          const data = await res.json();
+          if (data?.payload?.days) {
+            lastUpdatedAt.current = data.updated_at ?? null;
+            skipSave.current = true;
+            onRemoteUpdate(data.payload);
+          }
+          setSaveState("saved");
+          return;
+        }
+
+        if (!res.ok) {
+          setSaveState("error");
+          return;
+        }
+
+        const data = await res.json();
+        if (data?.updated_at) lastUpdatedAt.current = data.updated_at;
+        setSaveState("saved");
+      } catch {
+        setSaveState("error");
+      }
     },
-    [code],
+    [code, onRemoteUpdate],
   );
 
   useEffect(() => {
@@ -53,6 +84,7 @@ export function useRoom(
       .then((r) => r.json())
       .then((data) => {
         const p = data?.payload as RoomPayload | undefined;
+        if (data?.updated_at) lastUpdatedAt.current = data.updated_at;
         if (p?.days && Array.isArray(p.days)) {
           skipSave.current = true;
           onRemoteUpdate(p);
@@ -72,7 +104,8 @@ export function useRoom(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${code}` },
         ({ new: row }) => {
-          const r = row as { payload: RoomPayload; members?: RoomMember[] };
+          const r = row as { payload: RoomPayload; members?: RoomMember[]; updated_at?: string };
+          if (r.updated_at) lastUpdatedAt.current = r.updated_at;
           if (r.payload?.days && Array.isArray(r.payload.days)) {
             skipSave.current = true;
             onRemoteUpdate(r.payload);
@@ -91,5 +124,5 @@ export function useRoom(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
-  return { connected, members, save };
+  return { connected, members, saveState, save };
 }

@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { CATEGORIES } from "../../constants/categories";
-import { HOUR_START, HOUR_END } from "../../constants/time";
-import { inputStyle } from "../../utils/styles";
-import type { CalendarEvent } from "../../types";
+import { CATEGORIES } from "@/constants/categories";
+import { HOUR_START, HOUR_END } from "@/constants/time";
+import { inputStyle } from "@/utils/styles";
+import type { CalendarEvent } from "@/types";
 
 const CAT_KEYS = Object.keys(CATEGORIES) as (keyof typeof CATEGORIES)[];
 

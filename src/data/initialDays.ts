@@ -1,4 +1,4 @@
-import { uid } from "../utils/uid";
+import { uid } from "@/utils/uid";
 import type { Day, CalendarEvent, DaySpan } from '../types';
 
 const mk = (start: number, end: number, title: string, cat: string, note = ""): CalendarEvent => ({

@@ -61,15 +61,9 @@ export interface DragPreview {
 export interface Extra {
   id: string;
   label: string;
-  // Meaning of `amount` depends on splitMode:
-  //  - "group"     → amount is the TOTAL for the range (split across people).
-  //  - "perPerson" → amount is the cost PER PERSON (multiplied by people for the group total).
-  amount: number;         // stored in `currency` units
+  amount: number;         // in `currency`; group total when splitMode="group", per-person when "perPerson"
   currency?: "USD" | "COP"; // default "USD"
-  // How the expense scales with the number of travelers. Default "group".
-  //  - "group":     adding a person keeps the total fixed → per-person share goes DOWN.
-  //  - "perPerson": adding a person keeps the per-person cost fixed → group total goes UP.
-  splitMode?: "group" | "perPerson";
+  splitMode?: "group" | "perPerson"; // default "group"
   linkedEventId?: string;
   // If startDayId is set, this extra belongs to the per-day timeline instead of Globales.
   // amount is divided across the days in the range for the per-day display.
@@ -77,11 +71,18 @@ export interface Extra {
   endDayId?: string;      // if omitted, defaults to startDayId (single day)
 }
 
+export type TaskPriority = "alta" | "media" | "baja";
+
 export interface Task {
   id: string;
   title: string;
   done: boolean;
   note?: string;
+  dayId?: string;         // set → placed on the calendar; unset → backlog
+  start?: number;
+  end?: number;
+  cat?: string;           // key of TASK_CATEGORIES
+  priority?: TaskPriority;
 }
 
 export interface RoomMember {

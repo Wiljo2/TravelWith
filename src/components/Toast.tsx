@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { fmtHour } from "../utils/time";
-import type { ToastAction } from "../types";
+import { fmtHour } from "@/utils/time";
+import type { ToastAction } from "@/types";
 
 interface ToastProps {
   action: ToastAction | null;

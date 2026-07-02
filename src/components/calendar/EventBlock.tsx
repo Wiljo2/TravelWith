@@ -1,9 +1,9 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
-import { CATEGORIES } from "../../constants/categories";
-import { HOUR_START, PX_PER_HOUR } from "../../constants/time";
-import { fmtHour, durLabel } from "../../utils/time";
-import type { CalendarEvent, Category } from "../../types";
+import { CATEGORIES } from "@/constants/categories";
+import { HOUR_START, PX_PER_HOUR } from "@/constants/time";
+import { fmtHour, durLabel } from "@/utils/time";
+import type { CalendarEvent, Category } from "@/types";
 
 // Conflict color scheme — warm red/orange to make overlaps unmistakable
 const CONFLICT_CAT: Category = {

@@ -1,5 +1,5 @@
 "use client";
-import { useAuth } from "../../hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function AuthButton() {
   const { user, loading, signInWithGoogle, signOut } = useAuth();

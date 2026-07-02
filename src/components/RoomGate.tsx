@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
-import { useAuth } from "../hooks/useAuth";
-import { useUserRooms } from "../hooks/useUserRooms";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserRooms } from "@/hooks/useUserRooms";
 
 interface RoomGateProps {
   onEnter: (code: string) => void;
