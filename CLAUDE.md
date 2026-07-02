@@ -22,7 +22,8 @@ Read `GUIDELINES.md` before large features. Operational summary:
 - Money math ONLY via `extraGroupUSD` / `extraPerPersonUSD` / `extraUnitUSD` (`utils/currency.ts`), always USD internally. `Extra.splitMode`: `"group"` = fixed total split across people; `"perPerson"` = unit cost that scales with people.
 - Hours are decimal (14.5 = 2:30pm); format with `utils/time.ts`.
 - Domain types in `src/types/index.ts`; enumerables in `src/constants/` as typed Records.
-- Inline styles with CSS variables (`var(--surface-2)`, etc.).
+- Styling: Tailwind v4 + shadcn/ui. Theme tokens (`bg-card`, `text-muted-foreground`, `border-border`) over raw hex; shadcn primitives over hand-rolled elements. Inline `style` only for data-driven values (calendar positions, category colors). Theme lives in `globals.css` `:root`.
 - No unnecessary comments.
 - Imports use the `@/` alias instead of `../../..`.
 - Editable rows follow the dirty + ✓/✕ pattern (see `GlobalExtraRow`).
+- No file over ~400 lines — split into composed subcomponents.

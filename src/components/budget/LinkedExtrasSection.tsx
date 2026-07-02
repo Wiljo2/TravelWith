@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
-import type { CSSProperties } from "react";
 import type { CalendarEvent, Extra } from "@/types";
 import { fmtUSDNum } from "@/utils/currency";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface LinkedExtrasSectionProps {
   selectedEvent: { ev: CalendarEvent; dayId: string };
@@ -12,10 +14,6 @@ interface LinkedExtrasSectionProps {
   onRemoveExtra: (id: string) => void;
 }
 
-function btnStyle(color: string): CSSProperties {
-  return { border: `1px solid ${color}`, borderRadius: 6, padding: "5px 0", fontSize: 11, cursor: "pointer", fontWeight: 500, background: `${color}22`, color: color };
-}
-
 function DeleteConfirm({ label, onUnlink, onDelete, onCancel }: {
   label: string;
   onUnlink: () => void;
@@ -23,14 +21,14 @@ function DeleteConfirm({ label, onUnlink, onDelete, onCancel }: {
   onCancel: () => void;
 }) {
   return (
-    <div style={{ background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", marginBottom: 6 }}>
-      <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--text-primary)" }}>
+    <div className="mb-1.5 rounded-lg border border-border bg-secondary px-2.5 py-2">
+      <p className="mb-2 text-xs text-foreground">
         ¿Qué hacemos con <strong>{label}</strong>?
       </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-        <button onClick={onUnlink} style={btnStyle("#3B82F6")}>Solo desvincular</button>
-        <button onClick={onDelete} style={btnStyle("#EF4444")}>Eliminar del presupuesto</button>
-        <button onClick={onCancel} style={{ ...btnStyle("var(--border)"), color: "var(--text-muted)", background: "none" }}>Cancelar</button>
+      <div className="flex flex-col gap-[5px]">
+        <button onClick={onUnlink} className="cursor-pointer rounded-md border border-[#3B82F6] bg-[#3B82F622] py-[5px] text-[11px] font-medium text-[#3B82F6]">Solo desvincular</button>
+        <button onClick={onDelete} className="cursor-pointer rounded-md border border-destructive bg-destructive/15 py-[5px] text-[11px] font-medium text-destructive">Eliminar del presupuesto</button>
+        <button onClick={onCancel} className="cursor-pointer rounded-md border border-border bg-transparent py-[5px] text-[11px] font-medium text-muted-foreground">Cancelar</button>
       </div>
     </div>
   );
@@ -51,34 +49,37 @@ function AddGastoForm({ defaultLabel, onSave, onCancel }: {
   }
 
   return (
-    <div style={{ background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px", marginTop: 6 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginBottom: 7, letterSpacing: ".06em" }}>NUEVO GASTO</div>
-      <input
+    <div className="mt-1.5 rounded-lg border border-border bg-secondary p-2.5">
+      <div className="mb-[7px] text-[11px] font-semibold tracking-[.06em] text-muted-foreground">NUEVO GASTO</div>
+      <Input
         value={label}
         onChange={(e) => setLabel(e.target.value)}
         placeholder="Concepto"
-        style={{ width: "100%", boxSizing: "border-box", padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--text-primary)", fontSize: 12, outline: "none", marginBottom: 6 }}
+        className="mb-1.5 bg-card text-xs"
       />
-      <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
+      <div className="mb-2 flex gap-[5px]">
         <button
           onClick={() => setCurrency((c) => c === "USD" ? "COP" : "USD")}
-          style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: currency === "COP" ? "#4ADE8022" : "#60A5FA22", color: currency === "COP" ? "#4ADE80" : "#60A5FA", fontWeight: 700, fontSize: 11, cursor: "pointer", flexShrink: 0 }}
+          className={cn(
+            "shrink-0 cursor-pointer rounded-md border border-border px-2 py-[5px] text-[11px] font-bold",
+            currency === "COP" ? "bg-[#4ADE8022] text-[#16A34A]" : "bg-[#60A5FA22] text-[#2563EB]",
+          )}
         >
           {currency}
         </button>
-        <input
+        <Input
           autoFocus
           type="text" inputMode="numeric"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") onCancel(); }}
           placeholder="0"
-          style={{ flex: 1, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--text-primary)", fontSize: 12, outline: "none", textAlign: "right", fontFamily: "monospace" }}
+          className="flex-1 bg-card text-right font-mono text-xs"
         />
       </div>
-      <div style={{ display: "flex", gap: 5 }}>
-        <button onClick={save} style={{ flex: 1, padding: "6px", borderRadius: 6, border: "none", background: "#6EE7B7", color: "#04342C", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>✓ Guardar</button>
-        <button onClick={onCancel} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}>✕</button>
+      <div className="flex gap-[5px]">
+        <Button onClick={save} size="sm" className="flex-1 font-bold">✓ Guardar</Button>
+        <Button variant="outline" size="sm" onClick={onCancel} className="text-muted-foreground">✕</Button>
       </div>
     </div>
   );
@@ -94,13 +95,13 @@ export default function LinkedExtrasSection({
   const linkable = extras.filter((x) => x.linkedEventId !== selectedEvent.ev.id);
 
   return (
-    <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", letterSpacing: ".06em", marginBottom: 8 }}>GASTOS VINCULADOS</div>
+    <div className="mt-3.5 border-t border-border pt-3">
+      <div className="mb-2 text-[11px] font-semibold tracking-[.06em] text-muted-foreground">GASTOS VINCULADOS</div>
 
       {linked.length === 0
-        ? <p style={{ margin: "0 0 8px", fontSize: 12, color: "var(--text-muted)" }}>Sin gastos asignados</p>
+        ? <p className="mb-2 text-xs text-muted-foreground">Sin gastos asignados</p>
         : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+          <div className="mb-2 flex flex-col gap-1">
             {linked.map((x) => {
               if (confirmDeleteId === x.id) {
                 return (
@@ -117,13 +118,13 @@ export default function LinkedExtrasSection({
                 ? `${Math.round(x.amount).toLocaleString("es-CO")} COP`
                 : `$${fmtUSDNum(x.amount)}`;
               return (
-                <div key={x.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12 }}>
-                  <span style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 130 }}>{x.label}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontFamily: "monospace", color: "var(--text-secondary)", fontSize: 11 }}>{displayAmt}</span>
+                <div key={x.id} className="flex items-center justify-between text-xs">
+                  <span className="max-w-[130px] truncate text-foreground">{x.label}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-[11px] text-secondary-foreground">{displayAmt}</span>
                     <button
                       onClick={() => setConfirmDeleteId(x.id)}
-                      style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14, padding: "0 2px", lineHeight: 1 }}
+                      className="cursor-pointer px-0.5 text-sm leading-none text-muted-foreground hover:text-foreground"
                     >×</button>
                   </div>
                 </div>
@@ -135,7 +136,7 @@ export default function LinkedExtrasSection({
 
       {linkable.length > 0 && (
         <select value="" onChange={(e) => e.target.value && onLinkExtra(e.target.value, selectedEvent.ev.id)}
-          style={{ width: "100%", fontSize: 11, color: "var(--text-muted)", background: "var(--surface-1)", border: "1px dashed var(--border)", borderRadius: 6, padding: "5px 8px", cursor: "pointer", outline: "none", marginBottom: 6 }}>
+          className="mb-1.5 w-full cursor-pointer rounded-md border border-dashed border-border bg-secondary px-2 py-[5px] text-[11px] text-muted-foreground outline-none">
           <option value="">+ vincular gasto existente</option>
           {linkable.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
         </select>
@@ -151,12 +152,9 @@ export default function LinkedExtrasSection({
           onCancel={() => setShowAddForm(false)}
         />
       ) : (
-        <button
-          onClick={() => setShowAddForm(true)}
-          style={{ width: "100%", padding: "6px", borderRadius: 6, border: "none", background: "#6EE7B7", color: "#04342C", fontWeight: 600, cursor: "pointer", fontSize: 12 }}
-        >
+        <Button size="sm" onClick={() => setShowAddForm(true)} className="w-full text-xs font-semibold">
           + Nuevo gasto para esta actividad
-        </button>
+        </Button>
       )}
     </div>
   );

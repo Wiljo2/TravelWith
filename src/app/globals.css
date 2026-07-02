@@ -1,109 +1,108 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  --surface-0: #F7F6F2;
-  --surface-1: #FBFAF7;
-  --surface-2: #ffffff;
+  /* shadcn tokens mapped to the TravelWith warm palette */
+  --background: #F7F6F2;
+  --foreground: #2C2C2A;
+  --card: #ffffff;
+  --card-foreground: #2C2C2A;
+  --popover: #ffffff;
+  --popover-foreground: #2C2C2A;
+  --primary: #6EE7B7;
+  --primary-foreground: #04342C;
+  --secondary: #FBFAF7;
+  --secondary-foreground: #5F5E5A;
+  --muted: #F1EFE8;
+  --muted-foreground: #888780;
+  --accent: #E1F5EE;
+  --accent-foreground: #04342C;
+  --destructive: #EF4444;
   --border: #E5E3DC;
-  --border-strong: #D3D1C7;
-  --text-primary: #2C2C2A;
-  --text-secondary: #5F5E5A;
-  --text-muted: #888780;
+  --input: #D3D1C7;
+  --ring: #059669;
+  --chart-1: #1D9E75;
+  --chart-2: #378ADD;
+  --chart-3: #D85A30;
+  --chart-4: #EF9F27;
+  --chart-5: #7F77DD;
+  --radius: 0.625rem;
+  --sidebar: #FBFAF7;
+  --sidebar-foreground: #2C2C2A;
+  --sidebar-primary: #6EE7B7;
+  --sidebar-primary-foreground: #04342C;
+  --sidebar-accent: #F1EFE8;
+  --sidebar-accent-foreground: #2C2C2A;
+  --sidebar-border: #E5E3DC;
+  --sidebar-ring: #059669;
 
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Legacy aliases — kept while any style still references them */
+  --surface-0: var(--background);
+  --surface-1: var(--secondary);
+  --surface-2: var(--card);
+  --border-strong: var(--input);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--secondary-foreground);
+  --text-muted: var(--muted-foreground);
+
   font-size: 14px;
-  line-height: 1.5;
-  color: var(--text-primary);
-  background: var(--surface-0);
-  -webkit-font-smoothing: antialiased;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+@theme inline {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-body {
-  margin: 0;
-  padding: 10px;
-  background: var(--surface-0);
-  zoom: 0.85;
-}
-
-h1 {
-  margin: 0;
-}
-
-.app-shell {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 16px;
-  border-radius: 14px;
-}
-
-.app-header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-
-.app-eyebrow {
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #D85A30;
-  font-weight: 600;
-}
-
-.app-title {
-  font-size: 24px;
-  font-weight: 600;
-  margin: 2px 0 0;
-  color: var(--text-primary);
-}
-
-.app-subtitle {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin-top: 3px;
-}
-
-.price-chips {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.app-body {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-
-/* ── Input states ────────────────────────────────────────────── */
-input,
-textarea,
-select {
-  transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
-}
-
-input:hover:not(:focus),
-textarea:hover:not(:focus),
-select:hover:not(:focus) {
-  border-color: var(--border-strong) !important;
-}
-
-input:focus,
-textarea:focus,
-select:focus {
-  border-color: #059669 !important;
-  background-color: #ffffff !important;
-  border-radius: 7px !important;
-  box-shadow:
-    0 0 0 1px #059669,
-    0 0 0 4px rgba(5, 150, 105, 0.18),
-    0 2px 8px rgba(0, 0, 0, 0.07) !important;
-  outline: none !important;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground m-0 p-2.5 antialiased;
+    zoom: 0.85;
+  }
+  html {
+    @apply font-sans;
+  }
 }

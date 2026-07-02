@@ -5,6 +5,7 @@ import { snapHour, fmtHour } from "@/utils/time";
 import { EventCard } from "./EventBlock";
 import EventBlock from "./EventBlock";
 import TaskBlock from "./TaskBlock";
+import { cn } from "@/lib/utils";
 import type { Day, CalendarEvent, DragPreview, DaySpan, Task } from "@/types";
 
 // Computes side-by-side column layout for overlapping events (Google Calendar style)
@@ -75,7 +76,7 @@ function GhostBlock({ preview }: { preview: DragPreview }) {
   const top    = (newStart - HOUR_START) * PX_PER_HOUR;
   const height = Math.max((newEnd - newStart) * PX_PER_HOUR, 26);
   return (
-    <div style={{ position: "absolute", top, left: 6, right: 6, height, pointerEvents: "none", boxShadow: "0 4px 16px rgba(0,0,0,.18)", borderRadius: 8 }}>
+    <div className="pointer-events-none absolute inset-x-1.5 rounded-lg shadow-[0_4px_16px_rgba(0,0,0,.18)]" style={{ top, height }}>
       <EventCard ev={ev} start={newStart} end={newEnd} height={height} selected={false} cat={cat} />
     </div>
   );
@@ -116,24 +117,19 @@ export default function DayColumn({
   const hoverHour = hoverY !== null ? snapHour(hoverY, 1, HOUR_START, HOUR_END) : null;
 
   return (
-    <div style={{ flex: "1 1 0", minWidth: 0, display: "flex", flexDirection: "column" }}>
+    <div className="flex min-w-0 flex-1 flex-col">
 
-      {/* ── Header: fixed 56px so all grid lines align across columns ── */}
-      <div style={{
-        height: 56, boxSizing: "border-box", padding: "8px 10px",
-        borderBottom: "1px solid var(--border)",
-        background: "var(--surface-1)",
-        overflow: "hidden", flexShrink: 0,
-      }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      {/* Header: fixed 56px so all grid lines align across columns */}
+      <div className="box-border h-14 shrink-0 overflow-hidden border-b border-border bg-secondary px-2.5 py-2">
+        <div className="truncate text-[13px] font-medium text-foreground">
           {day.label}
         </div>
-        <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div className="mt-0.5 truncate text-[11px] text-secondary-foreground">
           {day.sub}
         </div>
       </div>
 
-      {/* ── Time grid ── */}
+      {/* Time grid */}
       <div
         ref={colRef}
         onDragOver={(e) => { e.preventDefault(); dragging.current = true; onDragMove(day.id, getHour(e.clientY)); }}
@@ -146,16 +142,12 @@ export default function DayColumn({
           const h = snapHour(getHour(e.clientY), 1, HOUR_START, HOUR_END - 1);
           onAddEvent(day.id, h, e.clientX, e.clientY);
         }}
-        style={{
-          position: "relative", height: totalHeight,
-          background: isDragTarget ? "rgba(213,90,48,.04)" : "transparent",
-          borderLeft: "1px solid var(--border)", borderRight: "1px solid var(--border)",
-          cursor: "crosshair",
-        }}
+        className={cn("relative cursor-crosshair border-x border-border", isDragTarget ? "bg-[rgba(213,90,48,.04)]" : "bg-transparent")}
+        style={{ height: totalHeight }}
       >
         {/* Hour lines */}
         {Array.from({ length: HOUR_END - HOUR_START + 1 }).map((_, i) => (
-          <div key={i} style={{ position: "absolute", top: i * PX_PER_HOUR, left: 0, right: 0, height: 1, background: "var(--border)" }} />
+          <div key={i} className="absolute inset-x-0 h-px bg-border" style={{ top: i * PX_PER_HOUR }} />
         ))}
 
         {/* Dynamic spans — sorted by zIndex (lower = painted first = further back).
@@ -167,15 +159,14 @@ export default function DayColumn({
           const height = Math.max(0, bottom - top);
           const hasBorder = span.border && span.border !== "transparent";
           return (
-            <div key={span.id} style={{
-              position: "absolute", top, height, left: 0, right: 0,
+            <div key={span.id} className="pointer-events-none absolute inset-x-0" style={{
+              top, height,
               background: span.bg,
               borderTop:    hasBorder ? `1px dashed ${span.border}` : undefined,
               borderBottom: hasBorder ? `1px dashed ${span.border}` : undefined,
-              pointerEvents: "none",
             }}>
               {span.label && hasBorder && (
-                <span style={{ position: "absolute", top: 3, right: 6, fontSize: 9, fontWeight: 600, color: span.border, opacity: .85, letterSpacing: ".05em", textTransform: "uppercase", userSelect: "none" }}>
+                <span className="absolute right-1.5 top-[3px] select-none text-[9px] font-semibold uppercase tracking-[.05em] opacity-85" style={{ color: span.border }}>
                   {span.label}
                 </span>
               )}
@@ -185,14 +176,9 @@ export default function DayColumn({
 
         {/* Hover indicator — shows where a click would add an event */}
         {hoverHour !== null && (
-          <div style={{ position: "absolute", top: (hoverHour - HOUR_START) * PX_PER_HOUR, left: 4, right: 4, pointerEvents: "none", zIndex: 5 }}>
-            <div style={{ height: 2, background: "#6EE7B7", borderRadius: 1, opacity: .7 }} />
-            <span style={{
-              position: "absolute", left: 4, top: 3,
-              fontSize: 10, color: "#6EE7B7", fontVariantNumeric: "tabular-nums",
-              background: "var(--surface-0)", padding: "0 3px", borderRadius: 3,
-              pointerEvents: "none",
-            }}>
+          <div className="pointer-events-none absolute inset-x-1 z-[5]" style={{ top: (hoverHour - HOUR_START) * PX_PER_HOUR }}>
+            <div className="h-0.5 rounded-[1px] bg-primary opacity-70" />
+            <span className="pointer-events-none absolute left-1 top-[3px] rounded-[3px] bg-background px-[3px] text-[10px] tabular-nums text-emerald-600">
               {fmtHour(hoverHour)}
             </span>
           </div>
@@ -200,27 +186,10 @@ export default function DayColumn({
 
         {/* Pending new event ghost */}
         {pendingHour !== null && (
-          <div style={{
-            position: "absolute",
-            top: (pendingHour - HOUR_START) * PX_PER_HOUR,
-            left: "7.5%",
-            width: "85%",
-            height: PX_PER_HOUR,
-            pointerEvents: "none",
-            zIndex: 4,
-          }}>
-            <div style={{
-              height: "100%",
-              borderRadius: 7,
-              border: "1.5px dashed rgba(5,150,105,.55)",
-              background: "rgba(5,150,105,.06)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 5,
-            }}>
-              <span style={{ fontSize: 13, color: "rgba(5,150,105,.6)", fontWeight: 300, lineHeight: 1 }}>+</span>
-              <span style={{ fontSize: 10.5, color: "rgba(5,150,105,.55)", fontWeight: 500, letterSpacing: ".03em" }}>nueva actividad</span>
+          <div className="pointer-events-none absolute left-[7.5%] z-[4] w-[85%]" style={{ top: (pendingHour - HOUR_START) * PX_PER_HOUR, height: PX_PER_HOUR }}>
+            <div className="flex h-full items-center justify-center gap-[5px] rounded-[7px] border-[1.5px] border-dashed border-[rgba(5,150,105,.55)] bg-[rgba(5,150,105,.06)]">
+              <span className="text-[13px] font-light leading-none text-[rgba(5,150,105,.6)]">+</span>
+              <span className="text-[10.5px] font-medium tracking-[.03em] text-[rgba(5,150,105,.55)]">nueva actividad</span>
             </div>
           </div>
         )}

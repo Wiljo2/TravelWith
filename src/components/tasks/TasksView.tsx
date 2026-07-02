@@ -1,9 +1,12 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import type { CSSProperties } from "react";
 import type { Task, TaskPriority, Day } from "@/types";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT, PRIORITIES, PRIORITY_ORDER } from "@/constants/taskCategories";
 import { fmtHour } from "@/utils/time";
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface TasksViewProps {
   days: Day[];
@@ -46,7 +49,7 @@ export default function TasksView({ days, tasks, onAdd, onToggle, onUpdateTask, 
 
   function renderList(list: Task[]) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div className="flex flex-col gap-1.5">
         {list.map((task) => (
           <TaskRow
             key={task.id}
@@ -70,49 +73,45 @@ export default function TasksView({ days, tasks, onAdd, onToggle, onUpdateTask, 
   }
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--surface-1)" }}>
-      <div style={{ flex: 1, overflowY: "auto", padding: "24px 0", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <div style={{ width: "100%", maxWidth: 640, padding: "0 20px" }}>
+    <div className="flex flex-1 flex-col overflow-hidden bg-secondary">
+      <div className="flex flex-1 flex-col items-center overflow-y-auto py-6">
+        <div className="w-full max-w-[640px] px-5">
 
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <input
+          <div className="mb-3 flex gap-2">
+            <Input
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="Nueva tarea, cosa por decidir..."
-              style={{ flex: 1, padding: "10px 14px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-primary)", fontSize: 14, outline: "none" }}
+              className="flex-1 bg-card py-2.5 text-sm"
             />
-            <button
-              onClick={submit}
-              disabled={!draft.trim()}
-              style={{ padding: "10px 18px", borderRadius: 8, background: "#6EE7B7", color: "#04342C", border: "none", fontWeight: 600, fontSize: 14, cursor: draft.trim() ? "pointer" : "not-allowed", opacity: draft.trim() ? 1 : 0.4 }}
-            >
+            <Button onClick={submit} disabled={!draft.trim()} className="font-semibold">
               Añadir
-            </button>
+            </Button>
           </div>
 
-          <p style={{ margin: "0 0 24px", fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
+          <p className="mb-6 text-[11.5px] leading-normal text-muted-foreground">
             Tip: en el calendario, haz clic en un hueco libre para agendar una tarea o discusión a una hora concreta.
           </p>
 
           {pending.length > 0 && (
-            <section style={{ marginBottom: 32 }}>
-              <p style={sectionTitle}>POR HACER · {pending.length}</p>
+            <section className="mb-8">
+              <p className="mb-2.5 text-[11px] font-semibold tracking-[.07em] text-muted-foreground">POR HACER · {pending.length}</p>
               {renderList(pending)}
             </section>
           )}
 
           {done.length > 0 && (
             <section>
-              <p style={sectionTitle}>COMPLETADAS · {done.length}</p>
+              <p className="mb-2.5 text-[11px] font-semibold tracking-[.07em] text-muted-foreground">COMPLETADAS · {done.length}</p>
               {renderList(done)}
             </section>
           )}
 
           {tasks.length === 0 && (
-            <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--text-muted)", fontSize: 14, lineHeight: 1.8 }}>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+            <div className="px-5 py-14 text-center text-sm leading-loose text-muted-foreground">
+              <div className="mb-3 text-[32px]">✓</div>
               Sin tareas aún.<br />
               Añade cosas por decidir, confirmar o recordar.
             </div>
@@ -122,8 +121,6 @@ export default function TasksView({ days, tasks, onAdd, onToggle, onUpdateTask, 
     </div>
   );
 }
-
-const sectionTitle: CSSProperties = { margin: "0 0 10px", fontSize: 11, fontWeight: 600, letterSpacing: ".07em", color: "var(--text-muted)" };
 
 interface TaskRowProps {
   task: Task;
@@ -158,33 +155,30 @@ function TaskRow({
   }, [expanded]);
 
   return (
-    <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden", opacity: task.done ? 0.6 : 1, transition: "opacity .15s" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px" }}>
-        <button
-          onClick={onToggleDone}
-          style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, border: `2px solid ${task.done ? "#6EE7B7" : "var(--border)"}`, background: task.done ? "#6EE7B7" : "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-        >
-          {task.done && (
-            <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L4 7L9 1" stroke="#04342C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          )}
-        </button>
+    <div className={cn("overflow-hidden rounded-[10px] border border-border bg-card transition-opacity", task.done && "opacity-60")}>
+      <div className="flex items-center gap-2.5 px-3.5 py-3">
+        <Checkbox
+          checked={task.done}
+          onCheckedChange={onToggleDone}
+          className="h-5 w-5 rounded-md data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+        />
 
         {editing ? (
-          <input
+          <Input
             autoFocus
             value={editValue}
             onChange={(e) => onEditChange(e.target.value)}
             onBlur={onCommitEdit}
             onKeyDown={(e) => { if (e.key === "Enter") onCommitEdit(); if (e.key === "Escape") onCancelEdit(); }}
-            style={{ flex: 1, background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-primary)", fontSize: 14, padding: "3px 8px", outline: "none" }}
+            className="h-auto flex-1 bg-secondary px-2 py-[3px] text-sm"
           />
         ) : (
           <span
             onDoubleClick={onStartEdit}
-            style={{ flex: 1, fontSize: 14, color: "var(--text-primary)", textDecoration: task.done ? "line-through" : "none", cursor: "text", userSelect: "none", display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}
+            className={cn("flex min-w-0 flex-1 cursor-text select-none items-center gap-[7px] text-sm text-foreground", task.done && "line-through")}
           >
-            <span title={c.label} style={{ flexShrink: 0 }}>{c.icon}</span>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{task.title}</span>
+            <span title={c.label} className="shrink-0">{c.icon}</span>
+            <span className="truncate">{task.title}</span>
           </span>
         )}
 
@@ -192,26 +186,31 @@ function TaskRow({
           <span
             onClick={() => onUpdate({ dayId: undefined, start: undefined, end: undefined })}
             title="Clic para quitar del calendario"
-            style={{ flexShrink: 0, fontSize: 10, color: c.text, background: c.bg, border: `1px solid ${c.border}44`, borderRadius: 20, padding: "2px 8px", whiteSpace: "nowrap", cursor: "pointer" }}
+            className="shrink-0 cursor-pointer whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px]"
+            style={{ color: c.text, background: c.bg, borderColor: `${c.border}44` }}
           >
             📅 {scheduledLabel} ×
           </span>
         )}
         {pr && (
-          <span style={{ flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: pr.color, background: pr.bg, borderRadius: 4, padding: "1px 6px" }}>{pr.label}</span>
+          <span className="shrink-0 rounded px-1.5 py-px text-[9.5px] font-bold" style={{ color: pr.color, background: pr.bg }}>{pr.label}</span>
         )}
 
         <button
           onClick={onToggleExpand}
           title="Detalle"
-          style={{ background: "none", border: "none", color: task.note ? "var(--text-secondary)" : "var(--text-muted)", cursor: "pointer", fontSize: 13, padding: "2px 6px", borderRadius: 4, opacity: expanded || task.note ? 1 : 0.4 }}
+          className={cn(
+            "cursor-pointer rounded px-1.5 py-0.5 text-[13px]",
+            task.note ? "text-secondary-foreground" : "text-muted-foreground",
+            expanded || task.note ? "opacity-100" : "opacity-40",
+          )}
         >
           {expanded ? "▴" : "▾"}
         </button>
 
         <button
           onClick={onDelete}
-          style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 16, padding: "2px 4px", borderRadius: 4, opacity: 0.5 }}
+          className="cursor-pointer rounded px-1 py-0.5 text-base text-muted-foreground opacity-50 hover:opacity-100"
           title="Eliminar"
         >
           ×
@@ -219,26 +218,28 @@ function TaskRow({
       </div>
 
       {expanded && (
-        <div style={{ padding: "0 14px 14px 44px", display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+        <div className="flex flex-col gap-2.5 pb-3.5 pl-11 pr-3.5">
+          <div className="flex flex-wrap gap-[5px]">
             {Object.entries(TASK_CATEGORIES).map(([key, cc]) => {
               const active = (task.cat ?? DEFAULT_TASK_CAT) === key;
               return (
                 <button key={key} onClick={() => onUpdate({ cat: key })}
-                  style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 20, fontSize: 11, fontWeight: 500, cursor: "pointer", background: active ? cc.bg : "var(--surface-1)", border: `1.5px solid ${active ? cc.border : "var(--border)"}`, color: active ? cc.text : "var(--text-muted)" }}>
+                  className={cn("flex cursor-pointer items-center gap-1 rounded-full border-[1.5px] px-2 py-[3px] text-[11px] font-medium", !active && "border-border bg-secondary text-muted-foreground")}
+                  style={active ? { background: cc.bg, borderColor: cc.border, color: cc.text } : undefined}>
                   <span>{cc.icon}</span>{cc.label}
                 </button>
               );
             })}
           </div>
 
-          <div style={{ display: "flex", gap: 5 }}>
+          <div className="flex gap-[5px]">
             {PRIORITY_ORDER.map((p) => {
               const active = task.priority === p;
               const prp = PRIORITIES[p];
               return (
                 <button key={p} onClick={() => onUpdate({ priority: p as TaskPriority })}
-                  style={{ padding: "3px 12px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", background: active ? prp.bg : "var(--surface-1)", border: `1px solid ${active ? prp.color : "var(--border)"}`, color: active ? prp.color : "var(--text-muted)" }}>
+                  className={cn("cursor-pointer rounded-md border px-3 py-[3px] text-[11px] font-semibold", !active && "border-border bg-secondary text-muted-foreground")}
+                  style={active ? { background: prp.bg, borderColor: prp.color, color: prp.color } : undefined}>
                   {prp.label}
                 </button>
               );
@@ -252,7 +253,7 @@ function TaskRow({
             onChange={(e) => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
             placeholder="Qué se va a discutir / detalle..."
             rows={2}
-            style={{ width: "100%", resize: "none", overflow: "hidden", background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-secondary)", fontSize: 13, padding: "8px 10px", outline: "none", lineHeight: 1.5, boxSizing: "border-box" }}
+            className="box-border w-full resize-none overflow-hidden rounded-md border border-border bg-secondary px-2.5 py-2 text-[13px] leading-normal text-secondary-foreground outline-none"
           />
         </div>
       )}

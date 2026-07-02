@@ -1,3 +1,7 @@
+"use client";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+
 export type Tab = "calendar" | "budget" | "tasks";
 
 interface TabBarProps {
@@ -14,42 +18,29 @@ const TABS: { id: Tab; label: string }[] = [
 
 export default function TabBar({ active, onChange, pendingTaskCount }: TabBarProps) {
   return (
-    <div style={{
-      display: "flex", gap: 0, padding: "0 20px",
-      borderBottom: "1px solid var(--border)",
-      background: "var(--surface-2)",
-    }}>
-      {TABS.map((t) => (
-        <button
-          key={t.id}
-          onClick={() => onChange(t.id)}
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "11px 22px",
-            border: "none",
-            borderBottom: active === t.id ? "2px solid #6EE7B7" : "2px solid transparent",
-            background: "none",
-            color: active === t.id ? "#6EE7B7" : "var(--text-muted)",
-            fontWeight: active === t.id ? 600 : 400,
-            cursor: "pointer",
-            fontSize: 14,
-            transition: "color .15s",
-          }}
-        >
-          {t.label}
-          {t.id === "tasks" && pendingTaskCount != null && pendingTaskCount > 0 && (
-            <span style={{
-              display: "inline-flex", alignItems: "center", justifyContent: "center",
-              minWidth: 18, height: 18, padding: "0 5px",
-              borderRadius: 9, fontSize: 11, fontWeight: 600,
-              background: active === t.id ? "#6EE7B7" : "var(--border)",
-              color: active === t.id ? "#04342C" : "var(--text-muted)",
-            }}>
-              {pendingTaskCount}
-            </span>
-          )}
-        </button>
-      ))}
+    <div className="flex border-b border-border bg-card px-5">
+      {TABS.map((t) => {
+        const isActive = active === t.id;
+        return (
+          <button
+            key={t.id}
+            onClick={() => onChange(t.id)}
+            className={cn(
+              "flex items-center gap-1.5 border-b-2 px-5 py-2.5 text-sm transition-colors",
+              isActive
+                ? "border-primary font-semibold text-emerald-700"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t.label}
+            {t.id === "tasks" && pendingTaskCount != null && pendingTaskCount > 0 && (
+              <Badge className={cn("h-[18px] min-w-[18px] rounded-full px-1.5 text-[11px]", !isActive && "bg-border text-muted-foreground")}>
+                {pendingTaskCount}
+              </Badge>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

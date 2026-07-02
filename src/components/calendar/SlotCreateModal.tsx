@@ -1,11 +1,14 @@
 "use client";
 import { useState } from "react";
-import type { CSSProperties } from "react";
 import type { Task, TaskPriority } from "@/types";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT, PRIORITIES, PRIORITY_ORDER } from "@/constants/taskCategories";
 import { CATEGORIES } from "@/constants/categories";
 import { fmtHour } from "@/utils/time";
 import { HOUR_END } from "@/constants/time";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const DURATIONS = [0.5, 1, 2, 3] as const;
 const CAT_KEYS = Object.keys(CATEGORIES);
@@ -53,87 +56,80 @@ export default function SlotCreateModal({
 
   return (
     <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+      <div onClick={onClose} className="fixed inset-0 z-40" />
 
       <div
-        style={{
-          position: "fixed", left: Math.max(12, left), top: Math.max(12, top), width: W, zIndex: 41,
-          background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12,
-          boxShadow: "0 12px 40px rgba(0,0,0,.28)", padding: 14,
-          display: "flex", flexDirection: "column", gap: 10,
-        }}
+        className="fixed z-[41] flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3.5 shadow-[0_12px_40px_rgba(0,0,0,.28)]"
+        style={{ left: Math.max(12, left), top: Math.max(12, top), width: W }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-            <strong style={{ color: "var(--text-secondary)" }}>{dayLabel}</strong> · {fmtHour(startHour)}
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] text-muted-foreground">
+            <strong className="text-secondary-foreground">{dayLabel}</strong> · {fmtHour(startHour)}
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+          <button onClick={onClose} className="cursor-pointer text-base leading-none text-muted-foreground hover:text-foreground">×</button>
         </div>
 
         {!editing && (
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => setTab("activity")} style={typeBtn(tab === "activity")}>
-              <span style={{ fontSize: 13 }}>📌</span> Actividad
-            </button>
-            <button onClick={() => setTab("task")} style={typeBtn(tab === "task")}>
-              <span style={{ fontSize: 13 }}>💬</span> Tarea
-            </button>
+          <div className="flex gap-1.5">
+            <TypeButton active={tab === "activity"} onClick={() => setTab("activity")} icon="📌" label="Actividad" />
+            <TypeButton active={tab === "task"} onClick={() => setTab("task")} icon="💬" label="Tarea" />
           </div>
         )}
 
-        <input
+        <Input
           autoFocus
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) save(); if (e.key === "Escape") onClose(); }}
           placeholder={tab === "activity" ? "Nombre de la actividad" : "¿Qué hay que hablar? (ej. ¿Excursión?)"}
-          style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface-1)", color: "var(--text-primary)", fontSize: 13, outline: "none" }}
+          className="bg-secondary text-[13px]"
         />
 
-        <textarea
+        <Textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder={tab === "activity" ? "Nota…" : "Qué se va a discutir / decidir…"}
           rows={2}
-          style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--surface-1)", color: "var(--text-secondary)", fontSize: 12, outline: "none", resize: "vertical", lineHeight: 1.4 }}
+          className="min-h-0 bg-secondary text-xs leading-normal"
         />
 
         <div>
-          <div style={labelStyle}>CATEGORÍA</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+          <div className="mb-1.5 text-[10px] font-semibold tracking-[.06em] text-muted-foreground">CATEGORÍA</div>
+          <div className="flex flex-wrap gap-[5px]">
             {tab === "activity"
               ? CAT_KEYS.map((key) => {
                   const c = CATEGORIES[key];
                   const active = actCat === key;
                   return (
-                    <button key={key} onClick={() => setActCat(key)} style={chip(active, c.bg, c.border, c.text)}>
-                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: c.dot, flexShrink: 0 }} />{c.label}
-                    </button>
+                    <Chip key={key} active={active} bg={c.bg} border={c.border} text={c.text} onClick={() => setActCat(key)}>
+                      <span className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ background: c.dot }} />{c.label}
+                    </Chip>
                   );
                 })
               : Object.entries(TASK_CATEGORIES).map(([key, c]) => {
                   const active = taskCat === key;
                   return (
-                    <button key={key} onClick={() => setTaskCat(key)} style={chip(active, c.bg, c.border, c.text)}>
+                    <Chip key={key} active={active} bg={c.bg} border={c.border} text={c.text} onClick={() => setTaskCat(key)}>
                       <span>{c.icon}</span>{c.label}
-                    </button>
+                    </Chip>
                   );
                 })}
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 12 }}>
+        <div className="flex gap-3">
           {tab === "task" && (
-            <div style={{ flex: 1 }}>
-              <div style={labelStyle}>PRIORIDAD</div>
-              <div style={{ display: "flex", gap: 4 }}>
+            <div className="flex-1">
+              <div className="mb-1.5 text-[10px] font-semibold tracking-[.06em] text-muted-foreground">PRIORIDAD</div>
+              <div className="flex gap-1">
                 {PRIORITY_ORDER.map((p) => {
                   const active = priority === p;
                   const pr = PRIORITIES[p];
                   return (
                     <button key={p} onClick={() => setPriority(p)}
-                      style={{ flex: 1, padding: "4px 0", borderRadius: 6, fontSize: 10.5, fontWeight: 600, cursor: "pointer", background: active ? pr.bg : "var(--surface-1)", border: `1px solid ${active ? pr.color : "var(--border)"}`, color: active ? pr.color : "var(--text-muted)" }}>
+                      className={cn("flex-1 cursor-pointer rounded-md border py-1 text-[10.5px] font-semibold", !active && "border-border bg-secondary text-muted-foreground")}
+                      style={active ? { background: pr.bg, borderColor: pr.color, color: pr.color } : undefined}>
                       {pr.label}
                     </button>
                   );
@@ -141,14 +137,17 @@ export default function SlotCreateModal({
               </div>
             </div>
           )}
-          <div style={{ width: tab === "task" ? 116 : "100%" }}>
-            <div style={labelStyle}>DURACIÓN</div>
-            <div style={{ display: "flex", gap: 4 }}>
+          <div className={tab === "task" ? "w-[116px]" : "w-full"}>
+            <div className="mb-1.5 text-[10px] font-semibold tracking-[.06em] text-muted-foreground">DURACIÓN</div>
+            <div className="flex gap-1">
               {DURATIONS.map((d) => {
                 const active = dur === d;
                 return (
                   <button key={d} onClick={() => setDur(d)}
-                    style={{ flex: 1, padding: "4px 0", borderRadius: 6, fontSize: 10.5, fontWeight: 600, cursor: "pointer", background: active ? "#6EE7B733" : "var(--surface-1)", border: `1px solid ${active ? "#6EE7B7" : "var(--border)"}`, color: active ? "var(--text-primary)" : "var(--text-muted)" }}>
+                    className={cn(
+                      "flex-1 cursor-pointer rounded-md border py-1 text-[10.5px] font-semibold",
+                      active ? "border-primary bg-primary/20 text-foreground" : "border-border bg-secondary text-muted-foreground",
+                    )}>
                     {d === 0.5 ? "30m" : `${d}h`}
                   </button>
                 );
@@ -157,21 +156,19 @@ export default function SlotCreateModal({
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
-          <button onClick={save} disabled={!canSave}
-            style={{ flex: 1, padding: "8px", borderRadius: 7, border: "none", background: canSave ? "#6EE7B7" : "var(--border)", color: canSave ? "#04342C" : "var(--text-muted)", fontWeight: 700, cursor: canSave ? "pointer" : "default", fontSize: 13 }}>
+        <div className="mt-0.5 flex gap-1.5">
+          <Button onClick={save} disabled={!canSave} className="flex-1 font-bold">
             {editing ? "✓ Guardar cambios" : tab === "activity" ? "✓ Agregar actividad" : "✓ Agregar tarea"}
-          </button>
+          </Button>
           {editing && onDeleteTask && (
-            <button onClick={onDeleteTask}
-              style={{ padding: "8px 12px", borderRadius: 7, border: "1px solid #F09595", background: "#FCEBEB", color: "#A32D2D", cursor: "pointer", fontSize: 13, fontWeight: 500 }}>
+            <Button variant="outline" onClick={onDeleteTask} className="border-[#F09595] bg-[#FCEBEB] text-[#A32D2D] hover:bg-[#FCEBEB]/80 hover:text-[#A32D2D]">
               Eliminar
-            </button>
+            </Button>
           )}
         </div>
 
         {tab === "activity" && !editing && (
-          <div style={{ fontSize: 10, color: "var(--text-muted)", textAlign: "center", lineHeight: 1.4 }}>
+          <div className="text-center text-[10px] leading-snug text-muted-foreground">
             Al guardar podrás ajustar horas, rangos y gastos en el panel.
           </div>
         )}
@@ -180,25 +177,31 @@ export default function SlotCreateModal({
   );
 }
 
-const labelStyle: CSSProperties = { fontSize: 10, fontWeight: 600, color: "var(--text-muted)", letterSpacing: ".06em", marginBottom: 6 };
-
-function chip(active: boolean, bg: string, border: string, text: string): CSSProperties {
-  return {
-    display: "flex", alignItems: "center", gap: 4, padding: "4px 9px", borderRadius: 20,
-    fontSize: 11, fontWeight: 500, cursor: "pointer",
-    background: active ? bg : "var(--surface-1)",
-    border: `1.5px solid ${active ? border : "var(--border)"}`,
-    color: active ? text : "var(--text-muted)",
-    boxShadow: active ? `0 0 0 2px ${border}33` : "none",
-  };
+function TypeButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: string; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex flex-1 cursor-pointer items-center justify-center gap-[5px] rounded-lg border py-[7px] text-[12.5px] font-semibold",
+        active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-secondary text-muted-foreground",
+      )}
+    >
+      <span className="text-[13px]">{icon}</span> {label}
+    </button>
+  );
 }
 
-function typeBtn(active: boolean): CSSProperties {
-  return {
-    flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-    padding: "7px 0", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer",
-    background: active ? "#6EE7B7" : "var(--surface-1)",
-    border: `1px solid ${active ? "#6EE7B7" : "var(--border)"}`,
-    color: active ? "#04342C" : "var(--text-muted)",
-  };
+function Chip({ active, bg, border, text, onClick, children }: {
+  active: boolean; bg: string; border: string; text: string;
+  onClick: () => void; children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn("flex cursor-pointer items-center gap-1 rounded-full border-[1.5px] px-[9px] py-1 text-[11px] font-medium", !active && "border-border bg-secondary text-muted-foreground")}
+      style={active ? { background: bg, borderColor: border, color: text, boxShadow: `0 0 0 2px ${border}33` } : undefined}
+    >
+      {children}
+    </button>
+  );
 }

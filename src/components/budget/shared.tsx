@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
-import type { CSSProperties } from "react";
 import type { Extra, Day } from "@/types";
 import { CATEGORIES } from "@/constants/categories";
+import { cn } from "@/lib/utils";
 
 export type Currency = "USD" | "COP";
 export type SplitMode = "group" | "perPerson";
@@ -17,21 +17,16 @@ export function parse(raw: string) {
   return parseFloat(raw.replace(/\./g, "").replace(",", ".")) || 0;
 }
 
-export const TH: CSSProperties = { padding: "10px 12px", fontSize: 11, color: "var(--text-muted)", fontWeight: 600, letterSpacing: ".06em", borderBottom: "1px solid var(--border)" };
-
-export const calcNum: CSSProperties = { width: 80, textAlign: "right", fontSize: 13, fontFamily: "monospace", color: "var(--text-muted)", fontStyle: "italic", display: "inline-block" };
-
-export const subLine: CSSProperties = { fontSize: 10, color: "var(--text-muted)", textAlign: "right", fontFamily: "monospace", marginTop: 1 };
-
-export function actionBtn(bg: string, color: string, bordered = false): CSSProperties {
-  return { background: bg, border: bordered ? "1px solid var(--border)" : "none", borderRadius: 5, color, cursor: "pointer", fontSize: bordered ? 13 : 14, fontWeight: 700, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center" };
-}
+export const TH_CLASS = "px-3 py-2.5 text-[11px] font-semibold tracking-[.06em] text-muted-foreground border-b border-border";
+export const CELL_CLASS = "px-3 py-2.5 border-b border-border align-middle";
+export const CALC_NUM_CLASS = "inline-block w-20 text-right font-mono text-[13px] italic text-muted-foreground";
+export const SUB_LINE_CLASS = "mt-px text-right font-mono text-[10px] text-muted-foreground";
 
 export function SectionHeader({ label, hint }: { label: string; hint: string }) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em" }}>{label}</div>
-      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{hint}</div>
+    <div className="mb-3">
+      <div className="text-xs font-bold tracking-[.06em]">{label}</div>
+      <div className="mt-0.5 text-[11px] text-muted-foreground">{hint}</div>
     </div>
   );
 }
@@ -45,7 +40,8 @@ export function InlineNumber({ value, onChange, width = 80 }: { value: number; o
       onFocus={() => setRaw(value === 0 ? "" : String(Math.round(value)))}
       onBlur={() => { if (raw !== null) onChange(raw); setRaw(null); }}
       onChange={(e) => { setRaw(e.target.value); onChange(e.target.value); }}
-      style={{ width, background: "none", border: "none", color: "var(--text-primary)", fontSize: 13, fontFamily: "monospace", textAlign: "right", outline: "none" }}
+      className="border-none bg-transparent text-right font-mono text-[13px] text-foreground outline-none"
+      style={{ width }}
     />
   );
 }
@@ -53,7 +49,10 @@ export function InlineNumber({ value, onChange, width = 80 }: { value: number; o
 export function CurrencyToggle({ currency, onClick }: { currency: Currency; onClick: () => void }) {
   return (
     <button onClick={onClick}
-      style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 5, border: "1px solid var(--border)", background: currency === "COP" ? "#4ADE8022" : "#60A5FA22", color: currency === "COP" ? "#4ADE80" : "#60A5FA", cursor: "pointer", flexShrink: 0 }}>
+      className={cn(
+        "shrink-0 cursor-pointer rounded-[5px] border border-border px-1.5 py-0.5 text-[10px] font-bold",
+        currency === "COP" ? "bg-[#4ADE8022] text-[#16A34A]" : "bg-[#60A5FA22] text-[#2563EB]",
+      )}>
       {currency}
     </button>
   );
@@ -61,20 +60,19 @@ export function CurrencyToggle({ currency, onClick }: { currency: Currency; onCl
 
 // Grupal: fixed total split across people. Por persona: unit cost that scales with people.
 export function ModeToggle({ mode, onChange }: { mode: SplitMode; onChange: (m: SplitMode) => void }) {
-  const opts: { id: SplitMode; label: string; color: string }[] = [
-    { id: "group",     label: "Grupal",      color: "#60A5FA" },
-    { id: "perPerson", label: "Por persona", color: "#F59E0B" },
+  const opts: { id: SplitMode; label: string; cls: string }[] = [
+    { id: "group",     label: "Grupal",      cls: "bg-[#60A5FA22] text-[#2563EB]" },
+    { id: "perPerson", label: "Por persona", cls: "bg-[#F59E0B22] text-[#B45309]" },
   ];
   return (
-    <div style={{ display: "inline-flex", marginTop: 6, borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)" }}>
+    <div className="mt-1.5 inline-flex overflow-hidden rounded-md border border-border">
       {opts.map((o) => (
         <button key={o.id} onClick={() => onChange(o.id)} type="button"
           title={o.id === "group" ? "Total fijo, se divide entre viajeros" : "Costo por viajero, escala con la cantidad"}
-          style={{
-            padding: "2px 8px", fontSize: 10, fontWeight: 600, cursor: "pointer", border: "none", lineHeight: 1.6,
-            background: mode === o.id ? `${o.color}22` : "transparent",
-            color: mode === o.id ? o.color : "var(--text-muted)",
-          }}>
+          className={cn(
+            "cursor-pointer border-none px-2 py-0.5 text-[10px] font-semibold leading-relaxed",
+            mode === o.id ? o.cls : "bg-transparent text-muted-foreground",
+          )}>
           {o.label}
         </button>
       ))}
@@ -90,18 +88,21 @@ export function EventLinkCell({ extra, days, onLink }: { extra: Extra; days: Day
 
   if (linked) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, padding: "2px 7px 2px 5px", borderRadius: 20, background: cat?.bg ?? "var(--surface-1)", border: `1px solid ${cat?.border ?? "var(--border)"}`, color: cat?.text ?? "var(--text-secondary)", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          <span style={{ width: 5, height: 5, borderRadius: "50%", background: cat?.dot ?? "#888", flexShrink: 0 }} />
+      <div className="flex items-center gap-1">
+        <span
+          className="flex max-w-[130px] items-center gap-1 truncate rounded-full border py-0.5 pl-[5px] pr-[7px] text-[11px]"
+          style={{ background: cat?.bg, borderColor: cat?.border, color: cat?.text }}
+        >
+          <span className="h-[5px] w-[5px] shrink-0 rounded-full" style={{ background: cat?.dot ?? "#888" }} />
           {linked.ev.title}
         </span>
-        <button onClick={() => onLink(undefined)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+        <button onClick={() => onLink(undefined)} className="cursor-pointer text-[13px] leading-none text-muted-foreground hover:text-foreground">×</button>
       </div>
     );
   }
   return (
     <select value="" onChange={(e) => e.target.value && onLink(e.target.value)}
-      style={{ fontSize: 11, color: "var(--text-muted)", background: "transparent", border: "1px dashed var(--border)", borderRadius: 6, padding: "2px 5px", cursor: "pointer", outline: "none" }}>
+      className="cursor-pointer rounded-md border border-dashed border-border bg-transparent px-[5px] py-0.5 text-[11px] text-muted-foreground outline-none">
       <option value="">— vincular —</option>
       {days.map((d) => d.events.length > 0 && (
         <optgroup key={d.id} label={d.label}>

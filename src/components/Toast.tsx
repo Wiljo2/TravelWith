@@ -1,4 +1,6 @@
+"use client";
 import { useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { fmtHour } from "@/utils/time";
 import type { ToastAction } from "@/types";
 
@@ -22,65 +24,31 @@ export default function Toast({ action, onUndo, onDismiss }: ToastProps) {
 
   return (
     <div
-      style={{
-        position: "fixed",
-        bottom: 24,
-        left: "50%",
-        transform: `translateX(-50%) translateY(${action ? 0 : 80}px)`,
-        opacity: action ? 1 : 0,
-        transition: "transform .22s cubic-bezier(.2,.8,.4,1), opacity .18s ease",
-        pointerEvents: action ? "auto" : "none",
-        zIndex: 200,
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        background: "#1F1E1B",
-        color: "#F7F6F2",
-        borderRadius: 10,
-        padding: "12px 16px 12px 18px",
-        boxShadow: "0 6px 24px rgba(0,0,0,.28)",
-        fontSize: 13,
-        whiteSpace: "nowrap",
-      }}
+      className={cn(
+        "fixed bottom-6 left-1/2 z-[200] flex -translate-x-1/2 items-center gap-4 whitespace-nowrap rounded-[10px] bg-[#1F1E1B] py-3 pl-[18px] pr-4 text-[13px] text-[#F7F6F2] shadow-[0_6px_24px_rgba(0,0,0,.28)] transition-all duration-200",
+        action ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-20 opacity-0",
+      )}
     >
       {action && (
         <>
           <span>
-            <strong style={{ fontWeight: 600 }}>{action.title}</strong>
+            <strong className="font-semibold">{action.title}</strong>
             {" movida · "}
-            <span style={{ fontVariantNumeric: "tabular-nums", opacity: .8 }}>
+            <span className="tabular-nums opacity-80">
               {fmtHour(action.newStart)} – {fmtHour(action.newEnd)}
             </span>
           </span>
 
           <button
             onClick={onUndo}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#6EE7B7",
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: "pointer",
-              padding: "2px 4px",
-              borderRadius: 4,
-            }}
+            className="cursor-pointer rounded px-1 py-0.5 text-[13px] font-semibold text-primary"
           >
             Deshacer
           </button>
 
           <button
             onClick={onDismiss}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#888780",
-              fontSize: 16,
-              lineHeight: 1,
-              cursor: "pointer",
-              padding: "2px 4px",
-              borderRadius: 4,
-            }}
+            className="cursor-pointer rounded px-1 py-0.5 text-base leading-none text-muted-foreground"
             aria-label="Cerrar"
           >
             ×

@@ -1,7 +1,11 @@
+"use client";
 import { useState } from "react";
 import { CATEGORIES } from "@/constants/categories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
-import { inputStyle } from "@/utils/styles";
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import type { CalendarEvent } from "@/types";
 
 const CAT_KEYS = Object.keys(CATEGORIES) as (keyof typeof CATEGORIES)[];
@@ -25,35 +29,32 @@ interface EventEditorProps {
 }
 
 export default function EventEditor({ ev, onChange, onDelete, deleteLabel = "Eliminar actividad" }: EventEditorProps) {
-  const activeCat = CATEGORIES[ev.cat] ?? CATEGORIES.logist;
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-      <input
+    <div className="flex flex-col gap-[9px]">
+      <Input
         value={ev.title}
         onChange={(e) => onChange({ title: e.target.value })}
-        style={inputStyle()}
+        className="bg-secondary text-[12.5px]"
       />
 
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className="flex gap-2">
         <TimeField label="Inicio" value={ev.start} min={HOUR_START} max={HOUR_END - 0.25}
           onChange={(v) => onChange({ start: v })} />
         <TimeField label="Fin" value={ev.end} min={HOUR_START + 0.25} max={HOUR_END}
           onChange={(v) => onChange({ end: v })} />
       </div>
 
-      <textarea
+      <Textarea
         value={ev.note}
         onChange={(e) => onChange({ note: e.target.value })}
         placeholder="Nota..."
         rows={2}
-        style={inputStyle({ resize: "vertical", lineHeight: 1.4 })}
+        className="min-h-0 bg-secondary text-[12.5px] leading-snug"
       />
 
-      {/* Category picker */}
       <div>
-        <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>Categoría</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+        <div className="mb-1.5 text-[11px] text-muted-foreground">Categoría</div>
+        <div className="flex flex-wrap gap-[5px]">
           {CAT_KEYS.map((key) => {
             const c = CATEGORIES[key];
             const active = ev.cat === key;
@@ -61,18 +62,13 @@ export default function EventEditor({ ev, onChange, onDelete, deleteLabel = "Eli
               <button
                 key={key}
                 onClick={() => onChange({ cat: key })}
-                style={{
-                  display: "flex", alignItems: "center", gap: 5,
-                  padding: "4px 9px", borderRadius: 20, fontSize: 11, fontWeight: 500,
-                  cursor: "pointer",
-                  background: active ? c.bg : "var(--surface-1)",
-                  border: `1.5px solid ${active ? c.border : "var(--border)"}`,
-                  color: active ? c.text : "var(--text-muted)",
-                  boxShadow: active ? `0 0 0 2px ${c.border}33` : "none",
-                  transition: "all .12s",
-                }}
+                className={cn(
+                  "flex cursor-pointer items-center gap-[5px] rounded-full border-[1.5px] px-[9px] py-1 text-[11px] font-medium transition-all",
+                  !active && "border-border bg-secondary text-muted-foreground",
+                )}
+                style={active ? { background: c.bg, borderColor: c.border, color: c.text, boxShadow: `0 0 0 2px ${c.border}33` } : undefined}
               >
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: c.dot, flexShrink: 0 }} />
+                <span className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ background: c.dot }} />
                 {c.label}
               </button>
             );
@@ -80,12 +76,13 @@ export default function EventEditor({ ev, onChange, onDelete, deleteLabel = "Eli
         </div>
       </div>
 
-      <button
+      <Button
+        variant="outline"
         onClick={onDelete}
-        style={{ border: "1px solid #F09595", background: "#FCEBEB", color: "#A32D2D", borderRadius: 6, padding: "6px 0", fontSize: 12, cursor: "pointer", fontWeight: 500 }}
+        className="w-full border-[#F09595] bg-[#FCEBEB] text-xs font-medium text-[#A32D2D] hover:bg-[#FCEBEB]/80 hover:text-[#A32D2D]"
       >
         {deleteLabel}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -116,14 +113,14 @@ function TimeField({ label, value, min, max, onChange }: TimeFieldProps) {
   }
 
   return (
-    <label style={{ flex: 1, fontSize: 11, color: "var(--text-secondary)" }}>
+    <label className="flex-1 text-[11px] text-secondary-foreground">
       {label}
-      <input
+      <Input
         type="time"
         value={displayed}
         onChange={(e) => handleChange(e.target.value)}
         onBlur={handleBlur}
-        style={inputStyle({ width: "100%", marginTop: 3, fontFamily: "monospace" })}
+        className="mt-[3px] w-full bg-secondary font-mono text-[12.5px]"
       />
     </label>
   );

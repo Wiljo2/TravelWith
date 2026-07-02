@@ -8,39 +8,32 @@ export default function TaskPreviewCard({ tasks }: { tasks: Task[] }) {
   const done    = tasks.filter((t) => t.done);
 
   return (
-    <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, padding: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>Tareas</div>
+    <div className="rounded-[10px] border border-border bg-card p-3.5">
+      <div className="mb-2.5 flex items-center justify-between">
+        <div className="text-[13px] font-semibold">Tareas</div>
         {pending.length > 0 && (
-          <div style={{
-            fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20,
-            background: "rgba(239,159,39,.12)", border: "1px solid rgba(239,159,39,.3)",
-            color: "#A36200",
-          }}>
+          <div className="rounded-full border border-[rgba(239,159,39,.3)] bg-[rgba(239,159,39,.12)] px-[7px] py-0.5 text-[10px] font-bold text-[#A36200]">
             {pending.length} pendiente{pending.length !== 1 ? "s" : ""}
           </div>
         )}
       </div>
 
       {pending.length === 0 ? (
-        <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: "10px 0" }}>
+        <div className="py-2.5 text-center text-xs text-muted-foreground">
           {tasks.length === 0 ? "Sin tareas aún" : "¡Todo al día!"}
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        <div className="flex flex-col gap-[5px]">
           {pending.slice(0, MAX_SHOW).map((t) => (
-            <div key={t.id} style={{ display: "flex", alignItems: "flex-start", gap: 7, fontSize: 12 }}>
-              <span style={{
-                width: 14, height: 14, borderRadius: 4, border: "1.5px solid var(--border)",
-                flexShrink: 0, marginTop: 1, display: "inline-block",
-              }} />
-              <span style={{ color: "var(--text-secondary)", lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div key={t.id} className="flex items-start gap-[7px] text-xs">
+              <span className="mt-px inline-block h-3.5 w-3.5 shrink-0 rounded border-[1.5px] border-border" />
+              <span className="truncate leading-snug text-secondary-foreground">
                 {t.title}
               </span>
             </div>
           ))}
           {pending.length > MAX_SHOW && (
-            <div style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 21 }}>
+            <div className="pl-[21px] text-[11px] text-muted-foreground">
               y {pending.length - MAX_SHOW} más...
             </div>
           )}
@@ -48,7 +41,7 @@ export default function TaskPreviewCard({ tasks }: { tasks: Task[] }) {
       )}
 
       {done.length > 0 && (
-        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)", fontSize: 11, color: "var(--text-muted)" }}>
+        <div className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
           {done.length} completada{done.length !== 1 ? "s" : ""}
         </div>
       )}

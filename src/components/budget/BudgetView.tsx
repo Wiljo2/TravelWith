@@ -2,11 +2,12 @@
 import type { Extra, Day, RoomMember } from "@/types";
 import type { MockPerson } from "@/hooks/useRoom";
 import { usdToCop, fmtUSDNum, fmtCOPNum, extraGroupUSD } from "@/utils/currency";
-import { TH, SectionHeader } from "@/components/budget/shared";
+import { TH_CLASS, SectionHeader } from "@/components/budget/shared";
 import GlobalExtraRow from "@/components/budget/GlobalExtraRow";
 import DayExtraRow from "@/components/budget/DayExtraRow";
 import DayTimeline from "@/components/budget/DayTimeline";
 import TravelersCard from "@/components/budget/TravelersCard";
+import { cn } from "@/lib/utils";
 
 interface BudgetViewProps {
   extras: Extra[];
@@ -24,6 +25,8 @@ interface BudgetViewProps {
   onRemoveMockPerson: (id: string) => void;
 }
 
+const ADD_BTN = "w-full cursor-pointer rounded-[7px] border border-dashed border-border bg-transparent px-3.5 py-[5px] text-xs text-muted-foreground hover:text-foreground";
+
 export default function BudgetView({
   extras, grandTotal, exchangeRate, members, mockPeople, days,
   onSetExchangeRate, onUpdateExtra, onLinkExtra, onAddExtra, onRemoveExtra,
@@ -39,14 +42,14 @@ export default function BudgetView({
   const globalTotal = [...globalExtras, ...linkedExtras].reduce((s, e) => s + extraGroupUSD(e, people, exchangeRate), 0);
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "28px 36px" }}>
+    <div className="flex-1 overflow-y-auto px-9 py-7">
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Presupuesto del viaje</h2>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, padding: "5px 12px" }}>
-          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>TRM</span>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-bold">Presupuesto del viaje</h2>
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-[5px]">
+          <span className="text-xs text-muted-foreground">TRM</span>
           <input type="number" value={exchangeRate} onChange={(e) => onSetExchangeRate(parseFloat(e.target.value) || 4000)}
-            style={{ width: 72, background: "none", border: "none", color: "var(--text-primary)", fontSize: 13, fontWeight: 600, textAlign: "right", outline: "none" }} />
+            className="w-[72px] border-none bg-transparent text-right text-[13px] font-semibold text-foreground outline-none" />
         </div>
       </div>
 
@@ -59,14 +62,14 @@ export default function BudgetView({
       />
 
       <SectionHeader label="GASTOS GLOBALES" hint="Costos fijos del viaje (tiquetes, crucero)" />
-      <table style={{ width: "100%", borderCollapse: "collapse", background: "var(--surface-2)", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", marginBottom: 32 }}>
+      <table className="mb-8 w-full border-collapse overflow-hidden rounded-xl border border-border bg-card">
         <thead>
           <tr>
-            <th style={{ ...TH, textAlign: "left", width: "26%" }}>CONCEPTO</th>
-            <th style={{ ...TH, textAlign: "left" }}>ACTIVIDAD</th>
-            <th style={{ ...TH, textAlign: "right", width: 160 }}>TOTAL GRUPO</th>
-            <th style={{ ...TH, textAlign: "right", width: 130 }}>POR PERSONA</th>
-            <th style={{ ...TH, width: 60 }} />
+            <th className={cn(TH_CLASS, "w-[26%] text-left")}>CONCEPTO</th>
+            <th className={cn(TH_CLASS, "text-left")}>ACTIVIDAD</th>
+            <th className={cn(TH_CLASS, "w-40 text-right")}>TOTAL GRUPO</th>
+            <th className={cn(TH_CLASS, "w-[130px] text-right")}>POR PERSONA</th>
+            <th className={cn(TH_CLASS, "w-[60px]")} />
           </tr>
         </thead>
         <tbody>
@@ -77,16 +80,16 @@ export default function BudgetView({
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={5} style={{ padding: "8px 12px", borderTop: "1px solid var(--border)" }}>
-              <button onClick={() => onAddExtra()} style={{ background: "none", border: "1px dashed var(--border)", borderRadius: 7, padding: "5px 14px", fontSize: 12, color: "var(--text-muted)", cursor: "pointer", width: "100%" }}>+ Añadir gasto global</button>
+            <td colSpan={5} className="border-t border-border px-3 py-2">
+              <button onClick={() => onAddExtra()} className={ADD_BTN}>+ Añadir gasto global</button>
             </td>
           </tr>
           {(globalExtras.length > 0 || linkedExtras.length > 0) && (
-            <tr style={{ background: "color-mix(in srgb, #6EE7B7 6%, transparent)" }}>
-              <td colSpan={2} style={{ padding: "10px 12px", fontWeight: 700, fontSize: 13, borderTop: "2px solid var(--border)" }}>Subtotal</td>
-              <td style={{ padding: "10px 12px", textAlign: "right", borderTop: "2px solid var(--border)", fontFamily: "monospace", fontWeight: 700 }}>${fmtUSDNum(globalTotal)}</td>
-              <td style={{ padding: "10px 12px", textAlign: "right", borderTop: "2px solid var(--border)", fontFamily: "monospace", fontWeight: 700 }}>${fmtUSDNum(globalTotal / people)}</td>
-              <td style={{ borderTop: "2px solid var(--border)" }} />
+            <tr className="bg-primary/5">
+              <td colSpan={2} className="border-t-2 border-border px-3 py-2.5 text-[13px] font-bold">Subtotal</td>
+              <td className="border-t-2 border-border px-3 py-2.5 text-right font-mono font-bold">${fmtUSDNum(globalTotal)}</td>
+              <td className="border-t-2 border-border px-3 py-2.5 text-right font-mono font-bold">${fmtUSDNum(globalTotal / people)}</td>
+              <td className="border-t-2 border-border" />
             </tr>
           )}
         </tfoot>
@@ -95,15 +98,15 @@ export default function BudgetView({
       <SectionHeader label="GASTOS POR DÍA" hint="Hospedaje, comidas y excursiones distribuidas en el rango de días" />
 
       {dayExtras.length > 0 && (
-        <table style={{ width: "100%", borderCollapse: "collapse", background: "var(--surface-2)", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", marginBottom: 16 }}>
+        <table className="mb-4 w-full border-collapse overflow-hidden rounded-xl border border-border bg-card">
           <thead>
             <tr>
-              <th style={{ ...TH, textAlign: "left", width: "22%" }}>CONCEPTO</th>
-              <th style={{ ...TH, textAlign: "left" }}>RANGO</th>
-              <th style={{ ...TH, textAlign: "right", width: 170 }}>TOTAL / DIARIO</th>
-              <th style={{ ...TH, textAlign: "right", width: 130 }}>POR PERSONA</th>
-              <th style={{ ...TH, textAlign: "left" }}>ACTIVIDAD</th>
-              <th style={{ ...TH, width: 60 }} />
+              <th className={cn(TH_CLASS, "w-[22%] text-left")}>CONCEPTO</th>
+              <th className={cn(TH_CLASS, "text-left")}>RANGO</th>
+              <th className={cn(TH_CLASS, "w-[170px] text-right")}>TOTAL / DIARIO</th>
+              <th className={cn(TH_CLASS, "w-[130px] text-right")}>POR PERSONA</th>
+              <th className={cn(TH_CLASS, "text-left")}>ACTIVIDAD</th>
+              <th className={cn(TH_CLASS, "w-[60px]")} />
             </tr>
           </thead>
           <tbody>
@@ -114,9 +117,8 @@ export default function BudgetView({
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={6} style={{ padding: "8px 12px", borderTop: "1px solid var(--border)" }}>
-                <button onClick={() => onAddExtra({ startDayId: days[0]?.id, endDayId: days[0]?.id })}
-                  style={{ background: "none", border: "1px dashed var(--border)", borderRadius: 7, padding: "5px 14px", fontSize: 12, color: "var(--text-muted)", cursor: "pointer", width: "100%" }}>+ Añadir gasto por días</button>
+              <td colSpan={6} className="border-t border-border px-3 py-2">
+                <button onClick={() => onAddExtra({ startDayId: days[0]?.id, endDayId: days[0]?.id })} className={ADD_BTN}>+ Añadir gasto por días</button>
               </td>
             </tr>
           </tfoot>
@@ -125,24 +127,24 @@ export default function BudgetView({
 
       {(dayExtras.length > 0 || linkedExtras.length > 0) ? (
         <>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", letterSpacing: ".06em", marginBottom: 10 }}>DISTRIBUCIÓN POR DÍA</div>
+          <div className="mb-2.5 text-[11px] font-bold tracking-[.06em] text-muted-foreground">DISTRIBUCIÓN POR DÍA</div>
           <DayTimeline dayExtras={dayExtras} linkedExtras={linkedExtras} days={days} exchangeRate={exchangeRate} people={people} />
         </>
       ) : (
         <button onClick={() => onAddExtra({ startDayId: days[0]?.id, endDayId: days[0]?.id })}
-          style={{ background: "none", border: "1px dashed var(--border)", borderRadius: 10, padding: "20px", fontSize: 13, color: "var(--text-muted)", cursor: "pointer", width: "100%", textAlign: "center" }}>
+          className="w-full cursor-pointer rounded-[10px] border border-dashed border-border bg-transparent p-5 text-center text-[13px] text-muted-foreground hover:text-foreground">
           + Añadir primer gasto por días<br />
-          <span style={{ fontSize: 11, opacity: .7 }}>Hospedaje, comidas, excursiones…</span>
+          <span className="text-[11px] opacity-70">Hospedaje, comidas, excursiones…</span>
         </button>
       )}
 
-      <div style={{ marginTop: 28 }}>
-        <div style={{ background: "color-mix(in srgb, #6EE7B7 10%, transparent)", border: "1px solid rgba(110,231,183,.4)", borderRadius: 12, padding: "16px 20px" }}>
-          <div style={{ fontSize: 11, color: "#6EE7B7", fontWeight: 600, marginBottom: 6, letterSpacing: ".06em" }}>TOTAL DEL VIAJE</div>
-          <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "monospace" }}>{fmtUSDNum(grandTotal)} <span style={{ fontSize: 12, fontWeight: 400 }}>USD</span></div>
-          <div style={{ fontSize: 13, color: "var(--text-secondary)", fontFamily: "monospace", marginTop: 2 }}>{fmtCOPNum(totalCOP)} COP</div>
-          <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-secondary)" }}>
-            <span style={{ fontWeight: 600 }}>{fmtUSDNum(grandTotal / people)}</span> por persona · {fmtCOPNum(usdToCop(grandTotal / people, exchangeRate))} COP
+      <div className="mt-7">
+        <div className="rounded-xl border border-primary/40 bg-primary/10 px-5 py-4">
+          <div className="mb-1.5 text-[11px] font-semibold tracking-[.06em] text-emerald-700">TOTAL DEL VIAJE</div>
+          <div className="font-mono text-[22px] font-bold">{fmtUSDNum(grandTotal)} <span className="text-xs font-normal">USD</span></div>
+          <div className="mt-0.5 font-mono text-[13px] text-secondary-foreground">{fmtCOPNum(totalCOP)} COP</div>
+          <div className="mt-2.5 text-xs text-secondary-foreground">
+            <span className="font-semibold">{fmtUSDNum(grandTotal / people)}</span> por persona · {fmtCOPNum(usdToCop(grandTotal / people, exchangeRate))} COP
           </div>
         </div>
       </div>

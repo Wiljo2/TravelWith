@@ -65,9 +65,10 @@ All trip state is stored as **a single JSONB `payload`** in the `rooms` table. O
 
 ### Components
 - Table-editing convention: local state + `dirty` flag + ✓/✕ commit/cancel buttons (see `GlobalExtraRow`). New editing features follow this pattern.
-- Inline styles with CSS variables (`var(--surface-2)`, `var(--border)`, …). This is the project idiom: don't half-introduce CSS modules or styled-components; if it ever migrates, migrate fully.
+- **Styling: Tailwind v4 + shadcn/ui.** Use theme tokens (`bg-card`, `text-muted-foreground`, `border-border`, `bg-primary`) — never raw hex for foundational surfaces. shadcn primitives (`Button`, `Input`, `Textarea`, `Dialog`, `Badge`, `Checkbox`, …) before hand-rolled elements. Inline `style` is allowed **only** for data-driven values (computed positions in the calendar, category colors from `CATEGORIES`/`TASK_CATEGORIES` records). The theme lives in `globals.css` `:root` — the warm palette is mapped to shadcn tokens; change colors there, not in components.
 - No unnecessary comments — only state constraints the code can't express.
 - Use the `@/` alias (configured in tsconfig) instead of deep relative imports (`../../../../../lib`).
+- No file over ~400 lines: split into composed subcomponents (see `components/budget/`).
 
 ### Don't break what exists
 - Don't change a shared callback signature (`onAddEvent`, `onUpdateExtra`, …) without updating **all** callers in the same commit; the typechecker is the guardian: `npx tsc --noEmit` must pass before every commit.

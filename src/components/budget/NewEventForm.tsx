@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import EventEditor from "@/components/editor/EventEditor";
+import { Button } from "@/components/ui/button";
 import type { CalendarEvent } from "@/types";
 
 interface NewEventFormProps {
@@ -24,9 +25,9 @@ export default function NewEventForm({ defaultHour, dayLabel, onSave, onCancel }
   const canSave = draft.title.trim().length > 0 && draft.end > draft.start;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-        <strong style={{ color: "var(--text-secondary)" }}>{dayLabel}</strong>
+    <div className="flex flex-col gap-[9px]">
+      <div className="text-[11px] text-muted-foreground">
+        <strong className="text-secondary-foreground">{dayLabel}</strong>
       </div>
 
       <EventEditor
@@ -36,20 +37,15 @@ export default function NewEventForm({ defaultHour, dayLabel, onSave, onCancel }
         deleteLabel="Cancelar"
       />
 
-      <button
+      <Button
         onClick={() => canSave && onSave(draft.title.trim(), draft.start, draft.end, draft.note ?? "")}
         disabled={!canSave}
-        style={{
-          width: "100%", padding: "8px", borderRadius: 6, border: "none",
-          background: canSave ? "#6EE7B7" : "var(--border)",
-          color: canSave ? "#04342C" : "var(--text-muted)",
-          fontWeight: 700, cursor: canSave ? "pointer" : "default", fontSize: 13,
-        }}
+        className="w-full font-bold"
       >
         ✓ Guardar actividad
-      </button>
+      </Button>
 
-      <div style={{ fontSize: 10.5, color: "var(--text-muted)", lineHeight: 1.4, textAlign: "center" }}>
+      <div className="text-center text-[10.5px] leading-snug text-muted-foreground">
         Al guardar podrás agregar rangos y gastos vinculados.
       </div>
     </div>

@@ -2,6 +2,8 @@
 import { useState } from "react";
 import type { Day, DaySpan, TripSpan } from "@/types";
 import { SPAN_COLORS } from "@/constants/spanColors";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface CalendarSpansCardProps {
   days: Day[];
@@ -33,43 +35,38 @@ function SpanCard({ label, bg, border, onRename, onDelete, onColor, subtitle }: 
   const active = matchColor(bg, border);
   const preview = previewColor(bg, border);
   return (
-    <div style={{ borderRadius: 8, overflow: "hidden", border: `1px solid var(--border)` }}>
-      <div style={{ height: 6, background: preview, opacity: .7 }} />
-      <div style={{ padding: "8px 10px", background: "var(--surface-1)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+    <div className="overflow-hidden rounded-lg border border-border">
+      <div className="h-1.5 opacity-70" style={{ background: preview }} />
+      <div className="bg-secondary px-2.5 py-2">
+        <div className="mb-[7px] flex items-center gap-1.5">
           {editing ? (
-            <input
+            <Input
               autoFocus
               defaultValue={label ?? ""}
               onBlur={(e) => { onRename(e.target.value); setEditing(false); }}
               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditing(false); }}
-              style={{ flex: 1, fontSize: 12, padding: "2px 6px", borderRadius: 5, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--text-primary)", outline: "none" }}
+              className="h-auto flex-1 bg-card px-1.5 py-0.5 text-xs"
             />
           ) : (
             <span
               onClick={() => setEditing(true)}
               title="Clic para editar nombre"
-              style={{ flex: 1, fontSize: 12, fontWeight: 500, color: "var(--text-primary)", cursor: "text" }}
+              className="flex-1 cursor-text text-xs font-medium text-foreground"
             >
-              {label || <em style={{ color: "var(--text-muted)", fontWeight: 400 }}>Sin nombre — clic para editar</em>}
+              {label || <em className="font-normal text-muted-foreground">Sin nombre — clic para editar</em>}
             </span>
           )}
           <button onClick={onDelete} title="Eliminar fondo"
-            style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 15, padding: "0 2px", lineHeight: 1 }}>×</button>
+            className="cursor-pointer px-0.5 text-[15px] leading-none text-muted-foreground hover:text-foreground">×</button>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        <div className="flex items-center gap-[5px]">
           {SPAN_COLORS.map((c) => (
             <button key={c.id} onClick={() => onColor(c.bg, c.border)} title={c.label}
-              style={{
-                width: 18, height: 18, borderRadius: "50%", padding: 0, cursor: "pointer",
-                background: c.border, flexShrink: 0,
-                border: active?.id === c.id ? `2.5px solid var(--text-primary)` : "2px solid transparent",
-                boxShadow: active?.id === c.id ? `0 0 0 1px ${c.border}` : "none",
-                transition: "all .1s",
-              }}
+              className={cn("h-[18px] w-[18px] shrink-0 cursor-pointer rounded-full p-0 transition-all", active?.id === c.id ? "border-[2.5px] border-foreground" : "border-2 border-transparent")}
+              style={{ background: c.border, boxShadow: active?.id === c.id ? `0 0 0 1px ${c.border}` : "none" }}
             />
           ))}
-          <span style={{ marginLeft: 6, fontSize: 10, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+          <span className="ml-1.5 flex-1 truncate text-[10px] text-muted-foreground">
             {subtitle}
           </span>
         </div>
@@ -91,31 +88,24 @@ export default function CalendarSpansCard({
   const allEvents = days.flatMap((d) => d.events);
 
   return (
-    <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+    <div className="overflow-hidden rounded-[10px] border border-border bg-card">
       <button
         onClick={() => setOpen((v) => !v)}
-        style={{
-          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "11px 14px", background: "none", border: "none",
-          color: "var(--text-primary)", cursor: "pointer", fontSize: 13, fontWeight: 600,
-        }}
+        className="flex w-full cursor-pointer items-center justify-between px-3.5 py-[11px] text-[13px] font-semibold text-foreground"
       >
         <span>Fondos del calendario</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div className="flex items-center gap-1.5">
           {total > 0 && (
-            <span style={{
-              fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 20,
-              background: "var(--surface-1)", border: "1px solid var(--border)", color: "var(--text-muted)",
-            }}>{total}</span>
+            <span className="rounded-full border border-border bg-secondary px-[7px] py-0.5 text-[10px] font-bold text-muted-foreground">{total}</span>
           )}
-          <span style={{ fontSize: 14, opacity: .4 }}>{open ? "▲" : "▼"}</span>
+          <span className="text-sm opacity-40">{open ? "▲" : "▼"}</span>
         </div>
       </button>
 
       {open && (
-        <div style={{ borderTop: "1px solid var(--border)", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 7 }}>
+        <div className="flex flex-col gap-[7px] border-t border-border px-3.5 py-2.5">
           {total === 0 && (
-            <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: "8px 0", lineHeight: 1.5 }}>
+            <p className="py-2 text-center text-xs leading-normal text-muted-foreground">
               Sin fondos. Selecciona una actividad y usa la sección <strong>RANGOS</strong> para crear uno.
             </p>
           )}

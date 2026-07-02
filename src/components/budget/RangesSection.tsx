@@ -2,6 +2,9 @@
 import { useState } from "react";
 import type { CalendarEvent, Day, TripSpan } from "@/types";
 import { SPAN_COLORS } from "@/constants/spanColors";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface RangesSectionProps {
   selectedEvent: { ev: CalendarEvent; dayId: string };
@@ -42,24 +45,24 @@ export default function RangesSection({
   }
 
   return (
-    <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", letterSpacing: ".06em", marginBottom: 8 }}>RANGOS</div>
+    <div className="mt-3.5 border-t border-border pt-3">
+      <div className="mb-2 text-[11px] font-semibold tracking-[.06em] text-muted-foreground">RANGOS</div>
 
       {mySpans.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+        <div className="mb-2 flex flex-col gap-1">
           {mySpans.map((s) => {
             const spanRole = s.startEventId === selectedEvent.ev.id ? "inicio" : "fin";
             const partnerEventId = spanRole === "inicio" ? s.endEventId : s.startEventId;
             const partnerEntry = allEvents.find((x) => x.ev.id === partnerEventId);
             return (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: s.border, flexShrink: 0 }} />
-                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-primary)" }}>
+              <div key={s.id} className="flex items-center gap-1.5 text-xs">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: s.border }} />
+                <span className="flex-1 truncate text-foreground">
                   {s.label ?? "Rango"} · {spanRole}
-                  {partnerEntry && <span style={{ color: "var(--text-muted)" }}> → {partnerEntry.day.label} · {partnerEntry.ev.title}</span>}
+                  {partnerEntry && <span className="text-muted-foreground"> → {partnerEntry.day.label} · {partnerEntry.ev.title}</span>}
                 </span>
                 <button onClick={() => onRemoveTripSpan(s.id)}
-                  style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14, padding: "0 2px", lineHeight: 1 }}>×</button>
+                  className="cursor-pointer px-0.5 text-sm leading-none text-muted-foreground hover:text-foreground">×</button>
               </div>
             );
           })}
@@ -67,28 +70,32 @@ export default function RangesSection({
       )}
 
       {showForm ? (
-        <div style={{ background: "var(--surface-1)", border: "1px solid var(--border)", borderRadius: 8, padding: 10 }}>
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Etiqueta del rango"
-            style={{ width: "100%", boxSizing: "border-box", padding: "5px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--text-primary)", fontSize: 12, outline: "none", marginBottom: 7 }} />
+        <div className="rounded-lg border border-border bg-secondary p-2.5">
+          <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Etiqueta del rango"
+            className="mb-[7px] bg-card text-xs" />
 
-          <div style={{ display: "flex", gap: 6, marginBottom: 7 }}>
+          <div className="mb-[7px] flex gap-1.5">
             {SPAN_COLORS.map((c) => (
               <button key={c.id} onClick={() => setColor(c.id)} title={c.label}
-                style={{ width: 20, height: 20, borderRadius: "50%", border: color === c.id ? `2px solid ${c.border}` : "2px solid transparent", background: c.border, cursor: "pointer", padding: 0, boxShadow: color === c.id ? `0 0 0 2px ${c.border}44` : "none" }} />
+                className={cn("h-5 w-5 cursor-pointer rounded-full p-0", color === c.id ? "border-2" : "border-2 border-transparent")}
+                style={{ background: c.border, borderColor: color === c.id ? c.border : undefined, boxShadow: color === c.id ? `0 0 0 2px ${c.border}44` : "none" }} />
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: 5, marginBottom: 7 }}>
+          <div className="mb-[7px] flex gap-[5px]">
             {(["start", "end"] as const).map((r) => (
               <button key={r} onClick={() => setRole(r)}
-                style={{ flex: 1, padding: "4px 0", borderRadius: 6, border: "1px solid var(--border)", background: role === r ? "#6EE7B7" : "var(--surface-2)", color: role === r ? "#04342C" : "var(--text-muted)", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                className={cn(
+                  "flex-1 cursor-pointer rounded-md border py-1 text-[11px] font-semibold",
+                  role === r ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground",
+                )}>
                 {r === "start" ? "Este evento es INICIO" : "Este evento es FIN"}
               </button>
             ))}
           </div>
 
           <select value={partnerId} onChange={(e) => setPartnerId(e.target.value)}
-            style={{ width: "100%", fontSize: 11, background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 8px", color: "var(--text-primary)", outline: "none", marginBottom: 8 }}>
+            className="mb-2 w-full rounded-md border border-border bg-card px-2 py-[5px] text-[11px] text-foreground outline-none">
             <option value="">— {role === "start" ? "¿Hasta qué evento?" : "¿Desde qué evento?"} —</option>
             {days.map((d) => {
               const opts = d.events.filter((e) => e.id !== selectedEvent.ev.id);
@@ -101,16 +108,14 @@ export default function RangesSection({
             })}
           </select>
 
-          <div style={{ display: "flex", gap: 5 }}>
-            <button onClick={saveSpan} disabled={!partnerId}
-              style={{ flex: 1, padding: "6px", borderRadius: 6, border: "none", background: partnerId ? "#6EE7B7" : "var(--border)", color: partnerId ? "#04342C" : "var(--text-muted)", fontWeight: 700, cursor: partnerId ? "pointer" : "default", fontSize: 12 }}>✓ Crear</button>
-            <button onClick={() => { setShowForm(false); setLabel(""); setPartnerId(""); }}
-              style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}>✕</button>
+          <div className="flex gap-[5px]">
+            <Button onClick={saveSpan} disabled={!partnerId} size="sm" className="flex-1 font-bold">✓ Crear</Button>
+            <Button variant="outline" size="sm" onClick={() => { setShowForm(false); setLabel(""); setPartnerId(""); }} className="text-muted-foreground">✕</Button>
           </div>
         </div>
       ) : (
         <button onClick={() => setShowForm(true)}
-          style={{ width: "100%", padding: "5px", borderRadius: 6, border: "1px dashed var(--border)", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}>
+          className="w-full cursor-pointer rounded-md border border-dashed border-border bg-transparent py-[5px] text-[11px] text-muted-foreground hover:text-foreground">
           + Crear rango desde este evento
         </button>
       )}

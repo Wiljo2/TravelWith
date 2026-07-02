@@ -1,11 +1,12 @@
+"use client";
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { CATEGORIES } from "@/constants/categories";
 import { HOUR_START, PX_PER_HOUR } from "@/constants/time";
 import { fmtHour, durLabel } from "@/utils/time";
+import { cn } from "@/lib/utils";
 import type { CalendarEvent, Category } from "@/types";
 
-// Conflict color scheme — warm red/orange to make overlaps unmistakable
 const CONFLICT_CAT: Category = {
   label:  "Conflicto",
   bg:     "rgba(239,68,68,.10)",
@@ -25,20 +26,18 @@ interface EventCardProps {
   style?: CSSProperties;
 }
 
-// Shared card renderer used by both real blocks and the drag ghost
+// Shared card renderer used by both real blocks and the drag ghost.
+// Category colors are data-driven, so they stay as inline styles.
 export function EventCard({ ev, start, end, height, selected, cat, conflict, style = {} }: EventCardProps) {
   const c = conflict ? CONFLICT_CAT : cat;
   const punctual = end <= start;
   return (
     <div
+      className="h-full overflow-hidden rounded-[7px] px-[7px] py-1"
       style={{
         background: c.bg,
         border: `1px solid ${c.border}`,
         borderLeft: `3px solid ${c.border}`,
-        borderRadius: 7,
-        padding: "4px 7px",
-        overflow: "hidden",
-        height: "100%",
         boxShadow: selected
           ? `0 0 0 2px ${c.border}`
           : conflict
@@ -48,35 +47,24 @@ export function EventCard({ ev, start, end, height, selected, cat, conflict, sty
       }}
     >
       {conflict && (
-        <div style={{
-          display: "inline-block", fontSize: 9, fontWeight: 700,
-          color: "#EF4444", letterSpacing: ".04em",
-          marginBottom: 1,
-        }}>
+        <div className="mb-px inline-block text-[9px] font-bold tracking-[.04em] text-destructive">
           ⚠ CONFLICTO
         </div>
       )}
       <div
-        style={{
-          fontSize: 12,
-          fontWeight: 500,
-          color: c.text,
-          lineHeight: 1.25,
-          whiteSpace: height < 40 ? "nowrap" : "normal",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
+        className={cn("overflow-hidden text-ellipsis text-xs font-medium leading-tight", height < 40 && "whitespace-nowrap")}
+        style={{ color: c.text }}
       >
         {ev.title}
       </div>
       {height >= 40 && (
-        <div style={{ fontSize: 10.5, color: c.border, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
+        <div className="mt-0.5 text-[10.5px] tabular-nums" style={{ color: c.border }}>
           {punctual ? fmtHour(start) : `${fmtHour(start)} – ${fmtHour(end)}`}
           {!punctual && ` · ${durLabel(start, end)}`}
         </div>
       )}
       {height >= 64 && ev.note && (
-        <div style={{ fontSize: 10.5, color: c.text, opacity: 0.7, marginTop: 3, lineHeight: 1.3 }}>
+        <div className="mt-[3px] text-[10.5px] leading-snug opacity-70" style={{ color: c.text }}>
           {ev.note}
         </div>
       )}
@@ -146,17 +134,8 @@ export default function EventBlock({
       onClick={(e) => { e.stopPropagation(); onSelect(ev.id); }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      style={{
-        position: "absolute",
-        top,
-        left: slotL,
-        width: slotW,
-        height,
-        cursor: "grab",
-        userSelect: "none",
-        opacity: dragging ? 0 : 1,
-        transition: "opacity .08s",
-      }}
+      className={cn("absolute cursor-grab select-none transition-opacity duration-[80ms]", dragging ? "opacity-0" : "opacity-100")}
+      style={{ top, left: slotL, width: slotW, height }}
       title="Arrastra para mover · clic para editar"
     >
       <EventCard

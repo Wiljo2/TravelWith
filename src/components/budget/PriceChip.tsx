@@ -1,3 +1,6 @@
+"use client";
+import { cn } from "@/lib/utils";
+
 interface PriceChipProps {
   label: string;
   value: string;
@@ -9,22 +12,29 @@ interface PriceChipProps {
 export default function PriceChip({ label, value, sub, accent, strong }: PriceChipProps) {
   return (
     <div
-      style={{
-        background: strong ? "#26215C" : accent ? "#E1F5EE" : "var(--surface-2)",
-        border: `1px solid ${strong ? "#26215C" : accent ? "#0F6E56" : "var(--border)"}`,
-        borderRadius: 10,
-        padding: "8px 14px",
-        minWidth: 110,
-      }}
+      className={cn(
+        "min-w-[110px] rounded-[10px] border px-3.5 py-2",
+        strong
+          ? "border-[#26215C] bg-[#26215C]"
+          : accent
+            ? "border-[#0F6E56] bg-accent"
+            : "border-border bg-card",
+      )}
     >
-      <div style={{ fontSize: 10.5, color: strong ? "#CECBF6" : accent ? "#0F6E56" : "var(--text-secondary)", fontWeight: 500 }}>
+      <div className={cn(
+        "text-[10.5px] font-medium",
+        strong ? "text-[#CECBF6]" : accent ? "text-[#0F6E56]" : "text-secondary-foreground",
+      )}>
         {label}
       </div>
-      <div style={{ fontSize: 18, fontWeight: 600, color: strong ? "#fff" : accent ? "#04342C" : "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
+      <div className={cn(
+        "text-lg font-semibold tabular-nums",
+        strong ? "text-white" : accent ? "text-accent-foreground" : "text-foreground",
+      )}>
         {value}
       </div>
       {sub && (
-        <div style={{ fontSize: 10, color: strong ? "#AFA9EC" : "var(--text-muted)" }}>
+        <div className={cn("text-[10px]", strong ? "text-[#AFA9EC]" : "text-muted-foreground")}>
           {sub}
         </div>
       )}

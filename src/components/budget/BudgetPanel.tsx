@@ -43,10 +43,10 @@ export default function BudgetPanel({
   const pendingDay = pendingNew ? days.find((d) => d.id === pendingNew.dayId) : null;
 
   return (
-    <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className="flex w-[300px] shrink-0 flex-col gap-2.5">
 
-      <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, padding: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+      <div className="rounded-[10px] border border-border bg-card p-3.5">
+        <div className="mb-2.5 text-[13px] font-semibold">
           {selectedEvent ? "Editar actividad" : pendingNew ? "Nueva actividad" : "Selecciona un bloque"}
         </div>
 
@@ -77,7 +77,7 @@ export default function BudgetPanel({
             onCancel={onCancelNew}
           />
         ) : (
-          <div style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+          <div className="text-[12.5px] leading-normal text-secondary-foreground">
             Haz clic en cualquier espacio vacío del calendario para agregar una actividad.
           </div>
         )}

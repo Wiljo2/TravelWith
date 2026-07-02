@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import HourGutter from "./HourGutter";
 import DayColumn from "./DayColumn";
+import { cn } from "@/lib/utils";
 import type { Day, CalendarEvent, DragPreview, TripSpan, DaySpan, Task } from "@/types";
 import { CATEGORIES } from "@/constants/categories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
@@ -99,41 +100,23 @@ export default function CalendarGrid({
   return (
     <div
       ref={containerRef}
-      style={{
-        flex: "1 1 0", minWidth: 0,
-        display: "flex", flexDirection: "column",
-        background: "var(--surface-2)",
-        border: "1px solid var(--border)",
-        borderRadius: 10,
-        overflow: "hidden",
-      }}
+      className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-border bg-card"
     >
       {/* Category legend */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: 8, padding: "0 12px",
-        height: 34, flexShrink: 0, overflowX: "auto",
-        borderBottom: "1px solid var(--border)",
-        background: "var(--surface-0)",
-      }}>
+      <div className="flex h-[34px] shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-background px-3">
         {Object.entries(CATEGORIES).map(([, c]) => (
-          <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0 }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: c.dot, flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{c.label}</span>
+          <div key={c.label} className="flex shrink-0 items-center gap-1 whitespace-nowrap">
+            <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: c.dot }} />
+            <span className="text-[11px] text-muted-foreground">{c.label}</span>
           </div>
         ))}
       </div>
 
       {/* Navigation bar */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "6px 10px 6px 6px",
-        borderBottom: "1px solid var(--border)",
-        background: "var(--surface-1)",
-        gap: 8, minHeight: 38,
-      }}>
+      <div className="flex min-h-[38px] items-center justify-between gap-2 border-b border-border bg-secondary py-1.5 pl-1.5 pr-2.5">
         <NavArrow dir="left" enabled={idx > 0} onClick={goLeft} />
 
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, justifyContent: "center" }}>
+        <div className="flex flex-1 items-center justify-center gap-1.5">
           {days.map((d, i) => {
             const isVisible = i >= idx && i < idx + visible;
             return (
@@ -141,12 +124,10 @@ export default function CalendarGrid({
                 key={d.id}
                 onClick={() => setStartIdx(Math.min(i, maxStart))}
                 title={d.label}
-                style={{
-                  width: isVisible ? 20 : 8, height: 8,
-                  borderRadius: 4, border: "none",
-                  background: isVisible ? "#6EE7B7" : "var(--border)",
-                  cursor: "pointer", padding: 0, transition: "all .2s", flexShrink: 0,
-                }}
+                className={cn(
+                  "h-2 shrink-0 cursor-pointer rounded border-none p-0 transition-all duration-200",
+                  isVisible ? "w-5 bg-primary" : "w-2 bg-border",
+                )}
               />
             );
           })}
@@ -156,10 +137,10 @@ export default function CalendarGrid({
       </div>
 
       {/* Calendar body */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      <div className="flex flex-1 overflow-hidden">
         {/* Gutter: header spacer height matches day column header (56px) */}
-        <div style={{ width: GUTTER_W, flexShrink: 0 }}>
-          <div style={{ height: 56, borderBottom: "1px solid var(--border)" }} />
+        <div className="shrink-0" style={{ width: GUTTER_W }}>
+          <div className="h-14 border-b border-border" />
           <HourGutter />
         </div>
 
@@ -202,15 +183,10 @@ function NavArrow({ dir, enabled, onClick }: { dir: "left" | "right"; enabled: b
   return (
     <button
       onClick={onClick} disabled={!enabled}
-      style={{
-        width: 32, height: 32, borderRadius: 8, border: "1px solid var(--border)",
-        background: enabled ? "var(--surface-2)" : "transparent",
-        color: enabled ? "var(--text-primary)" : "var(--border)",
-        cursor: enabled ? "pointer" : "default",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 18, fontWeight: 300, flexShrink: 0,
-        transition: "background .15s, color .15s",
-      }}
+      className={cn(
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-lg font-light transition-colors",
+        enabled ? "cursor-pointer bg-card text-foreground hover:bg-secondary" : "bg-transparent text-border",
+      )}
     >
       {dir === "left" ? "‹" : "›"}
     </button>

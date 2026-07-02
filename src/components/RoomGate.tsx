@@ -2,6 +2,12 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRooms } from "@/hooks/useUserRooms";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 
 interface RoomGateProps {
   onEnter: (code: string) => void;
@@ -68,127 +74,89 @@ export default function RoomGate({ onEnter }: RoomGateProps) {
   }
 
   return (
-    <div style={{
-      minHeight: "100vh", display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center",
-      background: "var(--surface-1)", padding: "20px 16px",
-    }}>
-      {/* Brand */}
-      <div style={{ textAlign: "center", marginBottom: 36 }}>
-        <div style={{ fontSize: 40, marginBottom: 8 }}>🚢</div>
-        <h1 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 700 }}>TravelWith</h1>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-secondary px-4 py-5">
+      <div className="mb-9 text-center">
+        <div className="mb-2 text-[40px]">🚢</div>
+        <h1 className="mb-1 text-[22px] font-bold">TravelWith</h1>
+        <p className="text-[13px] text-secondary-foreground">
           Wonder of the Seas · Bahamas · Nov 2026
         </p>
       </div>
 
-      <div style={{ width: "100%", maxWidth: 380 }}>
+      <div className="w-full max-w-[380px]">
 
-        {/* ── NOT LOGGED IN ── */}
         {authLoading ? (
-          <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>Cargando...</div>
+          <div className="text-center text-[13px] text-muted-foreground">Cargando...</div>
         ) : !user ? (
-          <div style={{
-            background: "var(--surface-2)", border: "1px solid var(--border)",
-            borderRadius: 14, padding: "32px 28px", textAlign: "center",
-          }}>
-            <p style={{ margin: "0 0 20px", fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-              Inicia sesión para ver tus viajes y colaborar en tiempo real con tu grupo.
-            </p>
-            <button
-              onClick={signInWithGoogle}
-              style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10,
-                width: "100%", padding: "12px 20px", borderRadius: 10,
-                border: "1px solid var(--border)", background: "var(--surface-1)",
-                color: "var(--text-primary)", cursor: "pointer", fontSize: 15, fontWeight: 500,
-              }}
-            >
-              <GoogleIcon />
-              Continuar con Google
-            </button>
-          </div>
+          <Card className="rounded-[14px]">
+            <CardContent className="px-7 py-2 text-center">
+              <p className="mb-5 text-sm leading-relaxed text-secondary-foreground">
+                Inicia sesión para ver tus viajes y colaborar en tiempo real con tu grupo.
+              </p>
+              <Button variant="outline" size="lg" onClick={signInWithGoogle} className="w-full gap-2.5 bg-secondary text-[15px]">
+                <GoogleIcon />
+                Continuar con Google
+              </Button>
+            </CardContent>
+          </Card>
 
         ) : (
-          /* ── LOGGED IN ── */
           <>
-            {/* User header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="mb-5 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
                 {user.user_metadata?.avatar_url
-                  ? <img src={user.user_metadata.avatar_url as string} alt="" width={36} height={36} style={{ borderRadius: "50%", border: "2px solid var(--border)" }} />
-                  : <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#6EE7B7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, color: "#04342C" }}>
+                  ? <img src={user.user_metadata.avatar_url as string} alt="" width={36} height={36} className="rounded-full border-2 border-border" />
+                  : <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-[15px] font-bold text-primary-foreground">
                       {String(user.user_metadata?.full_name ?? user.email ?? "?")[0].toUpperCase()}
                     </div>
                 }
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>
+                  <div className="text-sm font-semibold">
                     {String(user.user_metadata?.full_name ?? user.email)}
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{user.email}</div>
+                  <div className="text-[11px] text-muted-foreground">{user.email}</div>
                 </div>
               </div>
-              <button
-                onClick={signOut}
-                style={{ background: "none", border: "1px solid var(--border)", color: "var(--text-muted)", cursor: "pointer", fontSize: 12, padding: "5px 10px", borderRadius: 6 }}
-              >
+              <Button variant="outline" size="sm" onClick={signOut} className="text-xs text-muted-foreground">
                 Salir
-              </button>
+              </Button>
             </div>
 
-            {/* Mis viajes */}
-            <div style={{ marginBottom: 16 }}>
-              <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", letterSpacing: ".07em" }}>
+            <div className="mb-4">
+              <p className="mb-2.5 text-[11px] font-semibold tracking-[.07em] text-muted-foreground">
                 MIS VIAJES
               </p>
 
               {rooms.length === 0 ? (
-                <div style={{
-                  background: "var(--surface-2)", border: "1px dashed var(--border)",
-                  borderRadius: 12, padding: "22px", textAlign: "center",
-                  color: "var(--text-muted)", fontSize: 13,
-                }}>
+                <div className="rounded-xl border border-dashed border-border bg-card p-[22px] text-center text-[13px] text-muted-foreground">
                   Aún no tienes viajes. Crea uno o únete con un código.
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div className="flex flex-col gap-2">
                   {rooms.map((r) => (
                     <div
                       key={r.room_code}
-                      style={{
-                        display: "flex", alignItems: "center",
-                        borderRadius: 12, border: "1px solid var(--border)",
-                        background: "var(--surface-2)", overflow: "hidden",
-                      }}
+                      className="flex items-center overflow-hidden rounded-xl border border-border bg-card"
                     >
                       <button
                         onClick={() => join(r.room_code)}
                         disabled={loading}
-                        style={{
-                          flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between",
-                          padding: "14px 16px", background: "none", border: "none",
-                          color: "var(--text-primary)", cursor: "pointer", textAlign: "left",
-                        }}
+                        className="flex flex-1 cursor-pointer items-center justify-between px-4 py-3.5 text-left text-foreground hover:bg-secondary"
                       >
                         <div>
-                          <div style={{ fontFamily: "monospace", fontWeight: 700, fontSize: 16, letterSpacing: ".08em" }}>
+                          <div className="font-mono text-base font-bold tracking-[.08em]">
                             {r.room_code}
                           </div>
-                          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3 }}>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">
                             {r.role === "owner" ? "Creador" : "Miembro"} · {new Date(r.joined_at).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}
                           </div>
                         </div>
-                        <span style={{ fontSize: 20, opacity: .35 }}>→</span>
+                        <span className="text-xl opacity-35">→</span>
                       </button>
                       <button
                         onClick={() => setDeleteTarget({ code: r.room_code, role: r.role })}
                         title="Eliminar sesión"
-                        style={{
-                          padding: "0 14px", height: "100%", background: "none",
-                          border: "none", borderLeft: "1px solid var(--border)",
-                          color: "var(--text-muted)", cursor: "pointer", fontSize: 16,
-                          display: "flex", alignItems: "center",
-                        }}
+                        className="flex h-full cursor-pointer items-center self-stretch border-l border-border px-3.5 text-base text-muted-foreground hover:bg-secondary"
                       >
                         🗑
                       </button>
@@ -198,125 +166,67 @@ export default function RoomGate({ onEnter }: RoomGateProps) {
               )}
             </div>
 
-            {/* Join / Create */}
             {!showJoin ? (
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => setShowJoin(true)}
-                  style={{
-                    flex: 1, padding: "11px", borderRadius: 10,
-                    border: "1px solid var(--border)", background: "var(--surface-2)",
-                    color: "var(--text-primary)", fontWeight: 500, cursor: "pointer", fontSize: 13,
-                  }}
-                >
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowJoin(true)} className="flex-1 bg-card">
                   Unirse con código
-                </button>
-                <button
-                  onClick={create}
-                  disabled={loading}
-                  style={{
-                    flex: 1, padding: "11px", borderRadius: 10,
-                    border: "none", background: "#6EE7B7",
-                    color: "#04342C", fontWeight: 600, cursor: "pointer", fontSize: 13,
-                    opacity: loading ? .6 : 1,
-                  }}
-                >
+                </Button>
+                <Button onClick={create} disabled={loading} className="flex-1 font-semibold">
                   {loading ? "Creando..." : "Nuevo viaje"}
-                </button>
+                </Button>
               </div>
             ) : (
-              <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px" }}>
-                <div style={{ display: "flex", gap: 8, marginBottom: error ? 8 : 0 }}>
-                  <input
-                    autoFocus
-                    value={input}
-                    onChange={(e) => setInput(e.target.value.toUpperCase())}
-                    onKeyDown={(e) => e.key === "Enter" && join()}
-                    placeholder="Código de sala"
-                    maxLength={8}
-                    style={{
-                      flex: 1, padding: "10px 12px", borderRadius: 8,
-                      border: "1px solid var(--border)", background: "var(--surface-1)",
-                      color: "var(--text-primary)", fontSize: 15, fontFamily: "monospace",
-                      letterSpacing: ".1em", outline: "none",
-                    }}
-                  />
-                  <button
-                    onClick={() => join()}
-                    disabled={loading || !input.trim()}
-                    style={{
-                      padding: "10px 16px", borderRadius: 8, border: "none",
-                      background: "#6EE7B7", color: "#04342C", fontWeight: 600,
-                      cursor: "pointer", fontSize: 14, opacity: loading || !input.trim() ? .5 : 1,
-                    }}
-                  >
-                    Entrar
-                  </button>
-                  <button
-                    onClick={() => { setShowJoin(false); setError(""); }}
-                    style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}
-                  >
-                    ×
-                  </button>
-                </div>
-                {error && <p style={{ margin: "8px 0 0", fontSize: 12, color: "#f87171" }}>{error}</p>}
-              </div>
+              <Card className="rounded-xl py-4">
+                <CardContent className="px-4">
+                  <div className="flex gap-2">
+                    <Input
+                      autoFocus
+                      value={input}
+                      onChange={(e) => setInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === "Enter" && join()}
+                      placeholder="Código de sala"
+                      maxLength={8}
+                      className="flex-1 bg-secondary font-mono text-[15px] tracking-[.1em]"
+                    />
+                    <Button onClick={() => join()} disabled={loading || !input.trim()} className="font-semibold">
+                      Entrar
+                    </Button>
+                    <Button variant="outline" onClick={() => { setShowJoin(false); setError(""); }} className="text-muted-foreground">
+                      ×
+                    </Button>
+                  </div>
+                  {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+                </CardContent>
+              </Card>
             )}
           </>
         )}
       </div>
 
-      {/* ── Delete confirmation modal ── */}
-      {deleteTarget && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 100,
-          background: "rgba(0,0,0,.45)", backdropFilter: "blur(2px)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: 20,
-        }}>
-          <div style={{
-            background: "var(--surface-2)", border: "1px solid var(--border)",
-            borderRadius: 16, padding: "28px 24px", maxWidth: 360, width: "100%",
-            boxShadow: "0 20px 60px rgba(0,0,0,.3)",
-          }}>
-            <div style={{ fontSize: 24, marginBottom: 12 }}>🗑</div>
-            <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700 }}>
-              {deleteTarget.role === "owner" ? "Eliminar sala" : "Salir de la sala"}
-            </h3>
-            <p style={{ margin: "0 0 6px", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-              {deleteTarget.role === "owner"
-                ? <>¿Eliminar la sala <strong style={{ fontFamily: "monospace" }}>{deleteTarget.code}</strong>? Se perderá el itinerario y todos los miembros perderán acceso.</>
-                : <>¿Salir de la sala <strong style={{ fontFamily: "monospace" }}>{deleteTarget.code}</strong>? Puedes volver a unirte con el mismo código.</>
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="max-w-[360px]">
+          <DialogHeader>
+            <div className="text-2xl">🗑</div>
+            <DialogTitle>
+              {deleteTarget?.role === "owner" ? "Eliminar sala" : "Salir de la sala"}
+            </DialogTitle>
+            <DialogDescription className="leading-normal">
+              {deleteTarget?.role === "owner"
+                ? <>¿Eliminar la sala <strong className="font-mono">{deleteTarget?.code}</strong>? Se perderá el itinerario y todos los miembros perderán acceso.</>
+                : <>¿Salir de la sala <strong className="font-mono">{deleteTarget?.code}</strong>? Puedes volver a unirte con el mismo código.</>
               }
-            </p>
-            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
-              <button
-                onClick={() => setDeleteTarget(null)}
-                disabled={deleting}
-                style={{
-                  flex: 1, padding: "10px", borderRadius: 8,
-                  border: "1px solid var(--border)", background: "none",
-                  color: "var(--text-primary)", cursor: "pointer", fontSize: 13, fontWeight: 500,
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={deleting}
-                style={{
-                  flex: 1, padding: "10px", borderRadius: 8, border: "none",
-                  background: "#EF4444", color: "#fff",
-                  cursor: deleting ? "wait" : "pointer", fontSize: 13, fontWeight: 600,
-                  opacity: deleting ? .6 : 1,
-                }}
-              >
-                {deleting ? "Eliminando..." : deleteTarget.role === "owner" ? "Eliminar sala" : "Salir"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row gap-2">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting} className="flex-1">
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleting} className="flex-1 font-semibold">
+              {deleting ? "Eliminando..." : deleteTarget?.role === "owner" ? "Eliminar sala" : "Salir"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

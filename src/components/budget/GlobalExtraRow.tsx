@@ -1,13 +1,13 @@
 "use client";
 import { useState } from "react";
-import type { CSSProperties } from "react";
 import type { Extra, Day } from "@/types";
 import { fmtUSDNum, fmtCOPNum } from "@/utils/currency";
 import {
-  toUSD, toCOP, parse, actionBtn, calcNum, subLine,
+  toUSD, toCOP, parse, CELL_CLASS, CALC_NUM_CLASS, SUB_LINE_CLASS,
   InlineNumber, CurrencyToggle, ModeToggle, EventLinkCell,
 } from "@/components/budget/shared";
 import type { Currency, SplitMode } from "@/components/budget/shared";
+import { cn } from "@/lib/utils";
 
 interface GlobalExtraRowProps {
   extra: Extra;
@@ -55,42 +55,43 @@ export default function GlobalExtraRow({
   function commit() { onCommit({ amount, label, currency, splitMode: mode }); setDirty(false); }
   function cancel() { setLabel(extra.label); setAmount(extra.amount); setCurrency(extra.currency ?? "USD"); setMode(extra.splitMode ?? "group"); setDirty(false); }
 
-  const cell: CSSProperties = { padding: "10px 12px", borderBottom: "1px solid var(--border)", verticalAlign: "middle" };
-
   return (
-    <tr style={{ background: dirty ? "color-mix(in srgb, #6EE7B7 5%, transparent)" : undefined }}>
-      <td style={cell}>
+    <tr className={cn(dirty && "bg-primary/5")}>
+      <td className={CELL_CLASS}>
         <input value={label} onChange={(e) => { setLabel(e.target.value); setDirty(true); }}
-          style={{ background: "none", border: "none", color: "var(--text-primary)", fontSize: 13, width: "100%", outline: "none" }} />
+          className="w-full border-none bg-transparent text-[13px] text-foreground outline-none" />
         <ModeToggle mode={liveMode} onChange={changeMode} />
       </td>
-      <td style={cell}><EventLinkCell extra={extra} days={days} onLink={onLinkExtra} /></td>
-      <td style={{ ...cell, textAlign: "right" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+      <td className={CELL_CLASS}><EventLinkCell extra={extra} days={days} onLink={onLinkExtra} /></td>
+      <td className={cn(CELL_CLASS, "text-right")}>
+        <div className="flex items-center justify-end gap-1">
           <CurrencyToggle currency={liveCur} onClick={toggleCurrency} />
           {liveMode === "group"
             ? <InlineNumber value={liveCur === "USD" ? groupUSD : groupCOP} onChange={(raw) => { setAmount(parse(raw)); setDirty(true); }} />
-            : <span style={calcNum} title="Calculado: por persona × viajeros">{liveCur === "USD" ? `$${fmtUSDNum(groupUSD)}` : fmtCOPNum(groupCOP)}</span>}
+            : <span className={CALC_NUM_CLASS} title="Calculado: por persona × viajeros">{liveCur === "USD" ? `$${fmtUSDNum(groupUSD)}` : fmtCOPNum(groupCOP)}</span>}
         </div>
-        <div style={subLine}>{liveCur === "USD" ? `${fmtCOPNum(groupCOP)} COP` : `${fmtUSDNum(groupUSD)} USD`}</div>
+        <div className={SUB_LINE_CLASS}>{liveCur === "USD" ? `${fmtCOPNum(groupCOP)} COP` : `${fmtUSDNum(groupUSD)} USD`}</div>
       </td>
-      <td style={{ ...cell, textAlign: "right" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 2 }}>
-          {liveCur === "USD" && <span style={{ fontSize: 13, fontFamily: "monospace", color: "var(--text-muted)" }}>$</span>}
+      <td className={cn(CELL_CLASS, "text-right")}>
+        <div className="flex items-center justify-end gap-0.5">
+          {liveCur === "USD" && <span className="font-mono text-[13px] text-muted-foreground">$</span>}
           {liveMode === "perPerson"
             ? <InlineNumber value={liveCur === "USD" ? paxUSD : paxCOP} onChange={(raw) => { setAmount(parse(raw)); setDirty(true); }} />
-            : <span style={calcNum} title="Calculado: total ÷ viajeros">{liveCur === "USD" ? fmtUSDNum(paxUSD) : fmtCOPNum(paxCOP)}</span>}
-          {liveCur === "COP" && <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 2 }}>COP</span>}
+            : <span className={CALC_NUM_CLASS} title="Calculado: total ÷ viajeros">{liveCur === "USD" ? fmtUSDNum(paxUSD) : fmtCOPNum(paxCOP)}</span>}
+          {liveCur === "COP" && <span className="ml-0.5 text-[10px] text-muted-foreground">COP</span>}
         </div>
-        <div style={subLine}>
+        <div className={SUB_LINE_CLASS}>
           {liveCur === "USD" ? `${fmtCOPNum(paxCOP)} COP` : `$${fmtUSDNum(paxUSD)} USD`}
         </div>
       </td>
-      <td style={{ ...cell, width: 60, padding: "10px 6px" }}>
-        <div style={{ display: "flex", gap: 3, justifyContent: "flex-end" }}>
+      <td className={cn(CELL_CLASS, "w-[60px] px-1.5")}>
+        <div className="flex justify-end gap-[3px]">
           {dirty
-            ? <><button onClick={commit} style={actionBtn("#6EE7B7", "#04342C")}>✓</button><button onClick={cancel} style={actionBtn("var(--surface-1)", "var(--text-muted)", true)}>✕</button></>
-            : <button onClick={onRemove} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 15, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", opacity: .4 }}>×</button>}
+            ? <>
+                <button onClick={commit} className="flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-[5px] bg-primary text-sm font-bold text-primary-foreground">✓</button>
+                <button onClick={cancel} className="flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-[5px] border border-border bg-secondary text-[13px] font-bold text-muted-foreground">✕</button>
+              </>
+            : <button onClick={onRemove} className="flex h-[26px] w-[26px] cursor-pointer items-center justify-center text-[15px] text-muted-foreground opacity-40 hover:opacity-100">×</button>}
         </div>
       </td>
     </tr>

@@ -126,7 +126,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="mx-auto max-w-[1280px] rounded-[14px] p-4">
       <AppHeader
         roomCode={roomCode}
         connected={connected}
@@ -145,7 +145,7 @@ export default function App() {
       <TabBar active={activeTab} onChange={setActiveTab} pendingTaskCount={pendingTaskCount} />
 
       {activeTab === "calendar" && (
-        <div className="app-body">
+        <div className="flex items-start gap-3.5">
           <CalendarGrid
             days={days}
             tripSpans={tripSpans}
@@ -195,7 +195,7 @@ export default function App() {
       )}
 
       {activeTab === "budget" && (
-        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        <div className="flex flex-1 overflow-hidden">
           <BudgetView
             extras={extras}
             grandTotal={grandTotal}

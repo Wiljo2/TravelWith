@@ -1,5 +1,6 @@
 "use client";
 import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 
 export default function AuthButton() {
   const { user, loading, signInWithGoogle, signOut } = useAuth();
@@ -8,19 +9,10 @@ export default function AuthButton() {
 
   if (!user) {
     return (
-      <button
-        onClick={signInWithGoogle}
-        style={{
-          display: "flex", alignItems: "center", gap: 8,
-          padding: "7px 14px", borderRadius: 8,
-          border: "1px solid var(--border)", background: "var(--surface-2)",
-          color: "var(--text-primary)", cursor: "pointer", fontSize: 13, fontWeight: 500,
-          whiteSpace: "nowrap",
-        }}
-      >
+      <Button variant="outline" size="sm" onClick={signInWithGoogle} className="gap-2 whitespace-nowrap bg-card">
         <GoogleIcon />
         Iniciar con Google
-      </button>
+      </Button>
     );
   }
 
@@ -28,20 +20,17 @@ export default function AuthButton() {
   const name = (user.user_metadata?.full_name ?? user.email) as string;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <div className="flex items-center gap-2">
       {avatar
-        ? <img src={avatar} alt={name} width={28} height={28} style={{ borderRadius: "50%", border: "2px solid var(--border)" }} />
-        : <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#6EE7B7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#04342C" }}>{name[0].toUpperCase()}</div>
+        ? <img src={avatar} alt={name} width={28} height={28} className="rounded-full border-2 border-border" />
+        : <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-primary-foreground">{name[0].toUpperCase()}</div>
       }
-      <span style={{ fontSize: 13, color: "var(--text-secondary)", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <span className="max-w-[130px] truncate text-[13px] text-secondary-foreground">
         {name}
       </span>
-      <button
-        onClick={signOut}
-        style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 12, padding: "2px 6px", borderRadius: 4 }}
-      >
+      <Button variant="ghost" size="sm" onClick={signOut} className="h-auto px-1.5 py-0.5 text-xs text-muted-foreground">
         Salir
-      </button>
+      </Button>
     </div>
   );
 }
