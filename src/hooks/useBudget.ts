@@ -1,40 +1,59 @@
 import { useState } from "react";
 import type { Extra } from "../types";
-
-const CRUISE_PRICE_PER_PERSON = 429;
-const GUESTS = 2;
+import { DEFAULT_RATE } from "../utils/currency";
 
 const DEFAULT_EXTRAS: Extra[] = [
-  { id: "x1", label: "Hotel Miami (2 noches)", amount: 360 },
-  { id: "x2", label: "Vuelos ida/vuelta (2 pax)", amount: 700 },
-  { id: "x3", label: "Excursiones / cabanas", amount: 250 },
-  { id: "x4", label: "Comidas + Uber + extras", amount: 500 },
+  // Globales — costo fijo del viaje
+  { id: "cruise", label: "Crucero (2 pax)",          amount: 858,  currency: "USD" },
+  { id: "x2",    label: "Vuelos ida/vuelta (2 pax)", amount: 700,  currency: "USD" },
+  // Por día — distribuidos en un rango de días
+  { id: "x1",    label: "Hotel Miami (2 noches)",    amount: 631000, currency: "COP", startDayId: "d0", endDayId: "d1" },
+  { id: "x3",    label: "Excursiones / cabañas",     amount: 250,  currency: "USD",  startDayId: "d4", endDayId: "d5" },
+  { id: "x4",    label: "Comidas + Uber + extras",   amount: 500,  currency: "USD",  startDayId: "d0", endDayId: "d6" },
 ];
 
-export function useBudget(): {
-  extras: Extra[];
-  cruiseTotal: number;
-  extrasTotal: number;
-  grandTotal: number;
-  pricePerPerson: number;
-  updateExtra: (id: string, patch: Partial<Extra>) => void;
-} {
+export function useBudget() {
   const [extras, setExtras] = useState<Extra[]>(DEFAULT_EXTRAS);
-
-  const cruiseTotal = CRUISE_PRICE_PER_PERSON * GUESTS;
-  const extrasTotal = extras.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const grandTotal = cruiseTotal + extrasTotal;
+  const [exchangeRate, setExchangeRate] = useState<number>(DEFAULT_RATE);
 
   function updateExtra(id: string, patch: Partial<Extra>) {
     setExtras((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   }
 
+  function updateExtraUSD(id: string, usd: number) {
+    updateExtra(id, { amount: usd, currency: "USD" });
+  }
+
+  function updateExtraCOP(id: string, cop: number) {
+    updateExtra(id, { amount: cop, currency: "COP" });
+  }
+
+  function addExtra(partial: Partial<Extra> = {}) {
+    const newExtra: Extra = {
+      id: crypto.randomUUID(),
+      label: "Nuevo gasto",
+      amount: 0,
+      currency: "USD",
+      ...partial,
+    };
+    setExtras((prev) => [...prev, newExtra]);
+    return newExtra.id;
+  }
+
+  function removeExtra(id: string) {
+    setExtras((prev) => prev.filter((x) => x.id !== id));
+  }
+
+  function loadBudget(incoming: Extra[], rate: number) {
+    setExtras(incoming);
+    setExchangeRate(rate);
+  }
+
   return {
-    extras,
-    cruiseTotal,
-    extrasTotal,
-    grandTotal,
-    pricePerPerson: CRUISE_PRICE_PER_PERSON,
-    updateExtra,
+    extras, exchangeRate,
+    setExchangeRate,
+    updateExtra, updateExtraUSD, updateExtraCOP,
+    addExtra, removeExtra,
+    loadBudget,
   };
 }

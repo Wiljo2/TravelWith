@@ -1,5 +1,5 @@
 import { HOUR_START, HOUR_END, PX_PER_HOUR } from "../../constants/time";
-import { fmtHour } from "../../utils/time";
+import { fmtHourShort } from "../../utils/time";
 
 export default function HourGutter() {
   const hours: number[] = [];
@@ -28,7 +28,7 @@ export default function HourGutter() {
               padding: "0 2px",
             }}
           >
-            {fmtHour(h)}
+            {fmtHourShort(h)}
           </span>
         </div>
       ))}

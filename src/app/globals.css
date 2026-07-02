@@ -1,14 +1,9 @@
 :root {
-  /* surface scale */
   --surface-0: #F7F6F2;
   --surface-1: #FBFAF7;
   --surface-2: #ffffff;
-
-  /* borders */
   --border: #E5E3DC;
   --border-strong: #D3D1C7;
-
-  /* text scale */
   --text-primary: #2C2C2A;
   --text-secondary: #5F5E5A;
   --text-muted: #888780;
@@ -33,17 +28,13 @@ body {
   background: var(--surface-0);
 }
 
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-}
-
 h1 {
   margin: 0;
 }
 
-/* App layout */
 .app-shell {
+  max-width: 1280px;
+  margin: 0 auto;
   padding: 16px;
   border-radius: 14px;
 }
@@ -88,4 +79,30 @@ h1 {
   display: flex;
   gap: 14px;
   align-items: flex-start;
+}
+
+/* ── Input states ────────────────────────────────────────────── */
+input,
+textarea,
+select {
+  transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+
+input:hover:not(:focus),
+textarea:hover:not(:focus),
+select:hover:not(:focus) {
+  border-color: var(--border-strong) !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #059669 !important;
+  background-color: #ffffff !important;
+  border-radius: 7px !important;
+  box-shadow:
+    0 0 0 1px #059669,
+    0 0 0 4px rgba(5, 150, 105, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.07) !important;
+  outline: none !important;
 }

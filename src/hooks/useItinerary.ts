@@ -11,8 +11,12 @@ export function useItinerary(): {
   setSelectedId: (id: string | null) => void;
   updateEvent: (patch: Partial<CalendarEvent>) => void;
   deleteEvent: () => void;
-  addEvent: (dayId: string) => void;
+  addEvent: (dayId: string, title: string, start: number, end: number, note?: string) => void;
   moveEvent: (fromDayId: string, toDayId: string, ev: CalendarEvent, newStart: number) => void;
+  loadDays: (days: Day[]) => void;
+  addDaySpan: (dayId: string, span: import("../types").DaySpan) => void;
+  removeDaySpan: (dayId: string, spanId: string) => void;
+  updateDaySpan: (dayId: string, spanId: string, patch: Partial<import("../types").DaySpan>) => void;
 } {
   const [days, setDays] = useState<Day[]>(initialDays);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -48,10 +52,8 @@ export function useItinerary(): {
     setSelectedId(null);
   }
 
-  function addEvent(dayId: string) {
-    // HOUR_START / HOUR_END referenced to satisfy noUnusedLocals — they guard the default times
-    const clampedStart = Math.max(HOUR_START, Math.min(12, HOUR_END - 1));
-    const nev: CalendarEvent = { id: uid(), start: clampedStart, end: clampedStart + 1, title: "Nueva actividad", cat: "miami", note: "" };
+  function addEvent(dayId: string, title: string, start: number, end: number, note = "") {
+    const nev: CalendarEvent = { id: uid(), start, end, title, cat: "miami", note };
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: [...d.events, nev] } : d)));
     setSelectedId(nev.id);
   }
@@ -77,5 +79,25 @@ export function useItinerary(): {
     setSelectedId(ev.id);
   }
 
-  return { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent };
+  function loadDays(incoming: Day[]) {
+    if (Array.isArray(incoming) && incoming.length > 0) setDays(incoming);
+  }
+
+  function addDaySpan(dayId: string, span: import("../types").DaySpan) {
+    setDays((prev) => prev.map((d) => d.id === dayId ? { ...d, spans: [...(d.spans ?? []), span] } : d));
+  }
+
+  function removeDaySpan(dayId: string, spanId: string) {
+    setDays((prev) => prev.map((d) => d.id === dayId ? { ...d, spans: (d.spans ?? []).filter((s) => s.id !== spanId) } : d));
+  }
+
+  function updateDaySpan(dayId: string, spanId: string, patch: Partial<import("../types").DaySpan>) {
+    setDays((prev) => prev.map((d) =>
+      d.id === dayId
+        ? { ...d, spans: (d.spans ?? []).map((s) => s.id === spanId ? { ...s, ...patch } : s) }
+        : d
+    ));
+  }
+
+  return { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, loadDays, addDaySpan, removeDaySpan, updateDaySpan };
 }
