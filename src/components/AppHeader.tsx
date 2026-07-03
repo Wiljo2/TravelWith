@@ -2,18 +2,27 @@
 import AuthButton from "@/components/auth/AuthButton";
 import PriceChip from "@/components/budget/PriceChip";
 import { usdToCop, fmtUSD, fmtCOP } from "@/utils/currency";
+import { fmtTripDates } from "@/utils/tripDays";
 import { cn } from "@/lib/utils";
 import type { SaveState } from "@/hooks/useRoom";
+import type { TripInfo } from "@/types";
 
 interface AppHeaderProps {
   roomCode: string;
   connected: boolean;
   saveState: SaveState;
+  trip: TripInfo | null;
   grandTotal: number;
   exchangeRate: number;
   onReset: () => void;
   onLeaveRoom: () => void;
 }
+
+// Shown for the LOCAL demo room, which has no trip metadata
+const DEMO = {
+  eyebrow: "Wonder of the Seas · Orlando · Miami · Bahamas · CocoCay",
+  title: "Bahamas & Perfect Day · Nov 26 – Dic 4, 2026",
+};
 
 const SAVE_LABEL: Record<SaveState, string> = {
   idle: "",
@@ -23,16 +32,21 @@ const SAVE_LABEL: Record<SaveState, string> = {
 };
 
 export default function AppHeader({
-  roomCode, connected, saveState, grandTotal, exchangeRate, onReset, onLeaveRoom,
+  roomCode, connected, saveState, trip, grandTotal, exchangeRate, onReset, onLeaveRoom,
 }: AppHeaderProps) {
+  const eyebrow = trip ? (trip.destination ?? "Viaje en grupo") : DEMO.eyebrow;
+  const title = trip
+    ? `${trip.name} · ${fmtTripDates(trip.startDate, trip.endDate)}`
+    : DEMO.title;
+
   return (
     <div className="mb-3.5 flex flex-wrap items-end justify-between gap-3.5">
       <div>
         <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#D85A30]">
-          Wonder of the Seas · Orlando · Miami · Bahamas · CocoCay
+          {eyebrow}
         </div>
         <h1 className="mt-0.5 text-2xl font-semibold text-foreground">
-          Bahamas &amp; Perfect Day · Nov 26 – Dic 4, 2026
+          {title}
         </h1>
         <div className="mt-1 text-[13px] text-secondary-foreground">
           Arrastra cualquier bloque para reorganizar el plan · clic para editar horas

@@ -15,13 +15,18 @@ interface RoomGateProps {
 
 export default function RoomGate({ onEnter }: RoomGateProps) {
   const { user, session, loading: authLoading, signInWithGoogle, signOut } = useAuth();
-  const { rooms, addRoom, removeRoom } = useUserRooms(user);
+  const { rooms, addRoom, removeRoom } = useUserRooms(user, session?.access_token);
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showJoin, setShowJoin] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ code: string; role: string } | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [tripName, setTripName] = useState("");
+  const [tripDestination, setTripDestination] = useState("");
+  const [tripStart, setTripStart] = useState("");
+  const [tripEnd, setTripEnd] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ code: string; name: string | null } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   async function registerMember(code: string) {
@@ -48,26 +53,39 @@ export default function RoomGate({ onEnter }: RoomGateProps) {
     onEnter(c);
   }
 
+  const canCreate = tripName.trim().length > 0 && !!tripStart && !!tripEnd && tripStart <= tripEnd;
+
   async function create() {
+    if (!canCreate) return;
     setLoading(true);
-    const res = await fetch("/api/rooms", { method: "POST" });
+    setError("");
+    const res = await fetch("/api/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: tripName.trim(),
+        destination: tripDestination.trim() || undefined,
+        startDate: tripStart,
+        endDate: tripEnd,
+      }),
+    });
     if (!res.ok) {
-      setError("Error al crear la sala.");
+      const data = await res.json().catch(() => null);
+      setError(data?.error ?? "Error al crear el viaje.");
       setLoading(false);
       return;
     }
     const { code } = await res.json();
     await registerMember(code);
-    await addRoom(code, "owner");
+    await addRoom(code, "owner", tripName.trim());
     onEnter(code);
   }
 
+  // Collaborative model: "delete" always means leaving MY view. The room lives
+  // while anyone else still has it; the server deletes it when the last member leaves.
   async function confirmDelete() {
     if (!deleteTarget || !session?.access_token) return;
     setDeleting(true);
-    if (deleteTarget.role === "owner") {
-      await fetch(`/api/rooms/${deleteTarget.code}`, { method: "DELETE" });
-    }
     await removeRoom(deleteTarget.code, session.access_token);
     setDeleting(false);
     setDeleteTarget(null);
@@ -76,10 +94,10 @@ export default function RoomGate({ onEnter }: RoomGateProps) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-secondary px-4 py-5">
       <div className="mb-9 text-center">
-        <div className="mb-2 text-[40px]">🚢</div>
+        <div className="mb-2 text-[40px]">🧳</div>
         <h1 className="mb-1 text-[22px] font-bold">TravelWith</h1>
         <p className="text-[13px] text-secondary-foreground">
-          Wonder of the Seas · Bahamas · Nov 2026
+          Planea viajes en grupo · itinerario, presupuesto y tareas en tiempo real
         </p>
       </div>
 
@@ -144,18 +162,20 @@ export default function RoomGate({ onEnter }: RoomGateProps) {
                         className="flex flex-1 cursor-pointer items-center justify-between px-4 py-3.5 text-left text-foreground hover:bg-secondary"
                       >
                         <div>
-                          <div className="font-mono text-base font-bold tracking-[.08em]">
-                            {r.room_code}
+                          <div className="text-[15px] font-semibold">
+                            {r.name ?? <span className="font-mono tracking-[.08em]">{r.room_code}</span>}
                           </div>
                           <div className="mt-0.5 text-[11px] text-muted-foreground">
-                            {r.role === "owner" ? "Creador" : "Miembro"} · {new Date(r.joined_at).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}
+                            <span className="font-mono tracking-wider">{r.room_code}</span>
+                            {" · "}{r.role === "owner" ? "Creador" : "Miembro"}
+                            {r.trip?.destination && <> · {r.trip.destination}</>}
                           </div>
                         </div>
                         <span className="text-xl opacity-35">→</span>
                       </button>
                       <button
-                        onClick={() => setDeleteTarget({ code: r.room_code, role: r.role })}
-                        title="Eliminar sesión"
+                        onClick={() => setDeleteTarget({ code: r.room_code, name: r.name })}
+                        title="Quitar de mi lista"
                         className="flex h-full cursor-pointer items-center self-stretch border-l border-border px-3.5 text-base text-muted-foreground hover:bg-secondary"
                       >
                         🗑
@@ -166,16 +186,47 @@ export default function RoomGate({ onEnter }: RoomGateProps) {
               )}
             </div>
 
-            {!showJoin ? (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setShowJoin(true)} className="flex-1 bg-card">
-                  Unirse con código
-                </Button>
-                <Button onClick={create} disabled={loading} className="flex-1 font-semibold">
-                  {loading ? "Creando..." : "Nuevo viaje"}
-                </Button>
-              </div>
-            ) : (
+            {showCreate ? (
+              <Card className="rounded-xl py-4">
+                <CardContent className="flex flex-col gap-2.5 px-4">
+                  <div className="text-[11px] font-semibold tracking-[.06em] text-muted-foreground">NUEVO VIAJE</div>
+                  <Input
+                    autoFocus
+                    value={tripName}
+                    onChange={(e) => setTripName(e.target.value)}
+                    placeholder="Nombre del viaje (ej. Bahamas 2026)"
+                    maxLength={80}
+                    className="bg-secondary text-sm"
+                  />
+                  <Input
+                    value={tripDestination}
+                    onChange={(e) => setTripDestination(e.target.value)}
+                    placeholder="Destino (opcional)"
+                    maxLength={80}
+                    className="bg-secondary text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <label className="flex-1 text-[11px] text-secondary-foreground">
+                      Inicio
+                      <Input type="date" value={tripStart} onChange={(e) => setTripStart(e.target.value)} className="mt-1 bg-secondary text-[13px]" />
+                    </label>
+                    <label className="flex-1 text-[11px] text-secondary-foreground">
+                      Fin
+                      <Input type="date" value={tripEnd} min={tripStart || undefined} onChange={(e) => setTripEnd(e.target.value)} className="mt-1 bg-secondary text-[13px]" />
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={create} disabled={loading || !canCreate} className="flex-1 font-semibold">
+                      {loading ? "Creando..." : "Crear viaje"}
+                    </Button>
+                    <Button variant="outline" onClick={() => { setShowCreate(false); setError(""); }} className="text-muted-foreground">
+                      ×
+                    </Button>
+                  </div>
+                  {error && <p className="text-xs text-destructive">{error}</p>}
+                </CardContent>
+              </Card>
+            ) : showJoin ? (
               <Card className="rounded-xl py-4">
                 <CardContent className="px-4">
                   <div className="flex gap-2">
@@ -198,6 +249,15 @@ export default function RoomGate({ onEnter }: RoomGateProps) {
                   {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
                 </CardContent>
               </Card>
+            ) : (
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowJoin(true)} className="flex-1 bg-card">
+                  Unirse con código
+                </Button>
+                <Button onClick={() => setShowCreate(true)} className="flex-1 font-semibold">
+                  Nuevo viaje
+                </Button>
+              </div>
             )}
           </>
         )}
@@ -207,14 +267,12 @@ export default function RoomGate({ onEnter }: RoomGateProps) {
         <DialogContent className="max-w-[360px]">
           <DialogHeader>
             <div className="text-2xl">🗑</div>
-            <DialogTitle>
-              {deleteTarget?.role === "owner" ? "Eliminar sala" : "Salir de la sala"}
-            </DialogTitle>
+            <DialogTitle>Quitar viaje de tu lista</DialogTitle>
             <DialogDescription className="leading-normal">
-              {deleteTarget?.role === "owner"
-                ? <>¿Eliminar la sala <strong className="font-mono">{deleteTarget?.code}</strong>? Se perderá el itinerario y todos los miembros perderán acceso.</>
-                : <>¿Salir de la sala <strong className="font-mono">{deleteTarget?.code}</strong>? Puedes volver a unirte con el mismo código.</>
-              }
+              ¿Quitar <strong>{deleteTarget?.name ?? deleteTarget?.code}</strong> de tus viajes?
+              Los demás miembros lo conservan y puedes volver con el código{" "}
+              <strong className="font-mono">{deleteTarget?.code}</strong>.
+              Si eres el último en salir, el viaje se elimina definitivamente.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-row gap-2">
@@ -222,7 +280,7 @@ export default function RoomGate({ onEnter }: RoomGateProps) {
               Cancelar
             </Button>
             <Button variant="destructive" onClick={confirmDelete} disabled={deleting} className="flex-1 font-semibold">
-              {deleting ? "Eliminando..." : deleteTarget?.role === "owner" ? "Eliminar sala" : "Salir"}
+              {deleting ? "Quitando..." : "Quitar de mi lista"}
             </Button>
           </DialogFooter>
         </DialogContent>

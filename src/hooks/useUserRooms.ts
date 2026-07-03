@@ -1,29 +1,39 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import type { TripInfo } from "@/types";
 
 export interface UserRoom {
   room_code: string;
   role: string;
   joined_at: string;
+  name: string | null;
+  trip: TripInfo | null;
 }
 
-export function useUserRooms(user: User | null) {
+export function useUserRooms(user: User | null, accessToken: string | undefined) {
   const [rooms, setRooms] = useState<UserRoom[]>([]);
 
   useEffect(() => {
-    if (!user || !supabase) {
+    if (!user || !accessToken) {
       setRooms([]);
       return;
     }
-    supabase
-      .from("user_rooms")
-      .select("room_code, role, joined_at")
-      .order("joined_at", { ascending: false })
-      .then(({ data }) => setRooms(data ?? []));
-  }, [user]);
+    fetch("/api/rooms/list", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((items: { code: string; name: string | null; role: string; joined_at: string; trip: TripInfo | null }[]) => {
+        setRooms(items.map((i) => ({
+          room_code: i.code,
+          role: i.role,
+          joined_at: i.joined_at,
+          name: i.name,
+          trip: i.trip,
+        })));
+      })
+      .catch(() => setRooms([]));
+  }, [user, accessToken]);
 
-  async function addRoom(code: string, role: "owner" | "member" = "member") {
+  async function addRoom(code: string, role: "owner" | "member" = "member", name: string | null = null) {
     if (!user || !supabase) return;
     await supabase.from("user_rooms").upsert(
       { user_id: user.id, room_code: code, role },
@@ -31,7 +41,7 @@ export function useUserRooms(user: User | null) {
     );
     setRooms((prev) => {
       if (prev.some((r) => r.room_code === code)) return prev;
-      return [{ room_code: code, role, joined_at: new Date().toISOString() }, ...prev];
+      return [{ room_code: code, role, joined_at: new Date().toISOString(), name, trip: null }, ...prev];
     });
   }
 

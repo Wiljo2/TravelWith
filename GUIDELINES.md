@@ -29,7 +29,56 @@ src/
 supabase/migrations/      Versioned SQL. Only add new files; never edit applied ones.
 ```
 
-**Data flow:** `App.tsx` owns state → flows down via props → children push changes up via callbacks → a debounced `useEffect` (600ms) PATCHes the full payload to `/api/rooms/[code]` → Supabase Realtime notifies other members → `onRemoteUpdate` replaces local state (`skipSave` prevents echo re-saves).
+**Data flow:** `App.tsx` owns state → flows down via props → children push changes up via callbacks → a debounced `useEffect` (600ms, gated on `connected`) PATCHes the full payload to `/api/rooms/[code]` → Supabase Realtime notifies other members → `onRemoteUpdate` replaces local state (`skipSave` prevents echo re-saves).
+
+---
+
+## 1b. Entities and relations
+
+A **room IS a trip** (1:1). Everything about the trip lives in one JSONB payload; membership is relational.
+
+```
+auth.users (Supabase Auth)
+   │ 1:N
+user_rooms (user_id, room_code, role owner|member, joined_at)   ← relational membership
+   │ N:1
+rooms (code PK, name, payload JSONB, members JSONB, updated_at)
+   └── payload: RoomPayload
+        ├── trip?: TripInfo (name, destination?, startDate, endDate)
+        ├── days: Day[] ─── events: CalendarEvent[]
+        │                └─ spans?: DaySpan[]
+        ├── extras: Extra[]        (money; linkedEventId → CalendarEvent, startDayId/endDayId → Day)
+        ├── tripSpans: TripSpan[]  (startEventId/endEventId → CalendarEvent, cross-day)
+        ├── tasks: Task[]          (dayId → Day when scheduled on the calendar)
+        ├── mockPeople: MockPerson[]
+        └── exchangeRate: number
+```
+
+Notes and known trade-offs:
+- **Membership is stored twice**: `rooms.members` (JSONB — display cache with name/avatar, written by POST members) and `user_rooms` (relational — source of truth for "my trips", enforced by RLS). Keep both in sync through the API routes; do not add a third representation.
+- `rooms.name` is **denormalized** from `payload.trip.name` so trip listings don't fetch full payloads. The PATCH route keeps it in sync — never write it from anywhere else.
+- References inside the payload are **by id across arrays** (e.g. `extra.linkedEventId` → an event inside some day). Deleting an event does NOT cascade; consumers must handle dangling ids gracefully (`find(...) ?? null`).
+- New rooms get their initial payload **built server-side** in `POST /api/rooms` (empty days generated from the trip dates). The client demo state (`initialDays`, `DEFAULT_EXTRAS`) is only for the `LOCAL` room and must never leak into real rooms — that's also why autosave is gated on `connected`.
+
+### API surface (Next.js route handlers)
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| POST | `/api/rooms` | Create trip: validates `{name, destination?, startDate, endDate}`, generates days, inserts room |
+| GET | `/api/rooms/list` | Authenticated: trips of the current user (joins `user_rooms` + `rooms`, returns names) |
+| GET | `/api/rooms/[code]` | Room payload + members + `updated_at` |
+| PATCH | `/api/rooms/[code]` | Save full payload; optional optimistic concurrency via `expectedUpdatedAt` (409 on conflict); syncs `name` |
+| DELETE | `/api/rooms/[code]` | Hard-delete for everyone. Authenticated + **owner only** (403 otherwise). Not wired in the UI |
+| GET/POST/DELETE | `/api/rooms/[code]/members` | List / join (idempotent, authenticated) / **leave** |
+
+### Deletion semantics (collaborative model)
+
+A trip belongs to everyone who joined it. "Delete" in the UI always means **leave**: remove
+the trip from *my* list (`user_rooms` row) and from the display roster (`rooms.members` JSONB,
+so the person stops counting in per-person budget math). The room itself is only deleted by the
+server **when the last member leaves** (garbage collection — no zombie rooms). The owner-only
+hard DELETE endpoint exists as an explicit "delete for everyone" escape hatch but is not exposed
+in the UI. Anyone can re-join later with the room code.
 
 ---
 

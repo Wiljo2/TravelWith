@@ -1,3 +1,11 @@
+// Trip identity — lives inside the room payload. A room IS a trip.
+export interface TripInfo {
+  name: string;
+  destination?: string;
+  startDate: string;      // ISO yyyy-mm-dd
+  endDate: string;        // ISO yyyy-mm-dd
+}
+
 export interface CalendarEvent {
   id: string;
   start: number;

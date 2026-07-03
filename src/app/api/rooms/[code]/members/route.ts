@@ -23,7 +23,10 @@ export async function GET(_req: Request, { params }: { params: Params }) {
   return NextResponse.json(data.members ?? []);
 }
 
-// DELETE /api/rooms/[code]/members — remove the authenticated user from user_rooms
+// DELETE /api/rooms/[code]/members — leave the trip (remove it from MY view).
+// Collaborative model: leaving never destroys the trip for the others; it also
+// removes the user from the display members list so they stop counting in the
+// per-person budget. When the LAST member leaves, the room itself is deleted.
 export async function DELETE(req: Request, { params }: { params: Params }) {
   const code = normalizeRoomCode((await params).code);
   if (!code) return NextResponse.json({ error: "Código inválido" }, { status: 400 });
@@ -44,7 +47,28 @@ export async function DELETE(req: Request, { params }: { params: Params }) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true });
+  const { data: room } = await supabase
+    .from("rooms")
+    .select("members")
+    .eq("code", code)
+    .maybeSingle();
+
+  if (room) {
+    const members: RoomMember[] = (room.members ?? []).filter((m: RoomMember) => m.userId !== user.id);
+    await supabase.from("rooms").update({ members }).eq("code", code);
+  }
+
+  const { count } = await supabase
+    .from("user_rooms")
+    .select("*", { count: "exact", head: true })
+    .eq("room_code", code);
+
+  if ((count ?? 0) === 0) {
+    await supabase.from("rooms").delete().eq("code", code);
+    return NextResponse.json({ ok: true, roomDeleted: true });
+  }
+
+  return NextResponse.json({ ok: true, roomDeleted: false });
 }
 
 // POST /api/rooms/[code]/members — add the authenticated user to this room's member list

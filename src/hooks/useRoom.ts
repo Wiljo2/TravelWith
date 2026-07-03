@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Day, Extra, RoomMember, Task, TripSpan } from "@/types";
+import type { Day, Extra, RoomMember, Task, TripInfo, TripSpan } from "@/types";
 
 export interface MockPerson {
   id: string;
@@ -11,6 +11,7 @@ export interface RoomPayload {
   days: Day[];
   extras: Extra[];
   exchangeRate: number;
+  trip?: TripInfo;
   mockPeople?: MockPerson[];
   tripSpans?: TripSpan[];
   tasks?: Task[];

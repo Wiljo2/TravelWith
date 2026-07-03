@@ -17,8 +17,9 @@ import AppHeader from "@/components/AppHeader";
 import Toast from "@/components/Toast";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
-import type { Task, ToastAction, TripSpan } from "@/types";
+import type { Task, ToastAction, TripInfo, TripSpan } from "@/types";
 import { initialDays } from "@/data/initialDays";
+import { generateDays } from "@/utils/tripDays";
 
 export default function App() {
   const [roomCode, setRoomCode] = useState<string | null>(null);
@@ -31,6 +32,7 @@ export default function App() {
   const [mockPeople, setMockPeople] = useState<MockPerson[]>([]);
   const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [trip, setTrip] = useState<TripInfo | null>(null);
 
   function addTripSpan(span: TripSpan) { setTripSpans((p) => [...p, span]); }
   function removeTripSpan(id: string)  { setTripSpans((p) => p.filter((s) => s.id !== id)); }
@@ -63,6 +65,7 @@ export default function App() {
   const onRemoteUpdate = useCallback((payload: RoomPayload) => {
     loadDays(payload.days);
     loadBudget(payload.extras, payload.exchangeRate);
+    if (payload.trip?.name)                setTrip(payload.trip);
     if (Array.isArray(payload.mockPeople)) setMockPeople(payload.mockPeople);
     if (Array.isArray(payload.tripSpans))  setTripSpans(payload.tripSpans);
     if (Array.isArray(payload.tasks))      setTasks(payload.tasks);
@@ -84,13 +87,16 @@ export default function App() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!roomCode || roomCode === "LOCAL") return;
+    // Never autosave before the room's own payload has loaded: the local demo
+    // state would overwrite the real trip.
+    if (!connected) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      save({ days, extras, exchangeRate, mockPeople, tripSpans, tasks });
+      save({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks });
     }, 600);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, extras, exchangeRate, mockPeople, tripSpans, tasks, roomCode]);
+  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, roomCode, connected]);
 
   function handleSelect(id: string | null) {
     setSelectedId(id);
@@ -131,11 +137,13 @@ export default function App() {
         roomCode={roomCode}
         connected={connected}
         saveState={saveState}
+        trip={trip}
         grandTotal={grandTotal}
         exchangeRate={exchangeRate}
         onReset={() => {
-          if (confirm("¿Restablecer el itinerario al default? Se perderán los cambios guardados.")) {
-            loadDays(initialDays);
+          if (confirm("¿Restablecer el itinerario? Se perderán las actividades del calendario.")) {
+            const regenerated = trip ? generateDays(trip.startDate, trip.endDate) : null;
+            loadDays(regenerated ?? initialDays);
             setTripSpans([]);
           }
         }}

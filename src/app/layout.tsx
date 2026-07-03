@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: "TravelWith · Wonder of the Seas",
-  description: "Planificador colaborativo de itinerario · Bahamas & Perfect Day · Nov 28 – Dic 4, 2026",
+  title: "TravelWith",
+  description: "Planificador colaborativo de viajes en grupo · itinerario, presupuesto y tareas en tiempo real",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
