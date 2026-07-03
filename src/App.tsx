@@ -3,6 +3,8 @@ import { useItinerary } from "@/hooks/useItinerary";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useBudget } from "@/hooks/useBudget";
 import { useRoom } from "@/hooks/useRoom";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserRooms } from "@/hooks/useUserRooms";
 import type { RoomPayload, MockPerson } from "@/hooks/useRoom";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { snapHour } from "@/utils/time";
@@ -26,6 +28,23 @@ import { generateDays } from "@/utils/tripDays";
 
 export default function App() {
   const [roomCode, setRoomCode] = useState<string | null>(null);
+
+  // Auto-resume: the user↔room relation (last_active_at) is persisted in
+  // Supabase (user_rooms), not localStorage, so this works across devices.
+  // On load, once auth + the room list have both resolved, enter the most
+  // recently active trip exactly once — a later explicit "leave" (onLeaveRoom)
+  // won't be undone by this, since resumeAttempted stays true afterward.
+  const { user, session, loading: authLoading, signInWithGoogle, signOut } = useAuth();
+  const { rooms: userRooms, roomsLoading, addRoom, removeRoom } = useUserRooms(user, session?.access_token);
+  const [resumeAttempted, setResumeAttempted] = useState(false);
+
+  useEffect(() => {
+    if (resumeAttempted) return;
+    if (authLoading || roomsLoading) return;
+    setResumeAttempted(true);
+    if (user && userRooms.length > 0) setRoomCode(userRooms[0].room_code);
+  }, [resumeAttempted, authLoading, roomsLoading, user, userRooms]);
+
   const [activeTab, setActiveTab] = useState<Tab>("calendar");
   const [pendingNew, setPendingNew] = useState<{ dayId: string; hour: number } | null>(null);
   const [slotDraft, setSlotDraft] = useState<{ dayId: string; hour: number; x: number; y: number; task: Task | null } | null>(null);
@@ -133,7 +152,28 @@ export default function App() {
   );
 
   if (!roomCode) {
-    return <RoomGate onEnter={setRoomCode} />;
+    // Wait for the resume decision before rendering RoomGate, so a returning
+    // user doesn't see a flash of "Mis viajes" before being auto-redirected.
+    if (!resumeAttempted) {
+      return (
+        <div className="flex min-h-screen items-center justify-center text-[13px] text-muted-foreground">
+          Cargando...
+        </div>
+      );
+    }
+    return (
+      <RoomGate
+        onEnter={setRoomCode}
+        user={user}
+        session={session}
+        authLoading={authLoading}
+        signInWithGoogle={signInWithGoogle}
+        signOut={signOut}
+        rooms={userRooms}
+        addRoom={addRoom}
+        removeRoom={removeRoom}
+      />
+    );
   }
 
   return (

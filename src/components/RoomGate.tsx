@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import { useUserRooms } from "@/hooks/useUserRooms";
+import type { User, Session } from "@supabase/supabase-js";
+import type { UserRoom } from "@/hooks/useUserRooms";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,12 +11,19 @@ import {
 
 interface RoomGateProps {
   onEnter: (code: string) => void;
+  user: User | null;
+  session: Session | null;
+  authLoading: boolean;
+  signInWithGoogle: () => void;
+  signOut: () => void;
+  rooms: UserRoom[];
+  addRoom: (code: string, role?: "owner" | "member", name?: string | null) => void;
+  removeRoom: (code: string, accessToken: string) => Promise<void>;
 }
 
-export default function RoomGate({ onEnter }: RoomGateProps) {
-  const { user, session, loading: authLoading, signInWithGoogle, signOut } = useAuth();
-  const { rooms, addRoom, removeRoom } = useUserRooms(user, session?.access_token);
-
+export default function RoomGate({
+  onEnter, user, session, authLoading, signInWithGoogle, signOut, rooms, addRoom, removeRoom,
+}: RoomGateProps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,11 +36,12 @@ export default function RoomGate({ onEnter }: RoomGateProps) {
   const [deleteTarget, setDeleteTarget] = useState<{ code: string; name: string | null } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  async function registerMember(code: string) {
+  async function registerMember(code: string, role?: "owner" | "member") {
     if (!session?.access_token) return;
     await fetch(`/api/rooms/${code}/members`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(role ? { role } : {}),
     });
   }
 
@@ -48,8 +56,8 @@ export default function RoomGate({ onEnter }: RoomGateProps) {
       setLoading(false);
       return;
     }
-    await registerMember(c);
-    await addRoom(c, "member");
+    await registerMember(c, "member");
+    addRoom(c, "member");
     onEnter(c);
   }
 
@@ -76,8 +84,8 @@ export default function RoomGate({ onEnter }: RoomGateProps) {
       return;
     }
     const { code } = await res.json();
-    await registerMember(code);
-    await addRoom(code, "owner", tripName.trim());
+    await registerMember(code, "owner");
+    addRoom(code, "owner", tripName.trim());
     onEnter(code);
   }
 

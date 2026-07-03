@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import type { TripInfo } from "@/types";
 
@@ -7,41 +6,56 @@ export interface UserRoom {
   room_code: string;
   role: string;
   joined_at: string;
+  last_active_at: string;
   name: string | null;
   trip: TripInfo | null;
 }
 
+// The user↔room relation (role, last_active_at) is persisted server-side by
+// POST /api/rooms/[code]/members — this hook only reads it and reflects
+// optimistic local updates; it never writes to Supabase directly.
 export function useUserRooms(user: User | null, accessToken: string | undefined) {
   const [rooms, setRooms] = useState<UserRoom[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
 
   useEffect(() => {
     if (!user || !accessToken) {
       setRooms([]);
+      setRoomsLoading(false);
       return;
     }
+    setRoomsLoading(true);
     fetch("/api/rooms/list", { headers: { Authorization: `Bearer ${accessToken}` } })
       .then((r) => (r.ok ? r.json() : []))
-      .then((items: { code: string; name: string | null; role: string; joined_at: string; trip: TripInfo | null }[]) => {
+      .then((items: { code: string; name: string | null; role: string; joined_at: string; last_active_at: string; trip: TripInfo | null }[]) => {
         setRooms(items.map((i) => ({
           room_code: i.code,
           role: i.role,
           joined_at: i.joined_at,
+          last_active_at: i.last_active_at,
           name: i.name,
           trip: i.trip,
         })));
       })
-      .catch(() => setRooms([]));
+      .catch(() => setRooms([]))
+      .finally(() => setRoomsLoading(false));
   }, [user, accessToken]);
 
-  async function addRoom(code: string, role: "owner" | "member" = "member", name: string | null = null) {
-    if (!user || !supabase) return;
-    await supabase.from("user_rooms").upsert(
-      { user_id: user.id, room_code: code, role },
-      { onConflict: "user_id,room_code" },
-    );
+  // Optimistic UI update after POST /members succeeds server-side. Moves the
+  // room to the front, matching the server's last_active_at desc ordering.
+  function addRoom(code: string, role: "owner" | "member" = "member", name: string | null = null) {
     setRooms((prev) => {
-      if (prev.some((r) => r.room_code === code)) return prev;
-      return [{ room_code: code, role, joined_at: new Date().toISOString(), name, trip: null }, ...prev];
+      const existing = prev.find((r) => r.room_code === code);
+      const rest = prev.filter((r) => r.room_code !== code);
+      const nowIso = new Date().toISOString();
+      return [{
+        room_code: code,
+        role: existing?.role ?? role,
+        joined_at: existing?.joined_at ?? nowIso,
+        last_active_at: nowIso,
+        name: existing?.name ?? name,
+        trip: existing?.trip ?? null,
+      }, ...rest];
     });
   }
 
@@ -54,5 +68,5 @@ export function useUserRooms(user: User | null, accessToken: string | undefined)
     setRooms((prev) => prev.filter((r) => r.room_code !== code));
   }
 
-  return { rooms, addRoom, removeRoom };
+  return { rooms, roomsLoading, addRoom, removeRoom };
 }

@@ -71,7 +71,11 @@ export async function DELETE(req: Request, { params }: { params: Params }) {
   return NextResponse.json({ ok: true, roomDeleted: false });
 }
 
-// POST /api/rooms/[code]/members — add the authenticated user to this room's member list
+// POST /api/rooms/[code]/members — join the room: add to the display roster
+// (rooms.members) and upsert the user↔room relation (user_rooms), bumping
+// last_active_at so the client can auto-resume the user's most recent trip.
+// Idempotent: re-entering an existing membership only bumps last_active_at —
+// it never downgrades an existing role.
 export async function POST(req: Request, { params }: { params: Params }) {
   const code = normalizeRoomCode((await params).code);
   if (!code) return NextResponse.json({ error: "Código inválido" }, { status: 400 });
@@ -81,6 +85,14 @@ export async function POST(req: Request, { params }: { params: Params }) {
 
   const user = await getUserFromToken(token);
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  let role: "owner" | "member" = "member";
+  try {
+    const body = await req.json();
+    if (body?.role === "owner") role = "owner";
+  } catch {
+    // No body sent — default role "member" (the common case: joining by code).
+  }
 
   const supabase = createServerClient();
 
@@ -94,25 +106,41 @@ export async function POST(req: Request, { params }: { params: Params }) {
   if (!room) return NextResponse.json({ error: "Sala no encontrada" }, { status: 404 });
 
   const members: RoomMember[] = room.members ?? [];
-
-  // Idempotent — do nothing if already a member
-  if (members.some((m) => m.userId === user.id)) {
-    return NextResponse.json({ ok: true });
+  if (!members.some((m) => m.userId === user.id)) {
+    const newMember: RoomMember = {
+      userId: user.id,
+      name: String(user.user_metadata?.full_name ?? user.email ?? "Usuario"),
+      avatar: user.user_metadata?.avatar_url as string | undefined,
+      joinedAt: new Date().toISOString(),
+    };
+    const { error: updateError } = await supabase
+      .from("rooms")
+      .update({ members: [...members, newMember] })
+      .eq("code", code);
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  const newMember: RoomMember = {
-    userId: user.id,
-    name: String(user.user_metadata?.full_name ?? user.email ?? "Usuario"),
-    avatar: user.user_metadata?.avatar_url as string | undefined,
-    joinedAt: new Date().toISOString(),
-  };
+  const nowIso = new Date().toISOString();
+  const { data: existingUserRoom } = await supabase
+    .from("user_rooms")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("room_code", code)
+    .maybeSingle();
 
-  const { error: updateError } = await supabase
-    .from("rooms")
-    .update({ members: [...members, newMember] })
-    .eq("code", code);
-
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+  if (existingUserRoom) {
+    const { error: touchError } = await supabase
+      .from("user_rooms")
+      .update({ last_active_at: nowIso })
+      .eq("user_id", user.id)
+      .eq("room_code", code);
+    if (touchError) return NextResponse.json({ error: touchError.message }, { status: 500 });
+  } else {
+    const { error: insertError } = await supabase
+      .from("user_rooms")
+      .insert({ user_id: user.id, room_code: code, role, last_active_at: nowIso });
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true });
 }

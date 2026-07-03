@@ -7,10 +7,12 @@ export interface TripListItem {
   name: string | null;
   role: string;
   joined_at: string;
+  last_active_at: string;
   trip: TripInfo | null;
 }
 
-// GET /api/rooms/list — trips of the authenticated user, with trip metadata
+// GET /api/rooms/list — trips of the authenticated user, with trip metadata.
+// Ordered by last_active_at desc so the first item is the trip to auto-resume.
 export async function GET(req: Request) {
   const token = req.headers.get("Authorization")?.replace("Bearer ", "");
   if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -22,9 +24,9 @@ export async function GET(req: Request) {
 
   const { data: memberships, error: mErr } = await supabase
     .from("user_rooms")
-    .select("room_code, role, joined_at")
+    .select("room_code, role, joined_at, last_active_at")
     .eq("user_id", user.id)
-    .order("joined_at", { ascending: false });
+    .order("last_active_at", { ascending: false });
 
   if (mErr) return NextResponse.json({ error: mErr.message }, { status: 500 });
   if (!memberships || memberships.length === 0) return NextResponse.json([]);
@@ -39,16 +41,21 @@ export async function GET(req: Request) {
 
   const byCode = new Map((rooms ?? []).map((r) => [r.code, r as { code: string; name: string | null; trip: TripInfo | null }]));
 
-  const items: TripListItem[] = memberships.map((m) => {
-    const room = byCode.get(m.room_code);
-    return {
-      code: m.room_code,
-      name: room?.name ?? room?.trip?.name ?? null,
-      role: m.role,
-      joined_at: m.joined_at,
-      trip: room?.trip ?? null,
-    };
-  });
+  // Drop stale memberships whose room no longer exists (defensive — shouldn't
+  // happen given the cleanup in DELETE /members, but never resume into a dead room).
+  const items: TripListItem[] = memberships
+    .filter((m) => byCode.has(m.room_code))
+    .map((m) => {
+      const room = byCode.get(m.room_code)!;
+      return {
+        code: m.room_code,
+        name: room.name ?? room.trip?.name ?? null,
+        role: m.role,
+        joined_at: m.joined_at,
+        last_active_at: m.last_active_at,
+        trip: room.trip ?? null,
+      };
+    });
 
   return NextResponse.json(items);
 }
