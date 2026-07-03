@@ -73,6 +73,7 @@ Server-side mutations do NOT talk to Supabase directly. The layering is:
 - Endpoint: `POST /api/rooms/[code]/agent` — SSE stream (`text` deltas, `tool` activity, `done` usage, `error`). Manual tool-use loop (max 15 iterations), model from `AGENT_MODEL` env (default `claude-sonnet-5`), adaptive thinking, no sampling params.
 - `ANTHROPIC_API_KEY` lives **only** on the server (env). Never send it to, or accept it from, the browser.
 - Agent rules: read tools (`get_trip_overview`, `get_day_detail`, `get_budget`) ground the model before writes; write tools persist per-mutation via `mutateRoom` so Realtime shows live progress to all members; validation failures return `is_error` tool results (the model self-corrects) instead of throwing.
+- Tool schemas do **not** use `strict: true`: Anthropic caps total optional parameters across all `strict` tools in one request at 24, and our edit-style tools (`update_task`, `update_expense`, `update_event`, …) intentionally have many optional fields by design. Domain-layer validation (`DomainError` → `is_error`) is the real validation boundary; don't re-add `strict: true` without first checking the combined optional-param count across `AGENT_TOOLS`.
 - The system prompt must stay **byte-stable** (it carries a `cache_control` breakpoint): dynamic trip data reaches the model via read tools, never by interpolating state into the prompt.
 - Chat history is ephemeral client state — never persist conversations into the room payload.
 

@@ -22,14 +22,12 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     name: "get_trip_overview",
     description:
       "Get the trip summary: name, dates, traveler count, day list with dayIds, backlog tasks and the current group total. Call this FIRST whenever you need context about the trip (day ids, what exists) before reading details or writing.",
-    strict: true,
     input_schema: schema({}),
   },
   {
     name: "get_day_detail",
     description:
       "Get every event and scheduled task of one day, with their ids, times and linked expenses. Call this before editing or deleting anything on a day, to get the exact eventId/taskId.",
-    strict: true,
     input_schema: schema(
       { dayId: { type: "string", description: "Day id from get_trip_overview (e.g. d0)" } },
       ["dayId"],
@@ -39,13 +37,11 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     name: "get_budget",
     description:
       "Get all expenses with computed group totals and per-person amounts in USD, plus the trip totals. Call this before answering money questions or editing expenses.",
-    strict: true,
     input_schema: schema({}),
   },
   {
     name: "create_event",
     description: "Create a calendar activity on a day. Call when the user asks to add/schedule an activity.",
-    strict: true,
     input_schema: schema(
       {
         dayId: { type: "string", description: "Target day id (from get_trip_overview)" },
@@ -62,7 +58,6 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     name: "update_event",
     description:
       "Edit an existing event: title, times, category, note, or move it to another day (pass dayId). Only pass the fields to change.",
-    strict: true,
     input_schema: schema(
       {
         eventId: { type: "string", description: "Event id from get_day_detail" },
@@ -80,14 +75,12 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     name: "delete_event",
     description:
       "Delete an event from the calendar. Linked expenses are kept but unlinked. Confirm with the user before deleting several events at once.",
-    strict: true,
     input_schema: schema({ eventId: { type: "string" } }, ["eventId"]),
   },
   {
     name: "create_task",
     description:
       "Create a task (something to decide, book, buy, confirm or pack). Omit dayId for the backlog; pass dayId+start to place it on the calendar at a specific time.",
-    strict: true,
     input_schema: schema(
       {
         title: { type: "string" },
@@ -105,7 +98,6 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     name: "update_task",
     description:
       "Edit a task: title, note, category, priority, mark done/undone, reschedule (dayId/start/end) or remove it from the calendar (unschedule: true). Only pass the fields to change.",
-    strict: true,
     input_schema: schema(
       {
         taskId: { type: "string", description: "Task id from get_trip_overview or get_day_detail" },
@@ -125,14 +117,12 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
   {
     name: "delete_task",
     description: "Delete a task permanently. To just complete it, use update_task with done: true instead.",
-    strict: true,
     input_schema: schema({ taskId: { type: "string" } }, ["taskId"]),
   },
   {
     name: "add_expense",
     description:
       "Add a budget expense. splitMode 'group' = amount is the fixed TOTAL split across travelers (adding people lowers the per-person share). splitMode 'perPerson' = amount is the cost PER TRAVELER (adding people raises the group total). Link to an activity with linkedEventId, or spread across days with startDayId/endDayId.",
-    strict: true,
     input_schema: schema(
       {
         label: { type: "string" },
@@ -150,7 +140,6 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     name: "update_expense",
     description:
       "Edit an expense: label, amount, currency, splitMode, link/unlink an event (unlinkEvent: true), or day range (clearDayRange: true). Only pass the fields to change.",
-    strict: true,
     input_schema: schema(
       {
         extraId: { type: "string", description: "Expense id from get_budget" },
@@ -170,13 +159,11 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
   {
     name: "remove_expense",
     description: "Delete an expense from the budget. Confirm with the user before deleting several at once.",
-    strict: true,
     input_schema: schema({ extraId: { type: "string" } }, ["extraId"]),
   },
   {
     name: "set_exchange_rate",
     description: "Set the COP per USD exchange rate (TRM) used for all currency conversions.",
-    strict: true,
     input_schema: schema({ rate: { type: "number", description: "COP per 1 USD, e.g. 4000" } }, ["rate"]),
   },
 ];
