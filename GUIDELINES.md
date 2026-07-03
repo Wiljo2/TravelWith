@@ -60,6 +60,22 @@ Notes and known trade-offs:
 - References inside the payload are **by id across arrays** (e.g. `extra.linkedEventId` → an event inside some day). Deleting an event does NOT cascade; consumers must handle dangling ids gracefully (`find(...) ?? null`).
 - New rooms get their initial payload **built server-side** in `POST /api/rooms` (empty days generated from the trip dates). The client demo state (`initialDays`, `DEFAULT_EXTRAS`) is only for the `LOCAL` room and must never leak into real rooms — that's also why autosave is gated on `connected`.
 
+### Server domain layer (`src/server/`)
+
+Server-side mutations do NOT talk to Supabase directly. The layering is:
+
+- `src/server/domain/*` — **pure functions** `(payload, args) → { payload, result }` that validate and apply one change to a `RoomPayload`. They throw `DomainError` with an actionable message; no I/O, fully unit-tested. Any future feature that mutates trip state server-side (REST endpoints, agents, cron) goes through these functions — never inline Supabase writes.
+- `src/server/trip-store.ts` — the only persistence gateway: `loadRoom`, `persistRoom` (name-column sync), and `mutateRoom` (read-modify-write with an `updated_at` guard + one retry, so server writes never clobber a member's concurrent autosave).
+- `src/server/agent/*` — the Claude assistant: tool definitions + executor (`tools.ts`, thin wrappers over the domain functions) and the stable system prompt (`prompt.ts`).
+
+### AI assistant (Claude agent)
+
+- Endpoint: `POST /api/rooms/[code]/agent` — SSE stream (`text` deltas, `tool` activity, `done` usage, `error`). Manual tool-use loop (max 15 iterations), model from `AGENT_MODEL` env (default `claude-sonnet-5`), adaptive thinking, no sampling params.
+- `ANTHROPIC_API_KEY` lives **only** on the server (env). Never send it to, or accept it from, the browser.
+- Agent rules: read tools (`get_trip_overview`, `get_day_detail`, `get_budget`) ground the model before writes; write tools persist per-mutation via `mutateRoom` so Realtime shows live progress to all members; validation failures return `is_error` tool results (the model self-corrects) instead of throwing.
+- The system prompt must stay **byte-stable** (it carries a `cache_control` breakpoint): dynamic trip data reaches the model via read tools, never by interpolating state into the prompt.
+- Chat history is ephemeral client state — never persist conversations into the room payload.
+
 ### API surface (Next.js route handlers)
 
 | Method | Route | Purpose |

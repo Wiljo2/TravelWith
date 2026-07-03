@@ -11,6 +11,8 @@ Read `GUIDELINES.md` before large features. Operational summary:
 - `App.tsx` composes domain hooks (`useItinerary`, `useBudget`, `useRoom`, `useDragDrop`) and passes everything down via props.
 - Persistence: all trip state is one JSONB `payload` in the `rooms` table (Supabase). Autosave debounced 600ms + Supabase Realtime for member sync.
 - Backend only in `src/app/api/rooms/**`; the service role key is only used in `lib/supabase-server.ts`.
+- Server-side mutations go through the domain layer: pure functions in `src/server/domain/*` + persistence via `src/server/trip-store.ts` (`mutateRoom` handles concurrency). Never inline Supabase writes for trip state.
+- AI assistant: `POST /api/rooms/[code]/agent` (SSE, manual tool loop, `@anthropic-ai/sdk`). `ANTHROPIC_API_KEY` server-only; model via `AGENT_MODEL` (default `claude-sonnet-5`); system prompt in `src/server/agent/prompt.ts` must stay byte-stable (prompt cache) — dynamic data flows through read tools.
 
 ## Hard rules (never break existing features)
 - New fields on persisted types (`Extra`, `Task`, `Day`, `CalendarEvent`, `TripSpan`, `RoomPayload`) are **always optional**, with defaults applied at read time (`x.field ?? DEFAULT`). Never rename or repurpose an existing field.

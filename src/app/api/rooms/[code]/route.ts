@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient, getUserFromToken } from "@/lib/supabase-server";
 import { normalizeRoomCode, validateRoomPayload } from "@/lib/validate";
+import { persistRoom, TripStoreError } from "@/server/trip-store";
 
 type Params = Promise<{ code: string }>;
 
@@ -104,22 +105,13 @@ export async function PATCH(req: Request, { params }: { params: Params }) {
     }
   }
 
-  const update: { payload: typeof payload; name?: string } = { payload };
-  if (payload.trip?.name) update.name = payload.trip.name;
-
-  const { data, error } = await supabase
-    .from("rooms")
-    .update(update)
-    .eq("code", code)
-    .select("updated_at")
-    .maybeSingle();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    const updatedAt = await persistRoom(code, payload);
+    return NextResponse.json({ ok: true, updated_at: updatedAt });
+  } catch (e) {
+    if (e instanceof TripStoreError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
+    throw e;
   }
-  if (!data) {
-    return NextResponse.json({ error: "Sala no encontrada" }, { status: 404 });
-  }
-
-  return NextResponse.json({ ok: true, updated_at: data.updated_at });
 }

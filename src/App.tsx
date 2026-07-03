@@ -10,6 +10,9 @@ import { extraGroupUSD } from "@/utils/currency";
 import CalendarGrid from "@/components/calendar/CalendarGrid";
 import SlotCreateModal from "@/components/calendar/SlotCreateModal";
 import BudgetPanel from "@/components/budget/BudgetPanel";
+import AgentPanel from "@/components/agent/AgentPanel";
+import type { AgentChatMessage } from "@/components/agent/AgentPanel";
+import { cn } from "@/lib/utils";
 import BudgetView from "@/components/budget/BudgetView";
 import TabBar from "@/components/TabBar";
 import type { Tab } from "@/components/TabBar";
@@ -26,6 +29,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("calendar");
   const [pendingNew, setPendingNew] = useState<{ dayId: string; hour: number } | null>(null);
   const [slotDraft, setSlotDraft] = useState<{ dayId: string; hour: number; x: number; y: number; task: Task | null } | null>(null);
+  const [sidePanel, setSidePanel] = useState<"budget" | "agent">("budget");
+  const [agentMessages, setAgentMessages] = useState<AgentChatMessage[]>([]);
 
   const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, loadDays, removeDaySpan, updateDaySpan } = useItinerary();
   const { extras, exchangeRate, setExchangeRate, updateExtra, addExtra, removeExtra, loadBudget } = useBudget();
@@ -176,29 +181,50 @@ export default function App() {
             onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
             pendingNew={pendingNew ?? (slotDraft && !slotDraft.task ? { dayId: slotDraft.dayId, hour: slotDraft.hour } : null)}
           />
-          <BudgetPanel
-            selectedEvent={selectedEvent}
-            onUpdateEvent={updateEvent}
-            onDeleteEvent={deleteEvent}
-            days={days}
-            extras={extras}
-            grandTotal={grandTotal}
-            exchangeRate={exchangeRate}
-            people={people}
-            onLinkExtra={linkExtra}
-            onAddExtra={addExtra}
-            onRemoveExtra={removeExtra}
-            tripSpans={tripSpans}
-            onAddTripSpan={addTripSpan}
-            onRemoveTripSpan={removeTripSpan}
-            onRemoveDaySpan={removeDaySpan}
-            onUpdateDaySpan={updateDaySpan}
-            onUpdateTripSpan={updateTripSpan}
-            tasks={tasks}
-            pendingNew={pendingNew}
-            onCommitNew={commitNewEvent}
-            onCancelNew={() => setPendingNew(null)}
-          />
+          <div className="flex w-[300px] shrink-0 flex-col gap-2">
+            <div className="flex overflow-hidden rounded-lg border border-border bg-card">
+              {([["budget", "Presupuesto"], ["agent", "✨ Asistente"]] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setSidePanel(id)}
+                  className={cn(
+                    "flex-1 cursor-pointer py-1.5 text-xs font-semibold transition-colors",
+                    sidePanel === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {sidePanel === "agent" ? (
+              <AgentPanel roomCode={roomCode} messages={agentMessages} setMessages={setAgentMessages} />
+            ) : (
+              <BudgetPanel
+                selectedEvent={selectedEvent}
+                onUpdateEvent={updateEvent}
+                onDeleteEvent={deleteEvent}
+                days={days}
+                extras={extras}
+                grandTotal={grandTotal}
+                exchangeRate={exchangeRate}
+                people={people}
+                onLinkExtra={linkExtra}
+                onAddExtra={addExtra}
+                onRemoveExtra={removeExtra}
+                tripSpans={tripSpans}
+                onAddTripSpan={addTripSpan}
+                onRemoveTripSpan={removeTripSpan}
+                onRemoveDaySpan={removeDaySpan}
+                onUpdateDaySpan={updateDaySpan}
+                onUpdateTripSpan={updateTripSpan}
+                tasks={tasks}
+                pendingNew={pendingNew}
+                onCommitNew={commitNewEvent}
+                onCancelNew={() => setPendingNew(null)}
+              />
+            )}
+          </div>
         </div>
       )}
 
