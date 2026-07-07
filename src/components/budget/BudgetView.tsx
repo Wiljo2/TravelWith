@@ -1,7 +1,7 @@
 "use client";
-import type { Extra, Day, RoomMember } from "@/types";
+import type { Extra, Day, RoomMember, Task } from "@/types";
 import type { MockPerson } from "@/hooks/useRoom";
-import { usdToCop, fmtUSDNum, fmtCOPNum, extraGroupUSD } from "@/utils/currency";
+import { usdToCop, fmtUSDNum, fmtCOPNum, extraGroupUSD, optionGroupUSD } from "@/utils/currency";
 import { TH_CLASS, SectionHeader } from "@/components/budget/shared";
 import GlobalExtraRow from "@/components/budget/GlobalExtraRow";
 import DayExtraRow from "@/components/budget/DayExtraRow";
@@ -16,6 +16,7 @@ interface BudgetViewProps {
   members: RoomMember[];
   mockPeople: MockPerson[];
   days: Day[];
+  tasks: Task[];
   onSetExchangeRate: (rate: number) => void;
   onUpdateExtra: (id: string, patch: Partial<Extra>) => void;
   onLinkExtra: (extraId: string, eventId: string | undefined) => void;
@@ -28,7 +29,7 @@ interface BudgetViewProps {
 const ADD_BTN = "w-full cursor-pointer rounded-[7px] border border-dashed border-border bg-transparent px-3.5 py-[5px] text-xs text-muted-foreground hover:text-foreground";
 
 export default function BudgetView({
-  extras, grandTotal, exchangeRate, members, mockPeople, days,
+  extras, grandTotal, exchangeRate, members, mockPeople, days, tasks,
   onSetExchangeRate, onUpdateExtra, onLinkExtra, onAddExtra, onRemoveExtra,
   onAddMockPerson, onRemoveMockPerson,
 }: BudgetViewProps) {
@@ -40,6 +41,16 @@ export default function BudgetView({
   const linkedExtras = extras.filter((e) => !e.startDayId && !!e.linkedEventId);
 
   const globalTotal = [...globalExtras, ...linkedExtras].reduce((s, e) => s + extraGroupUSD(e, people, exchangeRate), 0);
+
+  // Undecided option-tasks: shown apart, never summed into the confirmed total.
+  const optionTasks = tasks
+    .filter((t) => (t.options?.length ?? 0) > 0)
+    .map((t) => {
+      const costs = t.options!.map((o) => optionGroupUSD(o, people, exchangeRate));
+      return { id: t.id, title: t.title, low: Math.min(...costs), high: Math.max(...costs), count: t.options!.length };
+    });
+  const rangeLow  = optionTasks.reduce((s, o) => s + o.low, 0);
+  const rangeHigh = optionTasks.reduce((s, o) => s + o.high, 0);
 
   return (
     <div className="flex-1 overflow-y-auto px-9 py-7">
@@ -138,6 +149,22 @@ export default function BudgetView({
         </button>
       )}
 
+      {optionTasks.length > 0 && (
+        <div className="mt-8">
+          <SectionHeader label="PENDIENTE DE DECIDIR" hint="Tareas con opciones sin elegir — no suman al total confirmado hasta que decidas" />
+          <div className="overflow-hidden rounded-xl border border-dashed border-[#F59E0B66] bg-[#F59E0B0d]">
+            {optionTasks.map((o) => (
+              <div key={o.id} className="flex items-center justify-between border-b border-[#F59E0B22] px-4 py-2.5 last:border-b-0">
+                <span className="text-[13px] text-foreground">🔀 {o.title} <span className="text-[11px] text-muted-foreground">· {o.count} opciones</span></span>
+                <span className="font-mono text-[13px] font-semibold text-[#B45309]">
+                  {o.low === o.high ? `$${fmtUSDNum(o.low)}` : `$${fmtUSDNum(o.low)} – $${fmtUSDNum(o.high)}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-7">
         <div className="rounded-xl border border-primary/40 bg-primary/10 px-5 py-4">
           <div className="mb-1.5 text-[11px] font-semibold tracking-[.06em] text-emerald-700">TOTAL DEL VIAJE</div>
@@ -146,6 +173,13 @@ export default function BudgetView({
           <div className="mt-2.5 text-xs text-secondary-foreground">
             <span className="font-semibold">{fmtUSDNum(grandTotal / people)}</span> por persona · {fmtCOPNum(usdToCop(grandTotal / people, exchangeRate))} COP
           </div>
+          {optionTasks.length > 0 && (
+            <div className="mt-3 border-t border-primary/20 pt-2.5 text-xs text-secondary-foreground">
+              Con lo pendiente por decidir, el viaje quedaría entre{" "}
+              <span className="font-mono font-semibold text-foreground">{fmtUSDNum(grandTotal + rangeLow)}</span> y{" "}
+              <span className="font-mono font-semibold text-foreground">{fmtUSDNum(grandTotal + rangeHigh)}</span> USD.
+            </div>
+          )}
         </div>
       </div>
 

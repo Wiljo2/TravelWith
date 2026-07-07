@@ -68,12 +68,13 @@ interface CalendarGridProps {
   onAddEvent: (dayId: string, atHour: number, x: number, y: number) => void;
   onToggleTask: (id: string) => void;
   onEditTask: (task: Task, x: number, y: number) => void;
+  onSwapDays: (aId: string, bId: string) => void;
   pendingNew?: { dayId: string; hour: number } | null;
 }
 
 export default function CalendarGrid({
   days, tripSpans, tasks, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd,
-  onSelect, selectedId, dragTarget, dragPreview, onAddEvent, onToggleTask, onEditTask, pendingNew,
+  onSelect, selectedId, dragTarget, dragPreview, onAddEvent, onToggleTask, onEditTask, onSwapDays, pendingNew,
 }: CalendarGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(900);
@@ -167,6 +168,7 @@ export default function CalendarGrid({
             onAddEvent={onAddEvent}
             onToggleTask={onToggleTask}
             onEditTask={onEditTask}
+            onSwapDays={onSwapDays}
             selectedId={selectedId}
             isDragTarget={dragTarget === day.id}
             dragPreview={dragPreview}

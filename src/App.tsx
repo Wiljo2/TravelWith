@@ -31,9 +31,11 @@ export default function App() {
 
   // Auto-resume: the user↔room relation (last_active_at) is persisted in
   // Supabase (user_rooms), not localStorage, so this works across devices.
-  // On load, once auth + the room list have both resolved, enter the most
-  // recently active trip exactly once — a later explicit "leave" (onLeaveRoom)
-  // won't be undone by this, since resumeAttempted stays true afterward.
+  // Only auto-enters when there's a SINGLE trip — no ambiguity to resolve.
+  // With multiple trips, RoomGate's "Mis viajes" list is shown instead so the
+  // user can see and pick among all of them (auto-jumping to just one would
+  // hide the rest). A later explicit "leave" (onLeaveRoom) won't be undone by
+  // this, since resumeAttempted stays true afterward.
   const { user, session, loading: authLoading, signInWithGoogle, signOut } = useAuth();
   const { rooms: userRooms, roomsLoading, addRoom, removeRoom } = useUserRooms(user, session?.access_token);
   const [resumeAttempted, setResumeAttempted] = useState(false);
@@ -42,7 +44,7 @@ export default function App() {
     if (resumeAttempted) return;
     if (authLoading || roomsLoading) return;
     setResumeAttempted(true);
-    if (user && userRooms.length > 0) setRoomCode(userRooms[0].room_code);
+    if (user && userRooms.length === 1) setRoomCode(userRooms[0].room_code);
   }, [resumeAttempted, authLoading, roomsLoading, user, userRooms]);
 
   const [activeTab, setActiveTab] = useState<Tab>("calendar");
@@ -51,7 +53,7 @@ export default function App() {
   const [sidePanel, setSidePanel] = useState<"budget" | "agent">("budget");
   const [agentMessages, setAgentMessages] = useState<AgentChatMessage[]>([]);
 
-  const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, loadDays, removeDaySpan, updateDaySpan } = useItinerary();
+  const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, loadDays, removeDaySpan, updateDaySpan } = useItinerary();
   const { extras, exchangeRate, setExchangeRate, updateExtra, addExtra, removeExtra, loadBudget } = useBudget();
   const [mockPeople, setMockPeople] = useState<MockPerson[]>([]);
   const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
@@ -81,6 +83,40 @@ export default function App() {
   }
   function deleteTask(id: string) {
     setTasks((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  // Confirm a decision: choosing an option promotes the task to a real activity
+  // (a calendar event if it's scheduled) plus a budget line, then removes the task.
+  function chooseTaskOption(taskId: string, optionId: string) {
+    const task = tasks.find((t) => t.id === taskId);
+    const option = task?.options?.find((o) => o.id === optionId);
+    if (!task || !option) return;
+
+    let linkedEventId: string | undefined;
+    if (task.dayId && task.start != null) {
+      const end = task.end ?? Math.min(task.start + 1, HOUR_END);
+      linkedEventId = addEvent(task.dayId, task.title, task.start, end, option.note ?? "", "logist");
+    }
+    if (option.amount && option.amount > 0) {
+      addExtra({
+        label: `${task.title}: ${option.label}`,
+        amount: option.amount,
+        currency: option.currency ?? "USD",
+        splitMode: option.splitMode ?? "group",
+        linkedEventId,
+      });
+    }
+    deleteTask(taskId);
+  }
+
+  // Swap the whole contents of two days (events + spans in useItinerary) and
+  // remap scheduled tasks' dayId, which live in this component's state.
+  function swapDaysWithTasks(aId: string, bId: string) {
+    if (aId === bId) return;
+    swapDays(aId, bId);
+    setTasks((prev) => prev.map((t) =>
+      t.dayId === aId ? { ...t, dayId: bId } : t.dayId === bId ? { ...t, dayId: aId } : t,
+    ));
   }
 
   const [toastAction, setToastAction] = useState<ToastAction | null>(null);
@@ -219,6 +255,7 @@ export default function App() {
             }}
             onToggleTask={toggleTask}
             onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
+            onSwapDays={swapDaysWithTasks}
             pendingNew={pendingNew ?? (slotDraft && !slotDraft.task ? { dayId: slotDraft.dayId, hour: slotDraft.hour } : null)}
           />
           <div className="flex w-[300px] shrink-0 flex-col gap-2">
@@ -277,6 +314,7 @@ export default function App() {
             members={members}
             mockPeople={mockPeople}
             days={days}
+            tasks={tasks}
             onSetExchangeRate={setExchangeRate}
             onUpdateExtra={updateExtra}
             onLinkExtra={linkExtra}
@@ -292,9 +330,12 @@ export default function App() {
         <TasksView
           days={days}
           tasks={tasks}
+          people={people}
+          exchangeRate={exchangeRate}
           onAdd={(title) => addTask({ title })}
           onToggle={toggleTask}
           onUpdateTask={updateTask}
+          onChooseOption={chooseTaskOption}
           onDelete={deleteTask}
         />
       )}

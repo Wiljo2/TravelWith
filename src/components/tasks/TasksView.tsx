@@ -3,21 +3,27 @@ import { useState, useRef, useEffect } from "react";
 import type { Task, TaskPriority, Day } from "@/types";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT, PRIORITIES, PRIORITY_ORDER } from "@/constants/taskCategories";
 import { fmtHour } from "@/utils/time";
+import { optionGroupUSD, fmtUSDNum } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import TaskOptions from "@/components/tasks/TaskOptions";
+import NoteLinks from "@/components/NoteLinks";
 
 interface TasksViewProps {
   days: Day[];
   tasks: Task[];
+  people: number;
+  exchangeRate: number;
   onAdd: (title: string) => void;
   onToggle: (id: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
+  onChooseOption: (taskId: string, optionId: string) => void;
   onDelete: (id: string) => void;
 }
 
-export default function TasksView({ days, tasks, onAdd, onToggle, onUpdateTask, onDelete }: TasksViewProps) {
+export default function TasksView({ days, tasks, people, exchangeRate, onAdd, onToggle, onUpdateTask, onChooseOption, onDelete }: TasksViewProps) {
   const [draft, setDraft] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -54,6 +60,8 @@ export default function TasksView({ days, tasks, onAdd, onToggle, onUpdateTask, 
           <TaskRow
             key={task.id}
             task={task}
+            people={people}
+            exchangeRate={exchangeRate}
             scheduledLabel={task.dayId ? `${dayLabel(task.dayId)} · ${fmtHour(task.start ?? 0)}` : null}
             expanded={expandedId === task.id}
             editing={editingId === task.id}
@@ -65,6 +73,7 @@ export default function TasksView({ days, tasks, onAdd, onToggle, onUpdateTask, 
             onCommitEdit={() => commitEdit(task.id)}
             onCancelEdit={() => setEditingId(null)}
             onUpdate={(patch) => onUpdateTask(task.id, patch)}
+            onChoose={(optionId) => onChooseOption(task.id, optionId)}
             onDelete={() => onDelete(task.id)}
           />
         ))}
@@ -124,6 +133,8 @@ export default function TasksView({ days, tasks, onAdd, onToggle, onUpdateTask, 
 
 interface TaskRowProps {
   task: Task;
+  people: number;
+  exchangeRate: number;
   scheduledLabel: string | null;
   expanded: boolean;
   editing: boolean;
@@ -135,24 +146,32 @@ interface TaskRowProps {
   onCommitEdit: () => void;
   onCancelEdit: () => void;
   onUpdate: (patch: Partial<Task>) => void;
+  onChoose: (optionId: string) => void;
   onDelete: () => void;
 }
 
 function TaskRow({
-  task, scheduledLabel, expanded, editing, editValue,
+  task, people, exchangeRate, scheduledLabel, expanded, editing, editValue,
   onToggleExpand, onToggleDone, onStartEdit,
-  onEditChange, onCommitEdit, onCancelEdit, onUpdate, onDelete,
+  onEditChange, onCommitEdit, onCancelEdit, onUpdate, onChoose, onDelete,
 }: TaskRowProps) {
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const c = TASK_CATEGORIES[task.cat ?? DEFAULT_TASK_CAT] ?? TASK_CATEGORIES[DEFAULT_TASK_CAT];
   const pr = task.priority ? PRIORITIES[task.priority] : null;
+  const options = task.options ?? [];
+  const optionRange = options.length > 0
+    ? (() => {
+        const costs = options.map((o) => optionGroupUSD(o, people, exchangeRate));
+        return { low: Math.min(...costs), high: Math.max(...costs) };
+      })()
+    : null;
 
   useEffect(() => {
     if (expanded && noteRef.current) {
       noteRef.current.style.height = "auto";
       noteRef.current.style.height = noteRef.current.scrollHeight + "px";
     }
-  }, [expanded]);
+  }, [expanded, task.note]);
 
   return (
     <div className={cn("overflow-hidden rounded-[10px] border border-border bg-card transition-opacity", task.done && "opacity-60")}>
@@ -190,6 +209,16 @@ function TaskRow({
             style={{ color: c.text, background: c.bg, borderColor: `${c.border}44` }}
           >
             📅 {scheduledLabel} ×
+          </span>
+        )}
+        {optionRange && (
+          <span
+            className="shrink-0 whitespace-nowrap rounded-full border border-[#F59E0B55] bg-[#F59E0B18] px-2 py-0.5 text-[9.5px] font-semibold text-[#B45309]"
+            title="Decisión pendiente: elige una opción para confirmarla"
+          >
+            🔀 {options.length} opc · {optionRange.low === optionRange.high
+              ? `$${fmtUSDNum(optionRange.low)}`
+              : `$${fmtUSDNum(optionRange.low)}–${fmtUSDNum(optionRange.high)}`}
           </span>
         )}
         {pr && (
@@ -248,13 +277,28 @@ function TaskRow({
 
           <textarea
             ref={noteRef}
-            defaultValue={task.note ?? ""}
-            onBlur={(e) => onUpdate({ note: e.target.value })}
-            onChange={(e) => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }}
-            placeholder="Qué se va a discutir / detalle..."
+            value={task.note ?? ""}
+            onChange={(e) => {
+              onUpdate({ note: e.target.value });
+              e.target.style.height = "auto";
+              e.target.style.height = e.target.scrollHeight + "px";
+            }}
+            placeholder="Notas, precios, links… (se guarda solo)"
             rows={2}
             className="box-border w-full resize-none overflow-hidden rounded-md border border-border bg-secondary px-2.5 py-2 text-[13px] leading-normal text-secondary-foreground outline-none"
           />
+          <NoteLinks note={task.note} />
+
+          <div className="border-t border-dashed border-border pt-2.5">
+            <TaskOptions
+              options={options}
+              people={people}
+              exchangeRate={exchangeRate}
+              scheduled={!!task.dayId && task.start != null}
+              onChange={(next) => onUpdate({ options: next })}
+              onChoose={onChoose}
+            />
+          </div>
         </div>
       )}
     </div>

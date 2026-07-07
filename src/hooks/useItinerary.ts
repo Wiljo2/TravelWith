@@ -11,8 +11,9 @@ export function useItinerary(): {
   setSelectedId: (id: string | null) => void;
   updateEvent: (patch: Partial<CalendarEvent>) => void;
   deleteEvent: () => void;
-  addEvent: (dayId: string, title: string, start: number, end: number, note?: string, cat?: string) => void;
+  addEvent: (dayId: string, title: string, start: number, end: number, note?: string, cat?: string) => string;
   moveEvent: (fromDayId: string, toDayId: string, ev: CalendarEvent, newStart: number) => void;
+  swapDays: (aId: string, bId: string) => void;
   loadDays: (days: Day[]) => void;
   addDaySpan: (dayId: string, span: import("../types").DaySpan) => void;
   removeDaySpan: (dayId: string, spanId: string) => void;
@@ -56,6 +57,24 @@ export function useItinerary(): {
     const nev: CalendarEvent = { id: uid(), start, end, title, cat, note };
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: [...d.events, nev] } : d)));
     setSelectedId(nev.id);
+    return nev.id;
+  }
+
+  // Swap the whole contents (events + day-level spans) between two days, keeping
+  // each day's own label/date. Event ids don't change, so trip-level spans still
+  // resolve. Callers also remap scheduled tasks' dayId (tasks live outside here).
+  function swapDays(aId: string, bId: string) {
+    if (aId === bId) return;
+    setDays((prev) => {
+      const a = prev.find((d) => d.id === aId);
+      const b = prev.find((d) => d.id === bId);
+      if (!a || !b) return prev;
+      return prev.map((d) => {
+        if (d.id === aId) return { ...d, events: b.events, spans: b.spans };
+        if (d.id === bId) return { ...d, events: a.events, spans: a.spans };
+        return d;
+      });
+    });
   }
 
   // newStart is already snapped and clamped by the caller
@@ -99,5 +118,5 @@ export function useItinerary(): {
     ));
   }
 
-  return { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, loadDays, addDaySpan, removeDaySpan, updateDaySpan };
+  return { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, loadDays, addDaySpan, removeDaySpan, updateDaySpan };
 }

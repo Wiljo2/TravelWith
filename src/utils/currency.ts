@@ -1,4 +1,4 @@
-import type { Extra } from "@/types";
+import type { Extra, TaskOption } from "@/types";
 
 export const DEFAULT_RATE = 4000;
 
@@ -19,6 +19,12 @@ export function extraGroupUSD(extra: Extra, people: number, rate: number): numbe
 export function extraPerPersonUSD(extra: Extra, people: number, rate: number): number {
   const unit = extraUnitUSD(extra.amount, extra.currency, rate);
   return extra.splitMode === "perPerson" ? unit : unit / Math.max(1, people);
+}
+
+// Group-total USD of a single task option (mirrors extraGroupUSD's split logic).
+export function optionGroupUSD(o: TaskOption, people: number, rate: number): number {
+  const unit = extraUnitUSD(o.amount ?? 0, o.currency, rate);
+  return o.splitMode === "perPerson" ? unit * Math.max(1, people) : unit;
 }
 
 export function copToUsd(cop: number, rate: number): number {

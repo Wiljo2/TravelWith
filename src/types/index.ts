@@ -81,6 +81,17 @@ export interface Extra {
 
 export type TaskPriority = "alta" | "media" | "baja";
 
+// A candidate choice inside an undecided task, each with its own optional cost.
+// Choosing an option confirms the task into a real activity + budget line.
+export interface TaskOption {
+  id: string;
+  label: string;
+  note?: string;                     // link / details / price notes
+  amount?: number;                   // cost of this option, in `currency`
+  currency?: "USD" | "COP";          // default "USD"
+  splitMode?: "group" | "perPerson"; // default "group"
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -91,6 +102,7 @@ export interface Task {
   end?: number;
   cat?: string;           // key of TASK_CATEGORIES
   priority?: TaskPriority;
+  options?: TaskOption[];  // candidate choices (a decision to resolve); unchosen options never sum into the confirmed total
 }
 
 export interface RoomMember {

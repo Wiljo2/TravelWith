@@ -94,20 +94,24 @@ interface DayColumnProps {
   onAddEvent: (dayId: string, atHour: number, x: number, y: number) => void;
   onToggleTask: (id: string) => void;
   onEditTask: (task: Task, x: number, y: number) => void;
+  onSwapDays: (aId: string, bId: string) => void;
   selectedId: string | null;
   isDragTarget: boolean;
   dragPreview: DragPreview | null;
   pendingHour: number | null;
 }
 
+const DAY_SWAP_MIME = "application/x-day-swap";
+
 export default function DayColumn({
   day, tasks, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd,
-  onSelect, onAddEvent, onToggleTask, onEditTask, selectedId, isDragTarget, dragPreview, pendingHour,
+  onSelect, onAddEvent, onToggleTask, onEditTask, onSwapDays, selectedId, isDragTarget, dragPreview, pendingHour,
 }: DayColumnProps) {
   const totalHeight = (HOUR_END - HOUR_START + 1) * PX_PER_HOUR;
   const colRef  = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const [hoverY, setHoverY] = useState<number | null>(null);
+  const [swapOver, setSwapOver] = useState(false);
 
   function getHour(clientY: number) {
     const rect = colRef.current!.getBoundingClientRect();
@@ -119,10 +123,31 @@ export default function DayColumn({
   return (
     <div className="flex min-w-0 flex-1 flex-col">
 
-      {/* Header: fixed 56px so all grid lines align across columns */}
-      <div className="box-border h-14 shrink-0 overflow-hidden border-b border-border bg-secondary px-2.5 py-2">
+      {/* Header: fixed 56px so all grid lines align across columns.
+          Draggable onto another day header to swap the two days' contents. */}
+      <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData(DAY_SWAP_MIME, day.id);
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes(DAY_SWAP_MIME)) { e.preventDefault(); setSwapOver(true); }
+        }}
+        onDragLeave={() => setSwapOver(false)}
+        onDrop={(e) => {
+          setSwapOver(false);
+          const sourceId = e.dataTransfer.getData(DAY_SWAP_MIME);
+          if (sourceId && sourceId !== day.id) { e.preventDefault(); onSwapDays(sourceId, day.id); }
+        }}
+        title="Arrastra este día sobre otro para intercambiar sus actividades"
+        className={cn(
+          "box-border h-14 shrink-0 cursor-grab overflow-hidden border-b border-border bg-secondary px-2.5 py-2 active:cursor-grabbing",
+          swapOver && "bg-primary/15 ring-2 ring-inset ring-primary",
+        )}
+      >
         <div className="truncate text-[13px] font-medium text-foreground">
-          {day.label}
+          <span className="mr-1 opacity-40">⇄</span>{day.label}
         </div>
         <div className="mt-0.5 truncate text-[11px] text-secondary-foreground">
           {day.sub}

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import NoteLinks from "@/components/NoteLinks";
 import type { CalendarEvent } from "@/types";
 
 const CAT_KEYS = Object.keys(CATEGORIES) as (keyof typeof CATEGORIES)[];
@@ -47,10 +48,11 @@ export default function EventEditor({ ev, onChange, onDelete, deleteLabel = "Eli
       <Textarea
         value={ev.note}
         onChange={(e) => onChange({ note: e.target.value })}
-        placeholder="Nota..."
+        placeholder="Nota, precios, links…"
         rows={2}
         className="min-h-0 bg-secondary text-[12.5px] leading-snug"
       />
+      <NoteLinks note={ev.note} />
 
       <div>
         <div className="mb-1.5 text-[11px] text-muted-foreground">Categoría</div>
