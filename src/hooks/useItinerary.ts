@@ -4,6 +4,27 @@ import { uid } from "@/utils/uid";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import type { Day, CalendarEvent } from "@/types";
 
+// Repairs payloads saved before ids were globally unique: the legacy counter
+// restarted at 0 each session, so older rooms can hold repeated event ids.
+function dedupeEventIds(incoming: Day[]): Day[] {
+  const seen = new Set<string>();
+  let changed = false;
+  const result = incoming.map((d) => ({
+    ...d,
+    events: (d.events ?? []).map((e) => {
+      if (!seen.has(e.id)) {
+        seen.add(e.id);
+        return e;
+      }
+      changed = true;
+      const id = uid();
+      seen.add(id);
+      return { ...e, id };
+    }),
+  }));
+  return changed ? result : incoming;
+}
+
 export function useItinerary(): {
   days: Day[];
   selectedId: string | null;
@@ -99,7 +120,7 @@ export function useItinerary(): {
   }
 
   function loadDays(incoming: Day[]) {
-    if (Array.isArray(incoming) && incoming.length > 0) setDays(incoming);
+    if (Array.isArray(incoming) && incoming.length > 0) setDays(dedupeEventIds(incoming));
   }
 
   function addDaySpan(dayId: string, span: import("../types").DaySpan) {

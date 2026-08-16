@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { Day, CalendarEvent, DragPreview, TripSpan, DaySpan, Task } from "@/types";
 import { CATEGORIES } from "@/constants/categories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
+import { cssZoom } from "@/utils/zoom";
 
 // Given all days and all trip-level spans, compute the DaySpan slices visible
 // in a specific day. A span crossing N days produces a slice in each of those days.
@@ -83,7 +84,7 @@ export default function CalendarGrid({
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const measure = () => setContainerW(el.getBoundingClientRect().width);
+    const measure = () => setContainerW(el.getBoundingClientRect().width / cssZoom(el));
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);

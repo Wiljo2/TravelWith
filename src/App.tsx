@@ -24,6 +24,7 @@ import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
 import type { Task, ToastAction, TripInfo, TripSpan } from "@/types";
 import { initialDays } from "@/data/initialDays";
+import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE, mockRoomPayload } from "@/data/mockRoom";
 import { generateDays } from "@/utils/tripDays";
 
 export default function App() {
@@ -40,12 +41,23 @@ export default function App() {
   const { rooms: userRooms, roomsLoading, addRoom, removeRoom } = useUserRooms(user, session?.access_token);
   const [resumeAttempted, setResumeAttempted] = useState(false);
 
+  const localMode = roomCode === LOCAL_ROOM_CODE;
+
   useEffect(() => {
     if (resumeAttempted) return;
     if (authLoading || roomsLoading) return;
     setResumeAttempted(true);
     if (user && userRooms.length === 1) setRoomCode(userRooms[0].room_code);
   }, [resumeAttempted, authLoading, roomsLoading, user, userRooms]);
+
+  // `?local=1` boots straight into local mode, skipping sign-in and the
+  // auto-resume above (which is what redirects a returning user into their room).
+  useEffect(() => {
+    if (!LOCAL_MODE_ENABLED) return;
+    if (!new URLSearchParams(window.location.search).has("local")) return;
+    setResumeAttempted(true);
+    setRoomCode(LOCAL_ROOM_CODE);
+  }, []);
 
   const [activeTab, setActiveTab] = useState<Tab>("calendar");
   const [pendingNew, setPendingNew] = useState<{ dayId: string; hour: number } | null>(null);
@@ -132,6 +144,16 @@ export default function App() {
   }, [loadDays, loadBudget]);
 
   const { connected, members, saveState, save } = useRoom(roomCode, onRemoteUpdate);
+
+  // useRoom fetches nothing for LOCAL, so the mock payload is seeded here. The
+  // ref keeps edits from being wiped: onRemoteUpdate is a new function each render.
+  const localSeeded = useRef(false);
+  useEffect(() => {
+    if (!localMode || localSeeded.current) return;
+    localSeeded.current = true;
+    onRemoteUpdate(mockRoomPayload);
+  }, [localMode, onRemoteUpdate]);
+
   const people = Math.max(1, members.length + mockPeople.length);
   // grandTotal depends on people: "perPerson" expenses scale up with the traveler count.
   const grandTotal = useMemo(
@@ -208,6 +230,7 @@ export default function App() {
         rooms={userRooms}
         addRoom={addRoom}
         removeRoom={removeRoom}
+        onEnterLocal={LOCAL_MODE_ENABLED ? () => setRoomCode(LOCAL_ROOM_CODE) : undefined}
       />
     );
   }
@@ -216,7 +239,7 @@ export default function App() {
     <div className="mx-auto max-w-[1280px] rounded-[14px] p-4">
       <AppHeader
         roomCode={roomCode}
-        connected={connected}
+        connected={connected || localMode}
         saveState={saveState}
         trip={trip}
         grandTotal={grandTotal}
@@ -228,7 +251,7 @@ export default function App() {
             setTripSpans([]);
           }
         }}
-        onLeaveRoom={() => setRoomCode(null)}
+        onLeaveRoom={() => { localSeeded.current = false; setRoomCode(null); }}
       />
 
       <TabBar active={activeTab} onChange={setActiveTab} pendingTaskCount={pendingTaskCount} />

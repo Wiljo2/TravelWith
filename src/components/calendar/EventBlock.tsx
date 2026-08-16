@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { CATEGORIES } from "@/constants/categories";
 import { HOUR_START, PX_PER_HOUR } from "@/constants/time";
 import { fmtHour, durLabel } from "@/utils/time";
+import { cssZoom } from "@/utils/zoom";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Category } from "@/types";
 
@@ -122,7 +123,7 @@ export default function EventBlock({
       draggable
       onDragStart={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        const grabOffsetHours = (e.clientY - rect.top) / PX_PER_HOUR;
+        const grabOffsetHours = (e.clientY - rect.top) / (PX_PER_HOUR * cssZoom(e.currentTarget));
         e.dataTransfer.setDragImage(getEmptyImg(), 0, 0);
         onDragStart(e, ev, dayId, grabOffsetHours);
         setDragging(true);

@@ -19,10 +19,11 @@ interface RoomGateProps {
   rooms: UserRoom[];
   addRoom: (code: string, role?: "owner" | "member", name?: string | null) => void;
   removeRoom: (code: string, accessToken: string) => Promise<void>;
+  onEnterLocal?: () => void;
 }
 
 export default function RoomGate({
-  onEnter, user, session, authLoading, signInWithGoogle, signOut, rooms, addRoom, removeRoom,
+  onEnter, user, session, authLoading, signInWithGoogle, signOut, rooms, addRoom, removeRoom, onEnterLocal,
 }: RoomGateProps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -268,6 +269,15 @@ export default function RoomGate({
               </div>
             )}
           </>
+        )}
+
+        {onEnterLocal && (
+          <button
+            onClick={onEnterLocal}
+            className="mt-6 w-full cursor-pointer border-none bg-transparent text-[11px] text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            Modo local · datos de prueba, sin cuenta ni guardado
+          </button>
         )}
       </div>
 

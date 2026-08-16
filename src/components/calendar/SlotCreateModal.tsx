@@ -4,6 +4,7 @@ import type { Task, TaskPriority } from "@/types";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT, PRIORITIES, PRIORITY_ORDER } from "@/constants/taskCategories";
 import { CATEGORIES } from "@/constants/categories";
 import { fmtHour } from "@/utils/time";
+import { rootZoom } from "@/utils/zoom";
 import { HOUR_END } from "@/constants/time";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -50,9 +51,13 @@ export default function SlotCreateModal({
     else onSaveTask({ title: title.trim(), note: note.trim(), cat: taskCat, priority, start, end });
   }
 
+  // x/y arrive as client coordinates; the modal is positioned inside the zoomed
+  // body, so both the cursor point and the viewport bounds go back to local px.
   const W = 288;
-  const left = typeof window !== "undefined" ? Math.min(x, window.innerWidth - W - 12) : x;
-  const top  = typeof window !== "undefined" ? Math.min(y, window.innerHeight - 440) : y;
+  const H = 440;
+  const z = rootZoom();
+  const left = typeof window !== "undefined" ? Math.min(x, window.innerWidth - (W + 12) * z) / z : x;
+  const top  = typeof window !== "undefined" ? Math.min(y, window.innerHeight - H * z) / z : y;
 
   return (
     <>

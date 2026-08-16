@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { HOUR_START, HOUR_END, PX_PER_HOUR } from "@/constants/time";
 import { CATEGORIES } from "@/constants/categories";
 import { snapHour, fmtHour } from "@/utils/time";
+import { cssZoom } from "@/utils/zoom";
 import { EventCard } from "./EventBlock";
 import EventBlock from "./EventBlock";
 import TaskBlock from "./TaskBlock";
@@ -114,8 +115,9 @@ export default function DayColumn({
   const [swapOver, setSwapOver] = useState(false);
 
   function getHour(clientY: number) {
-    const rect = colRef.current!.getBoundingClientRect();
-    return HOUR_START + (clientY - rect.top) / PX_PER_HOUR;
+    const el = colRef.current!;
+    const rect = el.getBoundingClientRect();
+    return HOUR_START + (clientY - rect.top) / (PX_PER_HOUR * cssZoom(el));
   }
 
   const hoverHour = hoverY !== null ? snapHour(hoverY, 1, HOUR_START, HOUR_END) : null;

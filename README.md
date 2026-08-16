@@ -68,22 +68,44 @@ npm install
 npm run dev
 ```
 
-Para habilitar la sala compartida, crea un archivo `.env.local`:
+### Modo local (sin cuenta, sin base de datos)
+
+Para trabajar en la UI sin login ni Supabase:
 
 ```
-VITE_SUPABASE_URL=https://xxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
+http://localhost:3000/?local=1
 ```
 
-Luego ejecuta el SQL de `supabase/migrations/001_init.sql` en el dashboard de Supabase.
+Arranca con los datos de prueba de `src/data/mockRoom.ts` (calendario, presupuesto
+y tareas). No guarda nada. También está el enlace *"Modo local"* al pie de la
+pantalla de entrada. Solo existe en builds de desarrollo.
 
-Sin las variables de entorno la app funciona igual pero sin sincronización.
+### Contra los datos reales
+
+Copia `.env.example` a `.env.local` y llena las cuatro variables desde el
+dashboard de Supabase (Settings → API) y la consola de Anthropic.
+
+`SUPABASE_SERVICE_ROLE_KEY` no es opcional: las políticas RLS de `user_rooms`
+filtran por `auth.uid()`, que es `null` para un cliente anónimo. Sin esa clave las
+salas cargan pero "Mis viajes" sale vacío y unirse o salir de un viaje no
+persiste. El servidor avisa por consola si falta.
+
+Para que el login con Google vuelva a `localhost` en vez de a producción, agrega
+`http://localhost:3000/**` en Supabase → Authentication → URL Configuration →
+Redirect URLs. El `redirectTo` que manda la app es `window.location.origin`; si
+ese origen no está en la lista, Supabase redirige al Site URL (producción).
+
+> Local y producción comparten la misma base de datos. Los cambios que hagas en
+> `npm run dev` afectan viajes reales — usa una sala de pruebas para experimentar.
+
+Las migraciones están en `supabase/migrations/`; ejecútalas en orden en el
+dashboard de Supabase.
 
 ---
 
 ## Deploy en Vercel
 
 1. Importa el repo desde [vercel.com/new](https://vercel.com/new)
-2. Vercel detecta Vite automáticamente
-3. Agrega las variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` en Settings → Environment Variables
+2. Vercel detecta Next.js automáticamente
+3. Agrega las variables de `.env.example` en Settings → Environment Variables
 4. Comparte la URL + el código de sala con tu grupo
