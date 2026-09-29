@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { createServerClient, getUserFromToken } from "@/lib/supabase-server";
+import type { User } from "@supabase/supabase-js";
+import { createServerClient } from "@/lib/supabase-server";
+import { requireUser } from "@/server/auth";
+import { errorResponse } from "@/server/http";
 import type { TripInfo } from "@/types";
 
 export interface TripListItem {
@@ -14,12 +17,14 @@ export interface TripListItem {
 // GET /api/rooms/list — trips of the authenticated user, with trip metadata.
 // Ordered by last_active_at desc so the first item is the trip to auto-resume.
 export async function GET(req: Request) {
-  const token = req.headers.get("Authorization")?.replace("Bearer ", "");
-  if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  try {
+    return NextResponse.json(await listTrips(await requireUser(req)));
+  } catch (e) {
+    return errorResponse(e, "GET /api/rooms/list");
+  }
+}
 
-  const user = await getUserFromToken(token);
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
+async function listTrips(user: User): Promise<TripListItem[]> {
   const supabase = createServerClient();
 
   const { data: memberships, error: mErr } = await supabase
@@ -28,8 +33,8 @@ export async function GET(req: Request) {
     .eq("user_id", user.id)
     .order("last_active_at", { ascending: false });
 
-  if (mErr) return NextResponse.json({ error: mErr.message }, { status: 500 });
-  if (!memberships || memberships.length === 0) return NextResponse.json([]);
+  if (mErr) throw mErr;
+  if (!memberships || memberships.length === 0) return [];
 
   const codes = memberships.map((m) => m.room_code);
   const { data: rooms, error: rErr } = await supabase
@@ -37,13 +42,13 @@ export async function GET(req: Request) {
     .select("code, name, payload->trip")
     .in("code", codes);
 
-  if (rErr) return NextResponse.json({ error: rErr.message }, { status: 500 });
+  if (rErr) throw rErr;
 
   const byCode = new Map((rooms ?? []).map((r) => [r.code, r as { code: string; name: string | null; trip: TripInfo | null }]));
 
   // Drop stale memberships whose room no longer exists (defensive — shouldn't
   // happen given the cleanup in DELETE /members, but never resume into a dead room).
-  const items: TripListItem[] = memberships
+  return memberships
     .filter((m) => byCode.has(m.room_code))
     .map((m) => {
       const room = byCode.get(m.room_code)!;
@@ -56,6 +61,4 @@ export async function GET(req: Request) {
         trip: room.trip ?? null,
       };
     });
-
-  return NextResponse.json(items);
 }

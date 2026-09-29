@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import type { UserRoom } from "@/hooks/useUserRooms";
+import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,27 +38,27 @@ export default function RoomGate({
   const [deleteTarget, setDeleteTarget] = useState<{ code: string; name: string | null } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  async function registerMember(code: string, role?: "owner" | "member") {
-    if (!session?.access_token) return;
-    await fetch(`/api/rooms/${code}/members`, {
+  function registerMember(code: string, role?: "owner" | "member") {
+    return apiFetch(`/api/rooms/${code}/members`, session?.access_token, {
       method: "POST",
-      headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(role ? { role } : {}),
     });
   }
 
+  // Reading a room requires membership, so joining registers first; the
+  // members endpoint answers 404 for unknown codes.
   async function join(code?: string) {
     const c = (code ?? input).trim().toUpperCase();
     if (!c) return;
     setLoading(true);
     setError("");
-    const res = await fetch(`/api/rooms/${c}`);
+    const res = await registerMember(c, "member");
     if (!res.ok) {
-      setError("Sala no encontrada.");
+      setError(res.status === 404 ? "Sala no encontrada." : "No se pudo entrar al viaje.");
       setLoading(false);
       return;
     }
-    await registerMember(c, "member");
     addRoom(c, "member");
     onEnter(c);
   }

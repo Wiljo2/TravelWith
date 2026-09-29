@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { validateTripInput } from "@/lib/validate";
 import { generateDays } from "@/utils/tripDays";
 import { DEFAULT_RATE } from "@/utils/currency";
+import { errorResponse } from "@/server/http";
 import type { RoomPayload } from "@/types";
 
 function genCode(): string {
@@ -56,9 +57,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ code, trip }, { status: 201 });
     }
     // 23505 = unique_violation → code collision, try a new one
-    if (error.code !== "23505") {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    if (error.code !== "23505") return errorResponse(error, "POST /api/rooms");
   }
 
   return NextResponse.json({ error: "No se pudo generar un código único" }, { status: 500 });

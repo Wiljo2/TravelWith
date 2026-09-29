@@ -142,7 +142,7 @@ export default function App() {
     if (Array.isArray(payload.tasks))      setTasks(payload.tasks);
   }, [loadDays, loadBudget]);
 
-  const { connected, members, saveState, save } = useRoom(roomCode, onRemoteUpdate);
+  const { connected, members, saveState, save } = useRoom(roomCode, session?.access_token, onRemoteUpdate);
 
   // useRoom fetches nothing for LOCAL, so the mock payload is seeded here. The
   // ref keeps edits from being wiped: onRemoteUpdate is a new function each render.
@@ -297,7 +297,7 @@ export default function App() {
             </div>
 
             {sidePanel === "agent" ? (
-              <AgentPanel roomCode={roomCode} messages={agentMessages} setMessages={setAgentMessages} />
+              <AgentPanel roomCode={roomCode} accessToken={session?.access_token} messages={agentMessages} setMessages={setAgentMessages} />
             ) : (
               <BudgetPanel
                 selectedEvent={selectedEvent}

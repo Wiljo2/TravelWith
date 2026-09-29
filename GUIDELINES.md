@@ -150,7 +150,9 @@ All trip state is stored as **a single JSONB `payload`** in the `rooms` table. O
   2. Validates the minimal body shape before writing, returning 400 with a message.
   3. Returns `{ error }` with the right status (400/401/404/409/500) — never throws uncaught.
 - Mutation endpoints should be **idempotent** where possible (see POST members: already a member → `{ ok: true }`).
-- Authenticated routes: token via `Authorization: Bearer` header, verified with `getUserFromToken`. Never trust a `userId` coming in the body.
+- Authenticated routes: token via `Authorization: Bearer` header. Use `requireUser` / `requireMember(req, code, minRole?)` from `src/server/auth.ts`, never hand-parse the header. Every room-scoped route calls `requireMember` (the service role bypasses RLS, so this is the only access check). Never trust a `userId` or role coming in the body.
+- Errors: wrap handlers in `try/catch` and return `errorResponse(e, context)` from `src/server/http.ts`. Throw `HttpError(status, message)` for user-facing errors; database and provider errors are logged and answered with a generic 500, never echoed.
+- Client calls to room routes go through `apiFetch(path, accessToken, init)` (`src/lib/api.ts`).
 - Schema changes = **new file** in `supabase/migrations/` with a sequential numeric prefix (`002_...`). Never edit an applied migration.
 
 ### Known backend debt (do not make it worse)

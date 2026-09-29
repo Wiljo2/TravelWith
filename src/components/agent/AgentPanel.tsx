@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 
 export interface AgentChatMessage {
   role: "user" | "assistant";
@@ -19,11 +20,12 @@ const EXAMPLES = [
 
 interface AgentPanelProps {
   roomCode: string;
+  accessToken: string | undefined;
   messages: AgentChatMessage[];
   setMessages: React.Dispatch<React.SetStateAction<AgentChatMessage[]>>;
 }
 
-export default function AgentPanel({ roomCode, messages, setMessages }: AgentPanelProps) {
+export default function AgentPanel({ roomCode, accessToken, messages, setMessages }: AgentPanelProps) {
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -63,7 +65,7 @@ export default function AgentPanel({ roomCode, messages, setMessages }: AgentPan
     abortRef.current = controller;
 
     try {
-      const res = await fetch(`/api/rooms/${roomCode}/agent`, {
+      const res = await apiFetch(`/api/rooms/${roomCode}/agent`, accessToken, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: history.map(({ role, content }) => ({ role, content })) }),

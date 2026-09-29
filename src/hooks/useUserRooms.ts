@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import type { TripInfo } from "@/types";
+import { apiFetch } from "@/lib/api";
 
 export interface UserRoom {
   room_code: string;
@@ -25,7 +26,7 @@ export function useUserRooms(user: User | null, accessToken: string | undefined)
       return;
     }
     setRoomsLoading(true);
-    fetch("/api/rooms/list", { headers: { Authorization: `Bearer ${accessToken}` } })
+    apiFetch("/api/rooms/list", accessToken)
       .then((r) => (r.ok ? r.json() : []))
       .then((items: { code: string; name: string | null; role: string; joined_at: string; last_active_at: string; trip: TripInfo | null }[]) => {
         setRooms(items.map((i) => ({
@@ -61,10 +62,7 @@ export function useUserRooms(user: User | null, accessToken: string | undefined)
 
   // Uses the server-side API (service role key) to bypass RLS
   async function removeRoom(code: string, accessToken: string) {
-    await fetch(`/api/rooms/${code}/members`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    await apiFetch(`/api/rooms/${code}/members`, accessToken, { method: "DELETE" });
     setRooms((prev) => prev.filter((r) => r.room_code !== code));
   }
 

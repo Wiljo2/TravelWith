@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 import type { RoomMember, RoomPayload } from "@/types";
 
 export type { MockPerson, RoomPayload } from "@/types";
@@ -15,6 +16,7 @@ interface UseRoomResult {
 
 export function useRoom(
   code: string | null,
+  accessToken: string | undefined,
   onRemoteUpdate: (payload: RoomPayload) => void,
 ): UseRoomResult {
   const [connected, setConnected] = useState(false);
@@ -22,6 +24,12 @@ export function useRoom(
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const skipSave = useRef(false);
   const lastUpdatedAt = useRef<string | null>(null);
+  // Tokens refresh about hourly; a ref keeps saves current without resubscribing.
+  const token = useRef(accessToken);
+  useEffect(() => {
+    token.current = accessToken;
+  }, [accessToken]);
+  const hasToken = !!accessToken;
 
   const save = useCallback(
     async (payload: RoomPayload) => {
@@ -32,7 +40,7 @@ export function useRoom(
       }
       setSaveState("saving");
       try {
-        const res = await fetch(`/api/rooms/${code}`, {
+        const res = await apiFetch(`/api/rooms/${code}`, token.current, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, expectedUpdatedAt: lastUpdatedAt.current ?? undefined }),
@@ -66,10 +74,13 @@ export function useRoom(
   );
 
   useEffect(() => {
-    if (!code || code === "LOCAL") return;
+    if (!code || code === "LOCAL" || !hasToken) return;
 
-    fetch(`/api/rooms/${code}`)
-      .then((r) => r.json())
+    apiFetch(`/api/rooms/${code}`, token.current)
+      .then((r) => {
+        if (!r.ok) throw new Error(`GET room ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         const p = data?.payload as RoomPayload | undefined;
         if (data?.updated_at) lastUpdatedAt.current = data.updated_at;
@@ -110,7 +121,7 @@ export function useRoom(
       setConnected(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code]);
+  }, [code, hasToken]);
 
   return { connected, members, saveState, save };
 }

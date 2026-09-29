@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { normalizeRoomCode } from "@/lib/validate";
 import { TripStoreError } from "@/server/trip-store";
+import { requireMember } from "@/server/auth";
+import { errorResponse, roomCodeParam } from "@/server/http";
 import { AGENT_TOOLS, TOOL_LABELS, executeTool } from "@/server/agent/tools";
 import { SYSTEM_PROMPT } from "@/server/agent/prompt";
 
@@ -18,8 +19,14 @@ type Params = Promise<{ code: string }>;
 // POST /api/rooms/[code]/agent — runs the agentic loop and streams SSE frames:
 // {type:"text",delta} | {type:"tool",name,label} | {type:"done",usage} | {type:"error",message}
 export async function POST(req: Request, { params }: { params: Params }) {
-  const code = normalizeRoomCode((await params).code);
-  if (!code) return jsonError("Código inválido", 400);
+  let code: string;
+  try {
+    code = roomCodeParam((await params).code);
+    // Beta rule: only the trip owner can run the (paid) assistant.
+    await requireMember(req, code, "owner");
+  } catch (e) {
+    return errorResponse(e, "POST /api/rooms/[code]/agent");
+  }
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return jsonError(
@@ -152,19 +159,19 @@ function validateTurns(raw: unknown): ChatTurn[] {
   return turns;
 }
 
+// Only messages meant for the user reach the client; provider and database
+// details are logged server-side.
 function friendlyError(e: unknown): string {
-  if (e instanceof TripStoreError) return e.message;
-  if (e instanceof Anthropic.AuthenticationError) {
-    return "La API key de Anthropic no es válida. Revisa ANTHROPIC_API_KEY.";
-  }
+  if (e instanceof TripStoreError && e.status < 500) return e.message;
   if (e instanceof Anthropic.RateLimitError) {
     return "Se alcanzó el límite de peticiones a Claude. Intenta de nuevo en unos segundos.";
   }
   if (e instanceof Anthropic.APIConnectionError) {
-    return "No se pudo conectar con la API de Claude. Revisa tu conexión.";
+    return "No se pudo conectar con la API de Claude. Intenta de nuevo.";
   }
+  console.error("[api] POST /api/rooms/[code]/agent", e);
   if (e instanceof Anthropic.APIError) {
-    return `Error de la API de Claude (${e.status ?? "?"}): ${e.message}`;
+    return "El asistente no está disponible en este momento. Intenta más tarde.";
   }
   return "Ocurrió un error inesperado en el asistente.";
 }
