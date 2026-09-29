@@ -1,5 +1,5 @@
 import type { Day } from "@/types";
-import { HOUR_START } from "@/constants/time";
+import { HOUR_START, HOUR_END } from "@/constants/time";
 
 const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -44,6 +44,12 @@ export function generateDays(startDate: string, endDate: string): Day[] | null {
     i++;
   }
   return days;
+}
+
+// Next free slot for a quick "+ Actividad": right after the day's last activity.
+export function nextFreeHour(day: Day): number {
+  const lastEnd = Math.max(0, ...day.events.map((e) => e.end));
+  return lastEnd ? Math.min(Math.ceil(lastEnd), HOUR_END - 1) : 9;
 }
 
 export type TripPhase =

@@ -10,13 +10,14 @@ import { tripPhase } from "@/utils/tripDays";
 import type { TripPhase } from "@/utils/tripDays";
 import { useNow } from "@/hooks/useNow";
 import { cn } from "@/lib/utils";
-import type { Day, Task, TripInfo } from "@/types";
+import type { Day, Idea, Task, TripInfo } from "@/types";
 import type { Tab } from "@/components/TabBar";
 
 interface HomeViewProps {
   trip: TripInfo | null;
   days: Day[];
   tasks: Task[];
+  ideas: Idea[];
   grandTotal: number;
   people: number;
   exchangeRate: number;
@@ -35,7 +36,7 @@ function heroCopy(phase: TripPhase | null, dayCount: number) {
 
 // Adapts to the moment: countdown and decisions before the trip, "now / next"
 // while it's underway, and a wrap-up once it's over.
-export default function HomeView({ trip, days, tasks, grandTotal, people, exchangeRate, onNavigate }: HomeViewProps) {
+export default function HomeView({ trip, days, tasks, ideas, grandTotal, people, exchangeRate, onNavigate }: HomeViewProps) {
   const now = useNow();
   const phase = trip ? tripPhase(trip.startDate, days.length, now) : null;
   const during = phase?.phase === "during" ? phase : null;
@@ -50,6 +51,8 @@ export default function HomeView({ trip, days, tasks, grandTotal, people, exchan
     .filter((t) => (t.options?.length ?? 0) > 0 || t.priority === "alta")
     .slice(0, 4);
 
+  const openIdeas = ideas.filter((i) => (i.status ?? "idea") === "idea");
+  const unsortedIdeas = openIdeas.filter((i) => !i.place || !i.cat).length;
   const toItinerary = () => onNavigate("calendar");
   const toTasks = () => onNavigate("tasks");
 
@@ -104,6 +107,19 @@ export default function HomeView({ trip, days, tasks, grandTotal, people, exchan
             ) : (
               <TaskList tasks={toDecide} people={people} exchangeRate={exchangeRate} onOpen={toTasks} />
             )}
+          </section>
+        )}
+
+        {!after && (
+          <section className={PANEL}>
+            <SectionTitle title="Ideas del grupo" count={openIdeas.length} action="Ideas" onAction={() => onNavigate("ideas")} />
+            <p className="text-[13px] text-secondary-foreground">
+              {openIdeas.length === 0
+                ? "Guarden aquí los reels y TikToks de comida, planes y tips de los lugares del viaje."
+                : unsortedIdeas > 0
+                  ? `${unsortedIdeas} ${unsortedIdeas === 1 ? "idea espera" : "ideas esperan"} lugar o tipo. Organícenlas y voten sus favoritas.`
+                  : "Todas las ideas están organizadas por lugar. Voten sus favoritas."}
+            </p>
           </section>
         )}
 

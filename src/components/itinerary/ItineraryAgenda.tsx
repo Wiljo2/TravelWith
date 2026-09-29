@@ -3,8 +3,8 @@ import { useEffect, useRef } from "react";
 import { Plus } from "lucide-react";
 import { CATEGORIES } from "@/constants/categories";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT } from "@/constants/taskCategories";
-import { HOUR_END } from "@/constants/time";
 import { fmtHour } from "@/utils/time";
+import { nextFreeHour } from "@/utils/tripDays";
 import { daySpanLabels } from "@/utils/spans";
 import { PANEL } from "@/components/home/shared";
 import { cn } from "@/lib/utils";
@@ -23,12 +23,6 @@ interface ItineraryAgendaProps {
 }
 
 type Row = { kind: "event"; ev: CalendarEvent; start: number } | { kind: "task"; task: Task; start: number };
-
-// Next free slot for a quick "+ Actividad": right after the day's last activity.
-function suggestedHour(day: Day): number {
-  const lastEnd = Math.max(0, ...day.events.map((e) => e.end));
-  return lastEnd ? Math.min(Math.ceil(lastEnd), HOUR_END - 1) : 9;
-}
 
 // The whole trip as a list of day cards — the default, low-noise itinerary view.
 export default function ItineraryAgenda({
@@ -77,7 +71,7 @@ export default function ItineraryAgenda({
                 )}
               </div>
               <button
-                onClick={(e) => onAdd(day.id, suggestedHour(day), e.clientX, e.clientY)}
+                onClick={(e) => onAdd(day.id, nextFreeHour(day), e.clientX, e.clientY)}
                 className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-2.5 py-1.5 text-[13px] font-medium text-emerald-700 hover:bg-accent"
               >
                 <Plus className="size-4" />

@@ -3,9 +3,9 @@ import { useItinerary } from "@/hooks/useItinerary";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useBudget } from "@/hooks/useBudget";
 import { useRoom } from "@/hooks/useRoom";
-import { useAuth } from "@/hooks/useAuth";
-import { useUserRooms } from "@/hooks/useUserRooms";
+import { useTripSession } from "@/hooks/useTripSession";
 import { useTasks } from "@/hooks/useTasks";
+import { useIdeas } from "@/hooks/useIdeas";
 import type { RoomPayload, MockPerson } from "@/hooks/useRoom";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { snapHour } from "@/utils/time";
@@ -22,6 +22,8 @@ import AppHeader from "@/components/AppHeader";
 import Toast from "@/components/Toast";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
+import IdeasView from "@/components/ideas/IdeasView";
+import { placeProfiles, seedPlaces } from "@/utils/ideas";
 import type { Task, ToastAction, TripInfo, TripSpan } from "@/types";
 import { initialDays } from "@/data/initialDays";
 import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE, mockRoomPayload } from "@/data/mockRoom";
@@ -34,36 +36,9 @@ import ActivityDetail from "@/components/itinerary/ActivityDetail";
 import SpansManager from "@/components/itinerary/SpansManager";
 
 export default function App() {
-  const [roomCode, setRoomCode] = useState<string | null>(null);
-
-  // Auto-resume: the user↔room relation (last_active_at) is persisted in
-  // Supabase (user_rooms), not localStorage, so this works across devices.
-  // Only auto-enters when there's a SINGLE trip — no ambiguity to resolve.
-  // With multiple trips, RoomGate's "Mis viajes" list is shown instead so the
-  // user can see and pick among all of them (auto-jumping to just one would
-  // hide the rest). A later explicit "leave" (onLeaveRoom) won't be undone by
-  // this, since resumeAttempted stays true afterward.
-  const { user, session, loading: authLoading, signInWithGoogle, signOut } = useAuth();
-  const { rooms: userRooms, roomsLoading, addRoom, removeRoom } = useUserRooms(user, session?.access_token);
-  const [resumeAttempted, setResumeAttempted] = useState(false);
-
-  const localMode = roomCode === LOCAL_ROOM_CODE;
-
-  useEffect(() => {
-    if (resumeAttempted) return;
-    if (authLoading || roomsLoading) return;
-    setResumeAttempted(true);
-    if (user && userRooms.length === 1) setRoomCode(userRooms[0].room_code);
-  }, [resumeAttempted, authLoading, roomsLoading, user, userRooms]);
-
-  // `?local=1` boots straight into local mode, skipping sign-in and the
-  // auto-resume above (which is what redirects a returning user into their room).
-  useEffect(() => {
-    if (!LOCAL_MODE_ENABLED) return;
-    if (!new URLSearchParams(window.location.search).has("local")) return;
-    setResumeAttempted(true);
-    setRoomCode(LOCAL_ROOM_CODE);
-  }, []);
+  const { roomCode, setRoomCode, resumeAttempted, localMode, auth, userRooms: rooms } = useTripSession();
+  const { user, session, loading: authLoading, signInWithGoogle, signOut } = auth;
+  const { rooms: userRooms, addRoom, removeRoom } = rooms;
 
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [slotDraft, setSlotDraft] = useState<{ dayId: string; hour: number; x: number; y: number; task: Task | null } | null>(null);
@@ -76,6 +51,10 @@ export default function App() {
   const [mockPeople, setMockPeople] = useState<MockPerson[]>([]);
   const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
   const { tasks, setTasks, addTask, toggleTask, updateTask, deleteTask, swapTaskDays } = useTasks();
+  const {
+    ideas, setIdeas, loadingIds, customPlaces, setCustomPlaces, renamePlace,
+    updateIdea, removeIdea, toggleVote, applySuggestions, acceptAllSuggestions, addFromText, refreshMetadata, setNote,
+  } = useIdeas(roomCode);
   const [trip, setTrip] = useState<TripInfo | null>(null);
 
   function addTripSpan(span: TripSpan) { setTripSpans((p) => [...p, span]); }
@@ -130,6 +109,8 @@ export default function App() {
     if (Array.isArray(payload.mockPeople)) setMockPeople(payload.mockPeople);
     if (Array.isArray(payload.tripSpans))  setTripSpans(payload.tripSpans);
     if (Array.isArray(payload.tasks))      setTasks(payload.tasks);
+    if (Array.isArray(payload.ideas))      setIdeas(payload.ideas);
+    if (Array.isArray(payload.ideaPlaces)) setCustomPlaces(payload.ideaPlaces);
   }, [loadDays, loadBudget]);
 
   const { connected, members, saveState, save } = useRoom(roomCode, onRemoteUpdate);
@@ -163,11 +144,11 @@ export default function App() {
     if (!connected) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      save({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks });
+      save({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ideas, ideaPlaces: customPlaces });
     }, 600);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, roomCode, connected]);
+  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, roomCode, connected]);
 
   function handleSelect(id: string | null) {
     setSelectedId(id);
@@ -224,6 +205,11 @@ export default function App() {
   }
 
   const todayIdx = trip ? tripDayIndex(trip.startDate, days.length) : undefined;
+  const places = customPlaces ?? seedPlaces(trip?.destination, days);
+  const profiles = placeProfiles(places, days);
+  const voter = user?.id ?? "local";
+  const addedBy = user ? String(user.user_metadata?.full_name ?? user.email ?? "").split(" ")[0] || undefined : undefined;
+
   const detail = selectedEvent && (
     <ActivityDetail
       key={selectedEvent.ev.id}
@@ -277,6 +263,7 @@ export default function App() {
           trip={trip}
           days={days}
           tasks={tasks}
+          ideas={ideas}
           grandTotal={grandTotal}
           people={people}
           exchangeRate={exchangeRate}
@@ -340,6 +327,26 @@ export default function App() {
             initialDayIdx={todayIdx}
           />
           }
+        />
+      )}
+
+      {activeTab === "ideas" && (
+        <IdeasView
+          ideas={ideas}
+          profiles={profiles}
+          loadingIds={loadingIds}
+          mobile={isMobile}
+          voter={voter}
+          onAdd={(text, note) => addFromText(text, note, addedBy, profiles)}
+          onUpdate={updateIdea}
+          onRemove={removeIdea}
+          onVote={(id) => toggleVote(id, voter)}
+          onApplySuggestions={applySuggestions}
+          onAcceptAll={acceptAllSuggestions}
+          onSetNote={(id, note) => setNote(id, note, profiles)}
+          onRetry={(id) => refreshMetadata(id, profiles)}
+          onAddPlace={(place) => setCustomPlaces([...places, place])}
+          onRemovePlace={(place) => { setCustomPlaces(places.filter((p) => p !== place)); renamePlace(place, undefined); }}
         />
       )}
 

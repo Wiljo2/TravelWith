@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Day, Extra, RoomMember, Task, TripInfo, TripSpan } from "@/types";
+import type { Day, Extra, Idea, RoomMember, Task, TripInfo, TripSpan } from "@/types";
 
 export interface MockPerson {
   id: string;
@@ -15,6 +15,8 @@ export interface RoomPayload {
   mockPeople?: MockPerson[];
   tripSpans?: TripSpan[];
   tasks?: Task[];
+  ideas?: Idea[];
+  ideaPlaces?: string[];   // places for organizing ideas; unset = derived from the trip
 }
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
