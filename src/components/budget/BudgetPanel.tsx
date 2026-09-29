@@ -7,6 +7,7 @@ import TaskPreviewCard from "@/components/budget/TaskPreviewCard";
 import CalendarSpansCard from "@/components/budget/CalendarSpansCard";
 import PerPersonCard from "@/components/budget/PerPersonCard";
 import type { CalendarEvent, Extra, Day, DaySpan, TripSpan, Task } from "@/types";
+import { cn } from "@/lib/utils";
 
 interface BudgetPanelProps {
   selectedEvent: { ev: CalendarEvent; dayId: string } | null;
@@ -43,10 +44,10 @@ export default function BudgetPanel({
   const pendingDay = pendingNew ? days.find((d) => d.id === pendingNew.dayId) : null;
 
   return (
-    <div className="flex w-[300px] shrink-0 flex-col gap-2.5">
+    <div className="flex w-full flex-col gap-2.5 md:w-[300px] md:shrink-0">
 
       <div className="rounded-[10px] border border-border bg-card p-3.5">
-        <div className="mb-2.5 text-[13px] font-semibold">
+        <div className={cn("mb-2.5 text-[13px] font-semibold", selectedEvent && "max-md:hidden")}>
           {selectedEvent ? "Editar actividad" : pendingNew ? "Nueva actividad" : "Selecciona un bloque"}
         </div>
 

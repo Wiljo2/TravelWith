@@ -65,7 +65,7 @@ export default function EventEditor({ ev, onChange, onDelete, deleteLabel = "Eli
                 key={key}
                 onClick={() => onChange({ cat: key })}
                 className={cn(
-                  "flex cursor-pointer items-center gap-[5px] rounded-full border-[1.5px] px-[9px] py-1 text-[11px] font-medium transition-all",
+                  "flex cursor-pointer items-center gap-[5px] rounded-full border-[1.5px] px-[9px] py-1.5 text-[11px] font-medium transition-all md:py-1",
                   !active && "border-border bg-secondary text-muted-foreground",
                 )}
                 style={active ? { background: c.bg, borderColor: c.border, color: c.text, boxShadow: `0 0 0 2px ${c.border}33` } : undefined}

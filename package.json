@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "next dev",
+    "local": "node scripts/dev.mjs --open",
+    "local:mock": "node scripts/dev.mjs --local --open",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

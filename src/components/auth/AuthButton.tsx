@@ -25,7 +25,7 @@ export default function AuthButton() {
         ? <img src={avatar} alt={name} width={28} height={28} className="rounded-full border-2 border-border" />
         : <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-primary-foreground">{name[0].toUpperCase()}</div>
       }
-      <span className="max-w-[130px] truncate text-[13px] text-secondary-foreground">
+      <span className="hidden max-w-[130px] truncate text-[13px] text-secondary-foreground md:inline">
         {name}
       </span>
       <Button variant="ghost" size="sm" onClick={signOut} className="h-auto px-1.5 py-0.5 text-xs text-muted-foreground">

@@ -98,14 +98,31 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* The desktop UI is dense and zoomed out; phones render at 1:1. */
   :root {
-    --app-zoom: 0.85;
+    --app-zoom: 1;
+  }
+  @media (min-width: 768px) {
+    :root {
+      --app-zoom: 0.85;
+    }
   }
   body {
-    @apply bg-background text-foreground m-0 p-2.5 antialiased;
+    @apply bg-background text-foreground m-0 p-0 antialiased md:p-2.5;
     zoom: var(--app-zoom);
   }
   html {
     @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  /* iOS zooms the page when focusing a field under 16px. */
+  @media (pointer: coarse) {
+    input,
+    textarea,
+    select {
+      font-size: max(16px, 1em) !important;
+    }
   }
 }

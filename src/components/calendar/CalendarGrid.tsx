@@ -2,11 +2,14 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import HourGutter from "./HourGutter";
 import DayColumn from "./DayColumn";
+import DateStrip from "./DateStrip";
 import { cn } from "@/lib/utils";
 import type { Day, CalendarEvent, DragPreview, TripSpan, DaySpan, Task } from "@/types";
 import { CATEGORIES } from "@/constants/categories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { cssZoom } from "@/utils/zoom";
+import { useIsMobile, useIsTouch } from "@/hooks/useMediaQuery";
+import { useTouchDrag } from "@/hooks/useTouchDrag";
 
 // Given all days and all trip-level spans, compute the DaySpan slices visible
 // in a specific day. A span crossing N days produces a slice in each of those days.
@@ -45,8 +48,10 @@ function resolveForDay(day: Day, allDays: Day[], tripSpans: TripSpan[]): DaySpan
 }
 
 const GUTTER_W = 56;
+const GUTTER_W_MOBILE = 44;
 const DAY_MIN  = 165;
 const MAX_DAYS = 5;
+const SWIPE_MIN_PX = 50;
 
 function calcVisible(containerWidth: number): number {
   const available = containerWidth - GUTTER_W;
@@ -58,6 +63,8 @@ interface CalendarGridProps {
   tripSpans: TripSpan[];
   tasks: Task[];
   onDragStart: (e: React.DragEvent, ev: CalendarEvent, dayId: string, grabOffsetHours: number) => void;
+  onTouchDragStart: (ev: CalendarEvent, dayId: string, grabOffsetHours: number) => void;
+  onTouchDragCancel: () => void;
   onDragEnter: (dayId: string) => void;
   onDragMove: (dayId: string, cursorHour: number) => void;
   onDrop: (dayId: string, droppedHour: number) => void;
@@ -71,15 +78,22 @@ interface CalendarGridProps {
   onEditTask: (task: Task, x: number, y: number) => void;
   onSwapDays: (aId: string, bId: string) => void;
   pendingNew?: { dayId: string; hour: number } | null;
+  // Day to open on first render, e.g. today while the trip is underway.
+  initialDayIdx?: number;
 }
 
 export default function CalendarGrid({
-  days, tripSpans, tasks, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd,
+  days, tripSpans, tasks, onDragStart, onTouchDragStart, onTouchDragCancel, onDragEnter, onDragMove, onDrop, onDragEnd,
   onSelect, selectedId, dragTarget, dragPreview, onAddEvent, onToggleTask, onEditTask, onSwapDays, pendingNew,
+  initialDayIdx,
 }: CalendarGridProps) {
+  const mobile = useIsMobile();
+  const touch = useIsTouch();
   const containerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(900);
   const [startIdx, setStartIdx] = useState(0);
+  const [slideDir, setSlideDir] = useState<-1 | 0 | 1>(0);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -91,21 +105,100 @@ export default function CalendarGrid({
     return () => ro.disconnect();
   }, []);
 
-  const visible  = calcVisible(containerW);
+  const jumpedToInitial = useRef(false);
+  useEffect(() => {
+    if (jumpedToInitial.current || initialDayIdx == null || initialDayIdx < 0) return;
+    jumpedToInitial.current = true;
+    setStartIdx(initialDayIdx);
+  }, [initialDayIdx]);
+
+  const gutterW  = mobile ? GUTTER_W_MOBILE : GUTTER_W;
+  const visible  = mobile ? 1 : calcVisible(containerW);
   const maxStart = Math.max(0, days.length - visible);
   const idx      = Math.min(startIdx, maxStart);
   const slice    = days.slice(idx, idx + visible);
 
-  const goLeft  = useCallback(() => setStartIdx((s) => Math.max(0, s - 1)), []);
-  const goRight = useCallback(() => setStartIdx((s) => Math.min(maxStart, s + 1)), [maxStart]);
+  const goTo = useCallback((next: number) => {
+    const clamped = Math.max(0, Math.min(maxStart, next));
+    setSlideDir(clamped > idx ? 1 : clamped < idx ? -1 : 0);
+    setStartIdx(clamped);
+  }, [idx, maxStart]);
+  const goLeft  = useCallback(() => goTo(idx - 1), [goTo, idx]);
+  const goRight = useCallback(() => goTo(idx + 1), [goTo, idx]);
+
+  const touchDrag = useTouchDrag({
+    onStart: onTouchDragStart,
+    onEnter: onDragEnter,
+    onMove: onDragMove,
+    onDrop,
+    onCancel: onTouchDragCancel,
+    onEdge: (dir) => (dir < 0 ? goLeft() : goRight()),
+    getEdges: () => {
+      const el = bodyRef.current;
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      return { left: rect.left + gutterW * cssZoom(el), right: rect.right };
+    },
+  });
+
+  // Horizontal swipe on the phone layout pages between days.
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  function onSwipeStart(e: React.TouchEvent) {
+    swipeStart.current = mobile && e.touches.length === 1
+      ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      : null;
+  }
+  function onSwipeEnd(e: React.TouchEvent) {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start || touchDrag.draggingId) return;
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dy = e.changedTouches[0].clientY - start.y;
+    if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (dx < 0) goRight(); else goLeft();
+  }
+
+  const columns = slice.map((day) => {
+    // Merge static day.spans with trip-level spans resolved for this day
+    const enriched: Day = {
+      ...day,
+      spans: [
+        ...(day.spans ?? []),
+        ...resolveForDay(day, days, tripSpans),
+      ],
+    };
+    return (
+      <DayColumn
+        key={day.id}
+        day={enriched}
+        tasks={tasks.filter((t) => t.dayId === day.id && t.start != null)}
+        onDragStart={onDragStart}
+        onDragEnter={onDragEnter}
+        onDragMove={onDragMove}
+        onDrop={onDrop}
+        onDragEnd={onDragEnd}
+        onSelect={onSelect}
+        onAddEvent={onAddEvent}
+        onToggleTask={onToggleTask}
+        onEditTask={onEditTask}
+        onSwapDays={onSwapDays}
+        selectedId={selectedId}
+        isDragTarget={dragTarget === day.id}
+        dragPreview={dragPreview}
+        pendingHour={pendingNew?.dayId === day.id ? pendingNew.hour : null}
+        onTouchPress={touch ? touchDrag.startPress : undefined}
+        touchDraggingId={touchDrag.draggingId}
+      />
+    );
+  });
 
   return (
     <div
       ref={containerRef}
-      className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-border bg-card"
+      className="flex min-w-0 flex-1 flex-col overflow-clip rounded-[10px] border border-border bg-card"
     >
       {/* Category legend */}
-      <div className="flex h-[34px] shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-background px-3">
+      <div className="flex h-[34px] shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-background px-3 [scrollbar-width:none]">
         {Object.entries(CATEGORIES).map(([, c]) => (
           <div key={c.label} className="flex shrink-0 items-center gap-1 whitespace-nowrap">
             <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: c.dot }} />
@@ -114,69 +207,56 @@ export default function CalendarGrid({
         ))}
       </div>
 
-      {/* Navigation bar */}
-      <div className="flex min-h-[38px] items-center justify-between gap-2 border-b border-border bg-secondary py-1.5 pl-1.5 pr-2.5">
-        <NavArrow dir="left" enabled={idx > 0} onClick={goLeft} />
-
-        <div className="flex flex-1 items-center justify-center gap-1.5">
-          {days.map((d, i) => {
-            const isVisible = i >= idx && i < idx + visible;
-            return (
-              <button
-                key={d.id}
-                onClick={() => setStartIdx(Math.min(i, maxStart))}
-                title={d.label}
-                className={cn(
-                  "h-2 shrink-0 cursor-pointer rounded border-none p-0 transition-all duration-200",
-                  isVisible ? "w-5 bg-primary" : "w-2 bg-border",
-                )}
-              />
-            );
-          })}
+      {/* Navigation: date chips on phones (sticky while scrolling hours), dots on desktop */}
+      {mobile ? (
+        <div className="sticky top-0 z-20 border-b border-border bg-secondary/95 backdrop-blur-md">
+          <DateStrip days={days} activeIdx={idx} onPick={goTo} />
         </div>
+      ) : (
+        <div className="flex min-h-[38px] items-center justify-between gap-2 border-b border-border bg-secondary py-1.5 pl-1.5 pr-2.5">
+          <NavArrow dir="left" enabled={idx > 0} onClick={goLeft} />
 
-        <NavArrow dir="right" enabled={idx < maxStart} onClick={goRight} />
-      </div>
+          <div className="flex flex-1 items-center justify-center gap-1.5">
+            {days.map((d, i) => {
+              const isVisible = i >= idx && i < idx + visible;
+              return (
+                <button
+                  key={d.id}
+                  onClick={() => setStartIdx(Math.min(i, maxStart))}
+                  title={d.label}
+                  className={cn(
+                    "h-2 shrink-0 cursor-pointer rounded border-none p-0 transition-all duration-200",
+                    isVisible ? "w-5 bg-primary" : "w-2 bg-border",
+                  )}
+                />
+              );
+            })}
+          </div>
+
+          <NavArrow dir="right" enabled={idx < maxStart} onClick={goRight} />
+        </div>
+      )}
 
       {/* Calendar body */}
-      <div className="flex flex-1 overflow-hidden">
+      <div ref={bodyRef} className="flex flex-1 overflow-hidden" onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd}>
         {/* Gutter: header spacer height matches day column header (56px) */}
-        <div className="shrink-0" style={{ width: GUTTER_W }}>
+        <div className="shrink-0" style={{ width: gutterW }}>
           <div className="h-14 border-b border-border" />
-          <HourGutter />
+          <HourGutter width={gutterW} />
         </div>
 
-        {slice.map((day) => {
-          // Merge static day.spans with trip-level spans resolved for this day
-          const enriched: Day = {
-            ...day,
-            spans: [
-              ...(day.spans ?? []),
-              ...resolveForDay(day, days, tripSpans),
-            ],
-          };
-          return (
-          <DayColumn
-            key={day.id}
-            day={enriched}
-            tasks={tasks.filter((t) => t.dayId === day.id && t.start != null)}
-            onDragStart={onDragStart}
-            onDragEnter={onDragEnter}
-            onDragMove={onDragMove}
-            onDrop={onDrop}
-            onDragEnd={onDragEnd}
-            onSelect={onSelect}
-            onAddEvent={onAddEvent}
-            onToggleTask={onToggleTask}
-            onEditTask={onEditTask}
-            onSwapDays={onSwapDays}
-            selectedId={selectedId}
-            isDragTarget={dragTarget === day.id}
-            dragPreview={dragPreview}
-            pendingHour={pendingNew?.dayId === day.id ? pendingNew.hour : null}
-          />
-          );
-        })}
+        {mobile ? (
+          <div
+            key={idx}
+            className={cn(
+              "flex min-w-0 flex-1 duration-200 animate-in fade-in-0",
+              slideDir > 0 && "slide-in-from-right-6",
+              slideDir < 0 && "slide-in-from-left-6",
+            )}
+          >
+            {columns}
+          </div>
+        ) : columns}
       </div>
     </div>
   );

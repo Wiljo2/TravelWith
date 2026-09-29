@@ -7,13 +7,15 @@ interface PriceChipProps {
   sub?: string;
   accent?: boolean;
   strong?: boolean;
+  className?: string;
 }
 
-export default function PriceChip({ label, value, sub, accent, strong }: PriceChipProps) {
+export default function PriceChip({ label, value, sub, accent, strong, className }: PriceChipProps) {
   return (
     <div
       className={cn(
         "min-w-[110px] rounded-[10px] border px-3.5 py-2",
+        className,
         strong
           ? "border-[#26215C] bg-[#26215C]"
           : accent

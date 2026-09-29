@@ -39,24 +39,30 @@ export default function AppHeader({
     ? `${trip.name} · ${fmtTripDates(trip.startDate, trip.endDate)}`
     : DEMO.title;
 
+  const total = fmtUSD(grandTotal);
+  const totalCop = fmtCOP(usdToCop(grandTotal, exchangeRate));
+
   return (
-    <div className="mb-3.5 flex flex-wrap items-end justify-between gap-3.5">
-      <div>
-        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#D85A30]">
-          {eyebrow}
+    <div className="mb-3 flex flex-wrap items-end justify-between gap-x-3.5 gap-y-2.5 md:mb-3.5">
+      <div className="flex w-full min-w-0 items-start gap-3 md:w-auto">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-[#D85A30]">
+            {eyebrow}
+          </div>
+          <h1 className="mt-0.5 text-lg font-semibold leading-snug text-foreground md:text-2xl">
+            {title}
+          </h1>
+          <div className="mt-1 hidden text-[13px] text-secondary-foreground md:block">
+            Arrastra cualquier bloque para reorganizar el plan · clic para editar horas
+          </div>
         </div>
-        <h1 className="mt-0.5 text-2xl font-semibold text-foreground">
-          {title}
-        </h1>
-        <div className="mt-1 text-[13px] text-secondary-foreground">
-          Arrastra cualquier bloque para reorganizar el plan · clic para editar horas
-        </div>
+        <PriceChip label="Total estimado" value={total} sub={totalCop} strong className="min-w-0 shrink-0 px-3 py-1.5 md:hidden" />
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex w-full items-center justify-between gap-3 md:w-auto md:justify-start">
         {roomCode !== "LOCAL" && (
-          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs">
+          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card py-1 pl-3 pr-1 text-xs md:py-1.5 md:pr-3">
             <span className={cn("h-[7px] w-[7px] shrink-0 rounded-full", connected ? "bg-primary" : "bg-gray-500")} />
-            <span className="text-muted-foreground">Sala</span>
+            <span className="hidden text-muted-foreground md:inline">Sala</span>
             <span className="font-mono font-bold tracking-wider">{roomCode}</span>
             <span className={cn("min-w-[52px] text-left text-[10px]", saveState === "error" ? "text-destructive" : "text-muted-foreground")}>
               {SAVE_LABEL[saveState]}
@@ -64,16 +70,17 @@ export default function AppHeader({
             <button
               title="Restablecer itinerario al default"
               onClick={onReset}
-              className="cursor-pointer pl-1 text-xs text-muted-foreground hover:text-foreground"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center text-xs text-muted-foreground hover:text-foreground md:h-auto md:w-auto md:pl-1"
             >↺</button>
             <button
+              title="Salir de la sala"
               onClick={onLeaveRoom}
-              className="cursor-pointer pl-1 text-[13px] text-muted-foreground hover:text-foreground"
+              className="flex h-7 w-7 cursor-pointer items-center justify-center text-[13px] text-muted-foreground hover:text-foreground md:h-auto md:w-auto md:pl-1"
             >×</button>
           </div>
         )}
-        <div className="flex flex-wrap gap-2.5">
-          <PriceChip label="Total estimado" value={fmtUSD(grandTotal)} sub={fmtCOP(usdToCop(grandTotal, exchangeRate))} strong />
+        <div className="hidden flex-wrap gap-2.5 md:flex">
+          <PriceChip label="Total estimado" value={total} sub={totalCop} strong />
         </div>
         <AuthButton />
       </div>

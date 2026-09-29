@@ -5,6 +5,7 @@ import { fmtUSDNum, fmtCOPNum } from "@/utils/currency";
 import {
   toUSD, toCOP, parse, CELL_CLASS, CALC_NUM_CLASS,
   InlineNumber, CurrencyToggle, ModeToggle, EventLinkCell,
+  ROW_CLASS, CELL_FULL_CLASS, CELL_LABEL_CLASS, CELL_ACTIONS_CLASS, ACTION_BTN_CLASS,
 } from "@/components/budget/shared";
 import type { Currency, SplitMode } from "@/components/budget/shared";
 import { cn } from "@/lib/utils";
@@ -68,13 +69,13 @@ export default function DayExtraRow({
   }
 
   return (
-    <tr className={cn(dirty && "bg-primary/5")}>
-      <td className={CELL_CLASS}>
+    <tr className={cn(ROW_CLASS, dirty && "bg-primary/5")}>
+      <td className={cn(CELL_CLASS, CELL_FULL_CLASS, "max-md:pr-24")}>
         <input value={label} onChange={(e) => { setLabel(e.target.value); setDirty(true); }}
           className="w-full border-none bg-transparent text-[13px] text-foreground outline-none" />
         <ModeToggle mode={liveMode} onChange={changeMode} />
       </td>
-      <td className={cn(CELL_CLASS, "whitespace-nowrap")}>
+      <td className={cn(CELL_CLASS, CELL_FULL_CLASS, CELL_LABEL_CLASS, "whitespace-nowrap")} data-label="RANGO">
         <div className="flex items-center gap-1">
           <select value={startId} onChange={(e) => { setStartId(e.target.value); setDirty(true); }} className={SEL_CLASS}>
             {days.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
@@ -85,7 +86,7 @@ export default function DayExtraRow({
           </select>
         </div>
       </td>
-      <td className={cn(CELL_CLASS, "text-right")}>
+      <td className={cn(CELL_CLASS, CELL_LABEL_CLASS, "text-right")} data-label="TOTAL / DIARIO">
         <div className="flex items-center justify-end gap-1">
           <CurrencyToggle currency={liveCur} onClick={toggleCurrency} />
           {liveMode === "group"
@@ -96,7 +97,7 @@ export default function DayExtraRow({
           {numDays}d · ${fmtUSDNum(perDay)}/día
         </div>
       </td>
-      <td className={cn(CELL_CLASS, "text-right")}>
+      <td className={cn(CELL_CLASS, CELL_LABEL_CLASS, "text-right")} data-label="POR PERSONA">
         <div className="flex items-center justify-end gap-0.5">
           {liveCur === "USD" && <span className="font-mono text-[13px] text-muted-foreground">$</span>}
           {liveMode === "perPerson"
@@ -108,15 +109,15 @@ export default function DayExtraRow({
           {liveCur === "USD" ? `${fmtCOPNum(paxCOP / numDays)}/día` : `$${fmtUSDNum(paxUSD / numDays)}/día`}
         </div>
       </td>
-      <td className={CELL_CLASS}><EventLinkCell extra={extra} days={days} onLink={onLinkExtra} /></td>
-      <td className={cn(CELL_CLASS, "w-[60px] px-1.5")}>
+      <td className={cn(CELL_CLASS, CELL_FULL_CLASS, CELL_LABEL_CLASS)} data-label="ACTIVIDAD"><EventLinkCell extra={extra} days={days} onLink={onLinkExtra} /></td>
+      <td className={cn(CELL_CLASS, CELL_ACTIONS_CLASS, "w-[60px] px-1.5")}>
         <div className="flex justify-end gap-[3px]">
           {dirty
             ? <>
-                <button onClick={commit} className="flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-[5px] bg-primary text-sm font-bold text-primary-foreground">✓</button>
-                <button onClick={cancel} className="flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-[5px] border border-border bg-secondary text-[13px] font-bold text-muted-foreground">✕</button>
+                <button onClick={commit} className={cn(ACTION_BTN_CLASS, "bg-primary text-sm font-bold text-primary-foreground")}>✓</button>
+                <button onClick={cancel} className={cn(ACTION_BTN_CLASS, "border border-border bg-secondary text-[13px] font-bold text-muted-foreground")}>✕</button>
               </>
-            : <button onClick={onRemove} className="flex h-[26px] w-[26px] cursor-pointer items-center justify-center text-[15px] text-muted-foreground opacity-40 hover:opacity-100">×</button>}
+            : <button onClick={onRemove} className={cn(ACTION_BTN_CLASS, "text-[15px] text-muted-foreground opacity-40 hover:opacity-100")}>×</button>}
         </div>
       </td>
     </tr>

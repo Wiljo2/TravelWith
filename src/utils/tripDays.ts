@@ -45,6 +45,16 @@ export function generateDays(startDate: string, endDate: string): Day[] | null {
   return days;
 }
 
+// Index of today within the trip, or undefined when the trip isn't underway.
+export function tripDayIndex(startDate: string, dayCount: number): number | undefined {
+  const start = parseISODate(startDate);
+  if (!start) return undefined;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const idx = Math.round((today.getTime() - start.getTime()) / 86_400_000);
+  return idx >= 0 && idx < dayCount ? idx : undefined;
+}
+
 export function fmtTripDates(startDate: string, endDate: string): string {
   const start = parseISODate(startDate);
   const end = parseISODate(endDate);

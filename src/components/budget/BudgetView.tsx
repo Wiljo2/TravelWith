@@ -2,7 +2,7 @@
 import type { Extra, Day, RoomMember, Task } from "@/types";
 import type { MockPerson } from "@/hooks/useRoom";
 import { usdToCop, fmtUSDNum, fmtCOPNum, extraGroupUSD, optionGroupUSD } from "@/utils/currency";
-import { TH_CLASS, SectionHeader } from "@/components/budget/shared";
+import { TH_CLASS, TABLE_CLASS, THEAD_CLASS, TBODY_CLASS, TFOOT_CLASS, SectionHeader } from "@/components/budget/shared";
 import GlobalExtraRow from "@/components/budget/GlobalExtraRow";
 import DayExtraRow from "@/components/budget/DayExtraRow";
 import DayTimeline from "@/components/budget/DayTimeline";
@@ -53,9 +53,9 @@ export default function BudgetView({
   const rangeHigh = optionTasks.reduce((s, o) => s + o.high, 0);
 
   return (
-    <div className="flex-1 overflow-y-auto px-9 py-7">
+    <div className="flex-1 overflow-y-auto py-4 md:px-9 md:py-7">
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 md:mb-6">
         <h2 className="text-lg font-bold">Presupuesto del viaje</h2>
         <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-[5px]">
           <span className="text-xs text-muted-foreground">TRM</span>
@@ -73,8 +73,8 @@ export default function BudgetView({
       />
 
       <SectionHeader label="GASTOS GLOBALES" hint="Costos fijos del viaje (tiquetes, crucero)" />
-      <table className="mb-8 w-full border-collapse overflow-hidden rounded-xl border border-border bg-card">
-        <thead>
+      <table className={cn(TABLE_CLASS, "mb-8")}>
+        <thead className={THEAD_CLASS}>
           <tr>
             <th className={cn(TH_CLASS, "w-[26%] text-left")}>CONCEPTO</th>
             <th className={cn(TH_CLASS, "text-left")}>ACTIVIDAD</th>
@@ -83,13 +83,13 @@ export default function BudgetView({
             <th className={cn(TH_CLASS, "w-[60px]")} />
           </tr>
         </thead>
-        <tbody>
+        <tbody className={TBODY_CLASS}>
           {[...globalExtras, ...linkedExtras].map((e) => (
             <GlobalExtraRow key={e.id} extra={e} exchangeRate={exchangeRate} people={people} days={days}
               onCommit={(p) => onUpdateExtra(e.id, p)} onRemove={() => onRemoveExtra(e.id)} onLinkExtra={(eid) => onLinkExtra(e.id, eid)} />
           ))}
         </tbody>
-        <tfoot>
+        <tfoot className={TFOOT_CLASS}>
           <tr>
             <td colSpan={5} className="border-t border-border px-3 py-2">
               <button onClick={() => onAddExtra()} className={ADD_BTN}>+ Añadir gasto global</button>
@@ -97,10 +97,12 @@ export default function BudgetView({
           </tr>
           {(globalExtras.length > 0 || linkedExtras.length > 0) && (
             <tr className="bg-primary/5">
-              <td colSpan={2} className="border-t-2 border-border px-3 py-2.5 text-[13px] font-bold">Subtotal</td>
+              <td colSpan={2} className="border-t-2 border-border px-3 py-2.5 text-[13px] font-bold max-md:flex-1">Subtotal</td>
               <td className="border-t-2 border-border px-3 py-2.5 text-right font-mono font-bold">${fmtUSDNum(globalTotal)}</td>
-              <td className="border-t-2 border-border px-3 py-2.5 text-right font-mono font-bold">${fmtUSDNum(globalTotal / people)}</td>
-              <td className="border-t-2 border-border" />
+              <td className="border-t-2 border-border px-3 py-2.5 text-right font-mono font-bold">
+                ${fmtUSDNum(globalTotal / people)}<span className="block text-[10px] font-normal text-muted-foreground md:hidden">por persona</span>
+              </td>
+              <td className="border-t-2 border-border max-md:hidden" />
             </tr>
           )}
         </tfoot>
@@ -109,8 +111,8 @@ export default function BudgetView({
       <SectionHeader label="GASTOS POR DÍA" hint="Hospedaje, comidas y excursiones distribuidas en el rango de días" />
 
       {dayExtras.length > 0 && (
-        <table className="mb-4 w-full border-collapse overflow-hidden rounded-xl border border-border bg-card">
-          <thead>
+        <table className={cn(TABLE_CLASS, "mb-4")}>
+          <thead className={THEAD_CLASS}>
             <tr>
               <th className={cn(TH_CLASS, "w-[22%] text-left")}>CONCEPTO</th>
               <th className={cn(TH_CLASS, "text-left")}>RANGO</th>
@@ -120,13 +122,13 @@ export default function BudgetView({
               <th className={cn(TH_CLASS, "w-[60px]")} />
             </tr>
           </thead>
-          <tbody>
+          <tbody className={TBODY_CLASS}>
             {dayExtras.map((e) => (
               <DayExtraRow key={e.id} extra={e} exchangeRate={exchangeRate} people={people} days={days}
                 onCommit={(p) => onUpdateExtra(e.id, p)} onRemove={() => onRemoveExtra(e.id)} onLinkExtra={(eid) => onLinkExtra(e.id, eid)} />
             ))}
           </tbody>
-          <tfoot>
+          <tfoot className={TFOOT_CLASS}>
             <tr>
               <td colSpan={6} className="border-t border-border px-3 py-2">
                 <button onClick={() => onAddExtra({ startDayId: days[0]?.id, endDayId: days[0]?.id })} className={ADD_BTN}>+ Añadir gasto por días</button>
@@ -154,7 +156,7 @@ export default function BudgetView({
           <SectionHeader label="PENDIENTE DE DECIDIR" hint="Tareas con opciones sin elegir — no suman al total confirmado hasta que decidas" />
           <div className="overflow-hidden rounded-xl border border-dashed border-[#F59E0B66] bg-[#F59E0B0d]">
             {optionTasks.map((o) => (
-              <div key={o.id} className="flex items-center justify-between border-b border-[#F59E0B22] px-4 py-2.5 last:border-b-0">
+              <div key={o.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-[#F59E0B22] px-4 py-2.5 last:border-b-0">
                 <span className="text-[13px] text-foreground">🔀 {o.title} <span className="text-[11px] text-muted-foreground">· {o.count} opciones</span></span>
                 <span className="font-mono text-[13px] font-semibold text-[#B45309]">
                   {o.low === o.high ? `$${fmtUSDNum(o.low)}` : `$${fmtUSDNum(o.low)} – $${fmtUSDNum(o.high)}`}

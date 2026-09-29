@@ -21,9 +21,12 @@ interface AgentPanelProps {
   roomCode: string;
   messages: AgentChatMessage[];
   setMessages: React.Dispatch<React.SetStateAction<AgentChatMessage[]>>;
+  className?: string;
+  // Inside a titled container (the phone sheet): header only shows the stop button.
+  embedded?: boolean;
 }
 
-export default function AgentPanel({ roomCode, messages, setMessages }: AgentPanelProps) {
+export default function AgentPanel({ roomCode, messages, setMessages, className, embedded }: AgentPanelProps) {
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -117,9 +120,9 @@ export default function AgentPanel({ roomCode, messages, setMessages }: AgentPan
   }
 
   return (
-    <div className="flex h-[560px] flex-col overflow-hidden rounded-[10px] border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-3.5 py-2.5">
-        <div className="text-[13px] font-semibold">✨ Asistente</div>
+    <div className={cn("flex h-[560px] flex-col overflow-hidden rounded-[10px] border border-border bg-card", className)}>
+      <div className={cn("flex items-center justify-between border-b border-border px-3.5 py-2.5", embedded && !streaming && "hidden")}>
+        <div className={cn("text-[13px] font-semibold", embedded && "invisible")}>✨ Asistente</div>
         {streaming && (
           <button
             onClick={() => abortRef.current?.abort()}
@@ -155,7 +158,7 @@ export default function AgentPanel({ roomCode, messages, setMessages }: AgentPan
         )}
       </div>
 
-      <div className="flex gap-1.5 border-t border-border p-2.5">
+      <div className="flex gap-1.5 border-t border-border p-2.5 pb-[max(10px,env(safe-area-inset-bottom))] md:pb-2.5">
         <Textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
