@@ -26,8 +26,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={cn("font-sans", geist.variable)}>
-      <body>{children}</body>
+    // Browsers and extensions (Grammarly, ColorZilla, password managers…) inject
+    // attributes on <html>/<body> before hydration. This only silences attribute
+    // diffs on these two elements, not on their children.
+    <html lang="es" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

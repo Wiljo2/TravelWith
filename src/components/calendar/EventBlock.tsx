@@ -34,16 +34,15 @@ export function EventCard({ ev, start, end, height, selected, cat, conflict, sty
   const punctual = end <= start;
   return (
     <div
-      className="h-full overflow-hidden rounded-[7px] px-[7px] py-1"
+      className="h-full overflow-hidden rounded-lg px-2 py-1"
       style={{
         background: c.bg,
-        border: `1px solid ${c.border}`,
-        borderLeft: `3px solid ${c.border}`,
+        borderLeft: `3px solid ${conflict ? c.border : c.dot}`,
         boxShadow: selected
           ? `0 0 0 2px ${c.border}`
           : conflict
-            ? `0 1px 4px rgba(239,68,68,.18)`
-            : "none",
+            ? `inset 0 0 0 1px ${c.border}, 0 1px 4px rgba(239,68,68,.18)`
+            : "0 1px 2px rgba(0,0,0,.05)",
         ...style,
       }}
     >

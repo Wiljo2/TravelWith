@@ -21,7 +21,7 @@
   --accent: #E1F5EE;
   --accent-foreground: #04342C;
   --destructive: #EF4444;
-  --border: #E5E3DC;
+  --border: #ECEAE3;
   --input: #D3D1C7;
   --ring: #059669;
   --chart-1: #1D9E75;
@@ -98,17 +98,13 @@
   * {
     @apply border-border outline-ring/50;
   }
-  /* The desktop UI is dense and zoomed out; phones render at 1:1. */
+  /* Global UI scale. Kept as a variable (utils/zoom.ts reads it) in case a
+     denser layout is wanted again; 1 keeps text readable everywhere. */
   :root {
     --app-zoom: 1;
   }
-  @media (min-width: 768px) {
-    :root {
-      --app-zoom: 0.85;
-    }
-  }
   body {
-    @apply bg-background text-foreground m-0 p-0 antialiased md:p-2.5;
+    @apply bg-background text-foreground m-0 p-0 antialiased;
     zoom: var(--app-zoom);
   }
   html {

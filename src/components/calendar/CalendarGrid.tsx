@@ -5,7 +5,6 @@ import DayColumn from "./DayColumn";
 import DateStrip from "./DateStrip";
 import { cn } from "@/lib/utils";
 import type { Day, CalendarEvent, DragPreview, TripSpan, DaySpan, Task } from "@/types";
-import { CATEGORIES } from "@/constants/categories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { cssZoom } from "@/utils/zoom";
 import { useIsMobile, useIsTouch } from "@/hooks/useMediaQuery";
@@ -195,18 +194,8 @@ export default function CalendarGrid({
   return (
     <div
       ref={containerRef}
-      className="flex min-w-0 flex-1 flex-col overflow-clip rounded-[10px] border border-border bg-card"
+      className="flex min-w-0 flex-1 flex-col overflow-clip rounded-2xl bg-card shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-border/70"
     >
-      {/* Category legend */}
-      <div className="flex h-[34px] shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-background px-3 [scrollbar-width:none]">
-        {Object.entries(CATEGORIES).map(([, c]) => (
-          <div key={c.label} className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-            <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: c.dot }} />
-            <span className="text-[11px] text-muted-foreground">{c.label}</span>
-          </div>
-        ))}
-      </div>
-
       {/* Navigation: date chips on phones (sticky while scrolling hours), dots on desktop */}
       {mobile ? (
         <div className="sticky top-0 z-20 border-b border-border bg-secondary/95 backdrop-blur-md">

@@ -15,6 +15,7 @@ import BudgetPanel from "@/components/budget/BudgetPanel";
 import AgentPanel from "@/components/agent/AgentPanel";
 import type { AgentChatMessage } from "@/components/agent/AgentPanel";
 import BudgetView from "@/components/budget/BudgetView";
+import HomeView from "@/components/home/HomeView";
 import TabBar from "@/components/TabBar";
 import type { Tab } from "@/components/TabBar";
 import AppHeader from "@/components/AppHeader";
@@ -61,7 +62,7 @@ export default function App() {
     setRoomCode(LOCAL_ROOM_CODE);
   }, []);
 
-  const [activeTab, setActiveTab] = useState<Tab>("calendar");
+  const [activeTab, setActiveTab] = useState<Tab>("home");
   const [pendingNew, setPendingNew] = useState<{ dayId: string; hour: number } | null>(null);
   const [slotDraft, setSlotDraft] = useState<{ dayId: string; hour: number; x: number; y: number; task: Task | null } | null>(null);
   const isMobile = useIsMobile();
@@ -277,14 +278,12 @@ export default function App() {
   );
 
   return (
-    <div className="mx-auto max-w-[1280px] px-3 pb-[calc(env(safe-area-inset-bottom)+84px)] pt-[max(12px,env(safe-area-inset-top))] md:rounded-[14px] md:p-4">
+    <div className="mx-auto max-w-[1200px] px-4 pb-[calc(env(safe-area-inset-bottom)+84px)] pt-[max(16px,env(safe-area-inset-top))] md:px-8 md:py-7">
       <AppHeader
         roomCode={roomCode}
         connected={connected || localMode}
         saveState={saveState}
         trip={trip}
-        grandTotal={grandTotal}
-        exchangeRate={exchangeRate}
         onReset={() => {
           if (confirm("¿Restablecer el itinerario? Se perderán las actividades del calendario.")) {
             const regenerated = trip ? generateDays(trip.startDate, trip.endDate) : null;
@@ -296,6 +295,18 @@ export default function App() {
       />
 
       <TabBar active={activeTab} onChange={setActiveTab} pendingTaskCount={pendingTaskCount} />
+
+      {activeTab === "home" && (
+        <HomeView
+          trip={trip}
+          days={days}
+          tasks={tasks}
+          grandTotal={grandTotal}
+          people={people}
+          exchangeRate={exchangeRate}
+          onNavigate={setActiveTab}
+        />
+      )}
 
       {activeTab === "calendar" && (
         <div className="flex items-start gap-3.5">
