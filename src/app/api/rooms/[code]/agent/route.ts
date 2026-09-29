@@ -1,13 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { TripStoreError } from "@/server/trip-store";
 import { requireMember } from "@/server/auth";
-import { errorResponse, roomCodeParam } from "@/server/http";
+import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
+import { LIMITS } from "@/constants/limits";
 import { AGENT_TOOLS, TOOL_LABELS, executeTool } from "@/server/agent/tools";
 import { SYSTEM_PROMPT } from "@/server/agent/prompt";
 
 const AGENT_MODEL = process.env.AGENT_MODEL ?? "claude-sonnet-5";
 const MAX_ITERATIONS = 15;
 const MAX_HISTORY_MESSAGES = 30;
+const BODY_ERROR = "Body inválido: se espera { messages: [{role, content}] }";
 
 interface ChatTurn {
   role: "user" | "assistant";
@@ -37,10 +39,12 @@ export async function POST(req: Request, { params }: { params: Params }) {
 
   let turns: ChatTurn[];
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => {
+      throw new HttpError(400, BODY_ERROR);
+    });
     turns = validateTurns(body?.messages);
-  } catch {
-    return jsonError("Body inválido: se espera { messages: [{role, content}] }", 400);
+  } catch (e) {
+    return errorResponse(e, "POST /api/rooms/[code]/agent");
   }
   if (!turns.length || turns[turns.length - 1].role !== "user") {
     return jsonError("El último mensaje debe ser del usuario", 400);
@@ -144,18 +148,29 @@ export async function POST(req: Request, { params }: { params: Params }) {
   });
 }
 
+// Bounds the input cost of every model call: user messages over the limit are
+// rejected, earlier assistant replies are truncated (they are only context),
+// and the oldest turns are dropped until the whole history fits.
 function validateTurns(raw: unknown): ChatTurn[] {
-  if (!Array.isArray(raw)) throw new Error("messages must be an array");
+  if (!Array.isArray(raw)) throw new HttpError(400, BODY_ERROR);
   const turns = raw.slice(-MAX_HISTORY_MESSAGES).map((m): ChatTurn => {
     if (
       typeof m !== "object" || m === null ||
       (m.role !== "user" && m.role !== "assistant") ||
       typeof m.content !== "string" || !m.content.trim()
     ) {
-      throw new Error("invalid message");
+      throw new HttpError(400, BODY_ERROR);
     }
-    return { role: m.role, content: m.content };
+    if (m.role === "user" && m.content.length > LIMITS.chatMessage) {
+      throw new HttpError(400, `El mensaje es demasiado largo (máximo ${LIMITS.chatMessage} caracteres)`);
+    }
+    return { role: m.role, content: m.content.slice(0, LIMITS.chatMessage) };
   });
+
+  let total = turns.reduce((n, t) => n + t.content.length, 0);
+  while (turns.length > 1 && (total > LIMITS.chatHistory || turns[0].role !== "user")) {
+    total -= turns.shift()!.content.length;
+  }
   return turns;
 }
 

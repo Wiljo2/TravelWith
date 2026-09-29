@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
+import { LIMITS } from "@/constants/limits";
 
 export interface AgentChatMessage {
   role: "user" | "assistant";
@@ -160,6 +161,7 @@ export default function AgentPanel({ roomCode, accessToken, messages, setMessage
       <div className="flex gap-1.5 border-t border-border p-2.5">
         <Textarea
           value={draft}
+          maxLength={LIMITS.chatMessage}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {

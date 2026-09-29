@@ -139,3 +139,28 @@ describe("read serializers", () => {
     expect(() => dayDetail(p, "zzz")).toThrow(DomainError);
   });
 });
+
+describe("input checks (untyped tool input)", () => {
+  const bad = <T>(v: unknown) => v as T;
+
+  it("turns wrong types into DomainError instead of TypeError", () => {
+    expect(() => addEvent(basePayload(), bad({ dayId: "d0", title: 42, start: 10, end: 11 }))).toThrow(DomainError);
+    expect(() => addTask(basePayload(), bad({ title: null }))).toThrow(DomainError);
+    expect(() => addExtra(basePayload(), bad({ label: "X", amount: "10" }))).toThrow(DomainError);
+    const { payload, task } = addTask(basePayload(), { title: "T" });
+    expect(() => updateTask(payload, task.id, bad({ start: "9", dayId: "d0" }))).toThrow(DomainError);
+    expect(() => updateTask(payload, task.id, bad({ done: "yes" }))).toThrow(DomainError);
+  });
+
+  it("caps string lengths", () => {
+    expect(() => addEvent(basePayload(), { dayId: "d0", title: "X", start: 10, end: 11, note: "n".repeat(5000) })).toThrow(DomainError);
+    expect(() => addTask(basePayload(), { title: "t".repeat(300) })).toThrow(DomainError);
+  });
+
+  it("rejects expense day ranges that end before they start", () => {
+    expect(() => addExtra(basePayload(), { label: "Hotel", amount: 100, startDayId: "d1", endDayId: "d0" })).toThrow(DomainError);
+    const { payload, extra } = addExtra(basePayload(), { label: "Hotel", amount: 100, startDayId: "d0", endDayId: "d1" });
+    expect(() => updateExtra(payload, extra.id, { startDayId: "d1", endDayId: "d0" })).toThrow(DomainError);
+    expect(() => updateExtra(payload, extra.id, { endDayId: "d0" })).not.toThrow();
+  });
+});

@@ -8,6 +8,7 @@ import {
 } from "@/components/budget/shared";
 import type { Currency, SplitMode } from "@/components/budget/shared";
 import { cn } from "@/lib/utils";
+import { LIMITS } from "@/constants/limits";
 
 const SEL_CLASS = "cursor-pointer rounded-md border border-border bg-secondary px-1.5 py-[3px] text-[11px] text-foreground outline-none";
 
@@ -70,7 +71,7 @@ export default function DayExtraRow({
   return (
     <tr className={cn(dirty && "bg-primary/5")}>
       <td className={CELL_CLASS}>
-        <input value={label} onChange={(e) => { setLabel(e.target.value); setDirty(true); }}
+        <input value={label} maxLength={LIMITS.label} onChange={(e) => { setLabel(e.target.value); setDirty(true); }}
           className="w-full border-none bg-transparent text-[13px] text-foreground outline-none" />
         <ModeToggle mode={liveMode} onChange={changeMode} />
       </td>

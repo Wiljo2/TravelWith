@@ -5,6 +5,7 @@ import type { MockPerson } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { LIMITS } from "@/constants/limits";
 
 function MemberAvatar({ member, size = 26 }: { member: RoomMember; size?: number }) {
   return member.avatar ? (
@@ -71,7 +72,7 @@ export default function TravelersCard({
       {adding && (
         <div className="mt-2 flex gap-1.5">
           <Input
-            autoFocus value={name} onChange={(e) => setName(e.target.value)}
+            autoFocus value={name} maxLength={LIMITS.name} onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") { setAdding(false); setName(""); } }}
             placeholder="Nombre del viajero"
             className="flex-1 bg-secondary text-[13px]"

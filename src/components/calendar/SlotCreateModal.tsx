@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { LIMITS } from "@/constants/limits";
 
 const DURATIONS = [0.5, 1, 2, 3] as const;
 const CAT_KEYS = Object.keys(CATEGORIES);
@@ -85,6 +86,7 @@ export default function SlotCreateModal({
         <Input
           autoFocus
           value={title}
+          maxLength={LIMITS.title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) save(); if (e.key === "Escape") onClose(); }}
           placeholder={tab === "activity" ? "Nombre de la actividad" : "¿Qué hay que hablar? (ej. ¿Excursión?)"}
@@ -93,6 +95,7 @@ export default function SlotCreateModal({
 
         <Textarea
           value={note}
+          maxLength={LIMITS.note}
           onChange={(e) => setNote(e.target.value)}
           placeholder={tab === "activity" ? "Nota…" : "Qué se va a discutir / decidir…"}
           rows={2}

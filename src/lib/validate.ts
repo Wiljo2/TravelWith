@@ -28,15 +28,27 @@ export function validateTripInput(body: unknown): TripInfo | null {
   return { name: t.name.trim(), destination, startDate: t.startDate, endDate: t.endDate };
 }
 
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+// Structural checks that are always enforced: anything that would make every
+// member's client throw on load (e.g. `days: [null]`) is rejected here. The
+// full schema with limits (`payloadIssues` in lib/schemas.ts) runs on top.
 export function validateRoomPayload(body: unknown): RoomPayload | null {
-  if (typeof body !== "object" || body === null) return null;
-  const p = body as Record<string, unknown>;
+  if (!isObject(body)) return null;
+  const p = body;
 
   if (!Array.isArray(p.days) || !Array.isArray(p.extras)) return null;
   if (typeof p.exchangeRate !== "number" || !Number.isFinite(p.exchangeRate) || p.exchangeRate <= 0) return null;
 
   for (const key of ["mockPeople", "tripSpans", "tasks"] as const) {
     if (p[key] !== undefined && !Array.isArray(p[key])) return null;
+  }
+  for (const key of ["extras", "mockPeople", "tripSpans", "tasks"] as const) {
+    if (Array.isArray(p[key]) && !(p[key] as unknown[]).every(isObject)) return null;
+  }
+  for (const d of p.days) {
+    if (!isObject(d) || !Array.isArray(d.events) || !d.events.every(isObject)) return null;
+    if (d.spans !== undefined && d.spans !== null && (!Array.isArray(d.spans) || !d.spans.every(isObject))) return null;
   }
 
   if (p.trip !== undefined && !validateTripInput(p.trip)) return null;

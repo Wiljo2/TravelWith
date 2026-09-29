@@ -84,7 +84,7 @@ Server-side mutations do NOT talk to Supabase directly. The layering is:
 | POST | `/api/rooms` | Create trip (authenticated): validates `{name, destination?, startDate, endDate}`, generates days, inserts room with a random 10-char code, makes the caller owner |
 | GET | `/api/rooms/list` | Authenticated: trips of the current user (joins `user_rooms` + `rooms`, returns names) |
 | GET | `/api/rooms/[code]` | Room payload + members + `updated_at` |
-| PATCH | `/api/rooms/[code]` | Save full payload; optional optimistic concurrency via `expectedUpdatedAt` (409 on conflict); syncs `name` |
+| PATCH | `/api/rooms/[code]` | Save full payload built on `expectedUpdatedAt` (required). Atomic compare-and-swap in SQL; 409 + current state on conflict. Body ≤ 512 KB, validated by `lib/schemas.ts`; syncs `name` |
 | DELETE | `/api/rooms/[code]` | Hard-delete for everyone. Authenticated + **owner only** (403 otherwise). Not wired in the UI |
 | GET/POST/DELETE | `/api/rooms/[code]/members` | List / join (idempotent, authenticated) / **leave** |
 
@@ -180,7 +180,7 @@ All trip state is stored as **a single JSONB `payload`** in the `rooms` table. O
 
 1. ~~Unit tests for `utils/currency.ts` and `utils/time.ts`~~ (done — see `src/utils/__tests__/`).
 2. ~~Migrate deep relative imports to the `@/` alias~~ (done).
-3. Schema validation (zod) for `PATCH /api/rooms/[code]` beyond the current shape checks.
+3. ~~Schema validation (zod) for `PATCH /api/rooms/[code]` beyond the current shape checks~~ (done — `src/lib/schemas.ts`, limits in `src/constants/limits.ts`; when adding a persisted field, add it to the schema as optional/`nullish`, and to `LIMITS` if it's a string or list).
 4. ~~Concurrent-save protection (compare `updated_at`)~~ (done — 409 + refetch).
 5. `BudgetPanel` takes ~25 props: consider splitting into connected subcomponents or a room context.
 6. Translate remaining Spanish UI copy if the product ever targets English-speaking users.

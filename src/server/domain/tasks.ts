@@ -2,7 +2,8 @@ import type { RoomPayload, Task, TaskPriority } from "@/types";
 import { TASK_CATEGORIES, PRIORITIES } from "@/constants/taskCategories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { uid } from "@/utils/uid";
-import { DomainError, requireDay } from "./core";
+import { LIMITS } from "@/constants/limits";
+import { DomainError, checkArgs, requireDay } from "./core";
 
 function validateTaskCat(cat: string) {
   if (!TASK_CATEGORIES[cat]) {
@@ -16,7 +17,22 @@ function validatePriority(priority: string): asserts priority is TaskPriority {
   }
 }
 
+const TASK_FIELDS = {
+  title: { type: "string", max: LIMITS.title },
+  note: { type: "string", max: LIMITS.note },
+  cat: { type: "string", max: LIMITS.id },
+  priority: { type: "string", max: LIMITS.id },
+  dayId: { type: "string", max: LIMITS.id },
+  start: { type: "number" },
+  end: { type: "number" },
+  done: { type: "boolean" },
+  unschedule: { type: "boolean" },
+} as const;
+
 function validateSchedule(start: number, end: number) {
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    throw new DomainError("start and end must be decimal hours (e.g. 19.5 = 7:30pm)");
+  }
   if (start < HOUR_START || end > HOUR_END || end <= start) {
     throw new DomainError(
       `Invalid time range: hours must satisfy ${HOUR_START} <= start < end <= ${HOUR_END} (decimal hours)`,
@@ -41,7 +57,9 @@ export interface AddTaskArgs {
 }
 
 export function addTask(payload: RoomPayload, args: AddTaskArgs): { payload: RoomPayload; task: Task } {
+  checkArgs(args, { ...TASK_FIELDS, title: { ...TASK_FIELDS.title, required: true } });
   if (!args.title.trim()) throw new DomainError("title is required");
+  if ((payload.tasks ?? []).length >= LIMITS.tasks) throw new DomainError(`The trip already has ${LIMITS.tasks} tasks`);
   if (args.cat) validateTaskCat(args.cat);
   if (args.priority) validatePriority(args.priority);
 
@@ -84,6 +102,7 @@ export function updateTask(
   taskId: string,
   patch: UpdateTaskArgs,
 ): { payload: RoomPayload; task: Task } {
+  checkArgs(patch, TASK_FIELDS);
   const current = requireTask(payload, taskId);
   if (patch.cat) validateTaskCat(patch.cat);
   if (patch.priority) validatePriority(patch.priority);

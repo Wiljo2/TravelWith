@@ -3,6 +3,7 @@ import type { TaskOption } from "@/types";
 import { optionGroupUSD, fmtUSDNum } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { LIMITS } from "@/constants/limits";
 
 type Currency = "USD" | "COP";
 type SplitMode = "group" | "perPerson";
@@ -48,6 +49,7 @@ export default function TaskOptions({ options, people, exchangeRate, scheduled, 
             <div className="flex items-center gap-1.5">
               <Input
                 value={o.label}
+                maxLength={LIMITS.label}
                 onChange={(e) => patch(o.id, { label: e.target.value })}
                 placeholder="Opción (ej. Universal Studios)"
                 className="h-7 flex-1 bg-card text-xs"
@@ -70,6 +72,7 @@ export default function TaskOptions({ options, people, exchangeRate, scheduled, 
 
             <Input
               value={o.note ?? ""}
+              maxLength={LIMITS.note}
               onChange={(e) => patch(o.id, { note: e.target.value })}
               placeholder="Nota o link…"
               className="h-7 bg-card text-xs"

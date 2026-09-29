@@ -5,6 +5,7 @@ import { fmtUSDNum } from "@/utils/currency";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { LIMITS } from "@/constants/limits";
 
 interface LinkedExtrasSectionProps {
   selectedEvent: { ev: CalendarEvent; dayId: string };
@@ -53,6 +54,7 @@ function AddGastoForm({ defaultLabel, onSave, onCancel }: {
       <div className="mb-[7px] text-[11px] font-semibold tracking-[.06em] text-muted-foreground">NUEVO GASTO</div>
       <Input
         value={label}
+        maxLength={LIMITS.label}
         onChange={(e) => setLabel(e.target.value)}
         placeholder="Concepto"
         className="mb-1.5 bg-card text-xs"

@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import NoteLinks from "@/components/NoteLinks";
 import type { CalendarEvent } from "@/types";
+import { LIMITS } from "@/constants/limits";
 
 const CAT_KEYS = Object.keys(CATEGORIES) as (keyof typeof CATEGORIES)[];
 
@@ -34,6 +35,7 @@ export default function EventEditor({ ev, onChange, onDelete, deleteLabel = "Eli
     <div className="flex flex-col gap-[9px]">
       <Input
         value={ev.title}
+        maxLength={LIMITS.title}
         onChange={(e) => onChange({ title: e.target.value })}
         className="bg-secondary text-[12.5px]"
       />
@@ -47,6 +49,7 @@ export default function EventEditor({ ev, onChange, onDelete, deleteLabel = "Eli
 
       <Textarea
         value={ev.note}
+        maxLength={LIMITS.note}
         onChange={(e) => onChange({ note: e.target.value })}
         placeholder="Nota, precios, links…"
         rows={2}
