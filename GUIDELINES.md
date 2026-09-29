@@ -55,7 +55,7 @@ rooms (code PK, name, payload JSONB, members JSONB, updated_at)
 ```
 
 Notes and known trade-offs:
-- **Membership is stored twice**: `rooms.members` (JSONB — display cache with name/avatar, written by POST members) and `user_rooms` (relational — source of truth for "my trips", enforced by RLS). Keep both in sync through the API routes; do not add a third representation.
+- **Membership is stored twice**: `rooms.members` (JSONB — display cache with name/avatar) and `user_rooms` (relational — source of truth for access and "my trips"). Both change only through the SQL functions `join_room` / `leave_room` / `delete_room` (`006_membership_functions.sql`, called via `src/server/members.ts`), which update them in one transaction; do not write either directly, and do not add a third representation. Roles are assigned by the server: the creator is `owner` (in `POST /api/rooms`), everyone who joins is `member`.
 - `rooms.name` is **denormalized** from `payload.trip.name` so trip listings don't fetch full payloads. The PATCH route keeps it in sync — never write it from anywhere else.
 - References inside the payload are **by id across arrays** (e.g. `extra.linkedEventId` → an event inside some day). Deleting an event does NOT cascade; consumers must handle dangling ids gracefully (`find(...) ?? null`).
 - New rooms get their initial payload **built server-side** in `POST /api/rooms` (empty days generated from the trip dates). The client demo state (`initialDays`, `DEFAULT_EXTRAS`) is only for the `LOCAL` room and must never leak into real rooms — that's also why autosave is gated on `connected`.
@@ -81,7 +81,7 @@ Server-side mutations do NOT talk to Supabase directly. The layering is:
 
 | Method | Route | Purpose |
 |--------|-------|---------|
-| POST | `/api/rooms` | Create trip: validates `{name, destination?, startDate, endDate}`, generates days, inserts room |
+| POST | `/api/rooms` | Create trip (authenticated): validates `{name, destination?, startDate, endDate}`, generates days, inserts room with a random 10-char code, makes the caller owner |
 | GET | `/api/rooms/list` | Authenticated: trips of the current user (joins `user_rooms` + `rooms`, returns names) |
 | GET | `/api/rooms/[code]` | Room payload + members + `updated_at` |
 | PATCH | `/api/rooms/[code]` | Save full payload; optional optimistic concurrency via `expectedUpdatedAt` (409 on conflict); syncs `name` |
@@ -157,6 +157,7 @@ All trip state is stored as **a single JSONB `payload`** in the `rooms` table. O
 
 ### Known backend debt (do not make it worse)
 - Saving is **last-write-wins of the full payload**: two people editing simultaneously can overwrite each other. Mitigated by the debounce, realtime, and the `updated_at` conflict check (409). Any new collaborative feature must keep this in mind.
+- `rooms.updated_at` is the payload's version: since `006_membership_functions.sql` the trigger only bumps it when `payload` changes (roster updates keep it), and clients skip reloading the payload when a Realtime row carries an unchanged `updated_at`. Don't bump it for non-payload columns.
 - The permissive `rooms` policies from `001_init.sql` are still `using (true)`, but `005_rls_lockdown.sql` adds restrictive policies on top: browser clients (anon key, signed in or not) can only read/write rooms they are members of, and cannot insert or delete `user_rooms` rows. Route handlers use the service role and bypass RLS, so **every route must enforce membership itself**. Never add a permissive policy that widens this, and never grant clients direct writes to `user_rooms`.
 
 ---

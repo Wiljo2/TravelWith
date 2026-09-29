@@ -1,7 +1,8 @@
 import type { RoomPayload, TripInfo } from "@/types";
 import { parseISODate } from "@/utils/tripDays";
 
-const CODE_RE = /^[A-Z0-9]{4,10}$/;
+// Accepts legacy 6-char codes and the 10-char codes from generateRoomCode.
+const CODE_RE = /^[A-Z0-9]{4,12}$/;
 const MAX_NAME_LENGTH = 80;
 
 export function normalizeRoomCode(raw: string): string | null {

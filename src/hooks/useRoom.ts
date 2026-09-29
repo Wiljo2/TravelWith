@@ -104,8 +104,11 @@ export function useRoom(
         { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${code}` },
         ({ new: row }) => {
           const r = row as { payload: RoomPayload; members?: RoomMember[]; updated_at?: string };
+          // Roster-only changes (join/leave) keep updated_at: don't reload the
+          // payload, or pending local edits would be replaced by the stored copy.
+          const payloadChanged = !r.updated_at || r.updated_at !== lastUpdatedAt.current;
           if (r.updated_at) lastUpdatedAt.current = r.updated_at;
-          if (r.payload?.days && Array.isArray(r.payload.days)) {
+          if (payloadChanged && r.payload?.days && Array.isArray(r.payload.days)) {
             skipSave.current = true;
             onRemoteUpdate(r.payload);
           }

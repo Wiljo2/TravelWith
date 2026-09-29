@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { validateRoomPayload } from "@/lib/validate";
 import { persistRoom } from "@/server/trip-store";
 import { requireMember } from "@/server/auth";
+import { deleteRoom } from "@/server/members";
 import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
 
 type Params = Promise<{ code: string }>;
@@ -32,14 +33,7 @@ export async function DELETE(req: Request, { params }: { params: Params }) {
   try {
     const code = roomCodeParam((await params).code);
     await requireMember(req, code, "owner");
-    const supabase = createServerClient();
-
-    const { error: membershipsError } = await supabase.from("user_rooms").delete().eq("room_code", code);
-    if (membershipsError) throw membershipsError;
-
-    const { error } = await supabase.from("rooms").delete().eq("code", code);
-    if (error) throw error;
-
+    await deleteRoom(code);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return errorResponse(e, "DELETE /api/rooms/[code]");

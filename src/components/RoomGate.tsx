@@ -38,14 +38,6 @@ export default function RoomGate({
   const [deleteTarget, setDeleteTarget] = useState<{ code: string; name: string | null } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  function registerMember(code: string, role?: "owner" | "member") {
-    return apiFetch(`/api/rooms/${code}/members`, session?.access_token, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(role ? { role } : {}),
-    });
-  }
-
   // Reading a room requires membership, so joining registers first; the
   // members endpoint answers 404 for unknown codes.
   async function join(code?: string) {
@@ -53,7 +45,7 @@ export default function RoomGate({
     if (!c) return;
     setLoading(true);
     setError("");
-    const res = await registerMember(c, "member");
+    const res = await apiFetch(`/api/rooms/${c}/members`, session?.access_token, { method: "POST" });
     if (!res.ok) {
       setError(res.status === 404 ? "Sala no encontrada." : "No se pudo entrar al viaje.");
       setLoading(false);
@@ -69,7 +61,7 @@ export default function RoomGate({
     if (!canCreate) return;
     setLoading(true);
     setError("");
-    const res = await fetch("/api/rooms", {
+    const res = await apiFetch("/api/rooms", session?.access_token, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -86,7 +78,6 @@ export default function RoomGate({
       return;
     }
     const { code } = await res.json();
-    await registerMember(code, "owner");
     addRoom(code, "owner", tripName.trim());
     onEnter(code);
   }
@@ -246,7 +237,7 @@ export default function RoomGate({
                       onChange={(e) => setInput(e.target.value.toUpperCase())}
                       onKeyDown={(e) => e.key === "Enter" && join()}
                       placeholder="Código de sala"
-                      maxLength={8}
+                      maxLength={12}
                       className="flex-1 bg-secondary font-mono text-[15px] tracking-[.1em]"
                     />
                     <Button onClick={() => join()} disabled={loading || !input.trim()} className="font-semibold">
