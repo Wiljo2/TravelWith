@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Day, Extra, Idea, RoomMember, Task, TripInfo, TripSpan } from "@/types";
+import type { Day, Extra, Idea, IdeaLink, RoomMember, Task, TripInfo, TripSpan } from "@/types";
 
 export interface MockPerson {
   id: string;
@@ -17,6 +17,8 @@ export interface RoomPayload {
   tasks?: Task[];
   ideas?: Idea[];
   ideaPlaces?: string[];   // places for organizing ideas; unset = derived from the trip
+  ideaLinks?: IdeaLink[];  // last "Analizar con Claude" result (free matches are computed live)
+  ideaLinksAt?: string;    // ISO time of that analysis
 }
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
@@ -25,7 +27,7 @@ interface UseRoomResult {
   connected: boolean;
   members: RoomMember[];
   saveState: SaveState;
-  save: (payload: RoomPayload) => void;
+  save: (payload: RoomPayload) => Promise<void>;
 }
 
 export function useRoom(

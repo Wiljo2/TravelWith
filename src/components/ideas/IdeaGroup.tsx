@@ -8,13 +8,14 @@ const PREVIEW = 5;
 
 interface IdeaGroupProps {
   title: string;
+  subtitle?: string;           // the area of a venue ("Orlando")
   count: number;
   muted?: boolean;
   children: React.ReactNode;   // IdeaRow items
 }
 
 // A place's ideas as a compact list: collapsible, showing the first few rows.
-export default function IdeaGroup({ title, count, muted, children }: IdeaGroupProps) {
+export default function IdeaGroup({ title, subtitle, count, muted, children }: IdeaGroupProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const rows = Children.toArray(children);
@@ -27,7 +28,8 @@ export default function IdeaGroup({ title, count, muted, children }: IdeaGroupPr
         aria-expanded={!collapsed}
         className="flex w-full cursor-pointer items-center gap-2 py-1.5 text-left"
       >
-        <span className={cn("text-[15px] font-semibold", muted && "text-secondary-foreground")}>📍 {title}</span>
+        <span className={cn("min-w-0 max-w-[75%] shrink-0 truncate text-[15px] font-semibold", muted && "text-secondary-foreground")}>📍 {title}</span>
+        {subtitle && <span className="truncate text-xs text-muted-foreground">{subtitle}</span>}
         <span className="rounded-full bg-muted px-2 py-px text-xs font-medium text-muted-foreground">{count}</span>
         <ChevronDown className={cn("ml-auto size-4 text-muted-foreground transition-transform", collapsed && "-rotate-90")} />
       </button>

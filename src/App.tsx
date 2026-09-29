@@ -22,8 +22,7 @@ import AppHeader from "@/components/AppHeader";
 import Toast from "@/components/Toast";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
-import IdeasView from "@/components/ideas/IdeasView";
-import { placeProfiles, seedPlaces } from "@/utils/ideas";
+import IdeasTab from "@/components/ideas/IdeasTab";
 import type { Task, ToastAction, TripInfo, TripSpan } from "@/types";
 import { initialDays } from "@/data/initialDays";
 import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE, mockRoomPayload } from "@/data/mockRoom";
@@ -51,10 +50,8 @@ export default function App() {
   const [mockPeople, setMockPeople] = useState<MockPerson[]>([]);
   const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
   const { tasks, setTasks, addTask, toggleTask, updateTask, deleteTask, swapTaskDays } = useTasks();
-  const {
-    ideas, setIdeas, loadingIds, customPlaces, setCustomPlaces, renamePlace,
-    updateIdea, removeIdea, toggleVote, applySuggestions, acceptAllSuggestions, addFromText, refreshMetadata, setNote,
-  } = useIdeas(roomCode);
+  const ideasApi = useIdeas(roomCode);
+  const { ideas, loadPayload: loadIdeasPayload, payload: ideasPayload, customPlaces, planLinks, planLinksAt } = ideasApi;
   const [trip, setTrip] = useState<TripInfo | null>(null);
 
   function addTripSpan(span: TripSpan) { setTripSpans((p) => [...p, span]); }
@@ -109,9 +106,8 @@ export default function App() {
     if (Array.isArray(payload.mockPeople)) setMockPeople(payload.mockPeople);
     if (Array.isArray(payload.tripSpans))  setTripSpans(payload.tripSpans);
     if (Array.isArray(payload.tasks))      setTasks(payload.tasks);
-    if (Array.isArray(payload.ideas))      setIdeas(payload.ideas);
-    if (Array.isArray(payload.ideaPlaces)) setCustomPlaces(payload.ideaPlaces);
-  }, [loadDays, loadBudget]);
+    loadIdeasPayload(payload);
+  }, [loadDays, loadBudget, loadIdeasPayload]);
 
   const { connected, members, saveState, save } = useRoom(roomCode, onRemoteUpdate);
 
@@ -144,11 +140,11 @@ export default function App() {
     if (!connected) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      save({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ideas, ideaPlaces: customPlaces });
+      save({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ...ideasPayload });
     }, 600);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, roomCode, connected]);
+  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, planLinks, planLinksAt, roomCode, connected]);
 
   function handleSelect(id: string | null) {
     setSelectedId(id);
@@ -205,11 +201,6 @@ export default function App() {
   }
 
   const todayIdx = trip ? tripDayIndex(trip.startDate, days.length) : undefined;
-  const places = customPlaces ?? seedPlaces(trip?.destination, days);
-  const profiles = placeProfiles(places, days);
-  const voter = user?.id ?? "local";
-  const addedBy = user ? String(user.user_metadata?.full_name ?? user.email ?? "").split(" ")[0] || undefined : undefined;
-
   const detail = selectedEvent && (
     <ActivityDetail
       key={selectedEvent.ev.id}
@@ -331,22 +322,16 @@ export default function App() {
       )}
 
       {activeTab === "ideas" && (
-        <IdeasView
-          ideas={ideas}
-          profiles={profiles}
-          loadingIds={loadingIds}
+        <IdeasTab
+          api={ideasApi}
+          roomCode={roomCode}
+          localMode={localMode}
           mobile={isMobile}
-          voter={voter}
-          onAdd={(text, note) => addFromText(text, note, addedBy, profiles)}
-          onUpdate={updateIdea}
-          onRemove={removeIdea}
-          onVote={(id) => toggleVote(id, voter)}
-          onApplySuggestions={applySuggestions}
-          onAcceptAll={acceptAllSuggestions}
-          onSetNote={(id, note) => setNote(id, note, profiles)}
-          onRetry={(id) => refreshMetadata(id, profiles)}
-          onAddPlace={(place) => setCustomPlaces([...places, place])}
-          onRemovePlace={(place) => { setCustomPlaces(places.filter((p) => p !== place)); renamePlace(place, undefined); }}
+          user={user}
+          days={days}
+          trip={trip}
+          currentPayload={() => ({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ...ideasPayload })}
+          save={save}
         />
       )}
 

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import type { RoomPayload } from "@/hooks/useRoom";
 import { canonicalUrl, classifyIdeaFields, detectPlatform, findIdeaUrls } from "@/utils/ideas";
-import type { IdeaTextFields, PlaceProfiles } from "@/utils/ideas";
-import type { Idea, IdeaSuggestion } from "@/types";
+import type { IdeaTextFields, PlaceIndex } from "@/utils/ideas";
+import type { Idea, IdeaLink, IdeaSuggestion } from "@/types";
 
-function rulesSuggestion(fields: IdeaTextFields, profiles: PlaceProfiles): IdeaSuggestion | undefined {
-  const { place, cat } = classifyIdeaFields(fields, profiles);
+function rulesSuggestion(fields: IdeaTextFields, index: PlaceIndex): IdeaSuggestion | undefined {
+  const { place, cat } = classifyIdeaFields(fields, index);
   return place || cat ? { place, cat, source: "rules" } : undefined;
 }
 
@@ -41,6 +42,23 @@ export function useIdeas(roomCode: string | null) {
   const [customPlaces, setCustomPlaces] = useState<string[] | undefined>();
   // Ideas whose caption is still being fetched (UI only, never persisted).
   const [loadingIds, setLoadingIds] = useState<Set<string>>(() => new Set());
+  // Last "Analizar con Claude" result (where each idea fits the itinerary).
+  const [planLinks, setPlanLinks] = useState<IdeaLink[] | undefined>();
+  const [planLinksAt, setPlanLinksAt] = useState<string | undefined>();
+
+  // The ideas part of the room payload, in and out. Stable: safe in callbacks.
+  const loadPayload = useCallback((p: RoomPayload) => {
+    if (Array.isArray(p.ideas)) setIdeas(p.ideas);
+    if (Array.isArray(p.ideaPlaces)) setCustomPlaces(p.ideaPlaces);
+    if (Array.isArray(p.ideaLinks)) setPlanLinks(p.ideaLinks);
+    if (p.ideaLinksAt) setPlanLinksAt(p.ideaLinksAt);
+  }, []);
+  const payload = { ideas, ideaPlaces: customPlaces, ideaLinks: planLinks, ideaLinksAt: planLinksAt };
+
+  function savePlan(links: IdeaLink[], at: string) {
+    setPlanLinks(links);
+    setPlanLinksAt(at);
+  }
 
   function updateIdea(id: string, patch: Partial<Idea>) {
     setIdeas((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
@@ -66,7 +84,7 @@ export function useIdeas(roomCode: string | null) {
   }
 
   // Adds every new link found in `text`; returns how many were added.
-  function addFromText(text: string, note: string, addedBy: string | undefined, profiles: PlaceProfiles): number {
+  function addFromText(text: string, note: string, addedBy: string | undefined, index: PlaceIndex): number {
     const known = new Set(ideas.map((i) => canonicalUrl(i.url)));
     const urls = findIdeaUrls(text).filter((u) => {
       const key = canonicalUrl(u);
@@ -83,17 +101,17 @@ export function useIdeas(roomCode: string | null) {
       note: trimmedNote,
       addedBy,
       status: "idea",
-      suggestion: rulesSuggestion({ note: trimmedNote }, profiles),
+      suggestion: rulesSuggestion({ note: trimmedNote }, index),
     }));
     if (created.length === 0) return 0;
     setIdeas((prev) => [...created, ...prev]);
-    for (const idea of created) void loadMetadata(idea, profiles);
+    for (const idea of created) void loadMetadata(idea, index);
     return created.length;
   }
 
   // Fetches the post data in the background, then re-runs the rules with every
   // source. Resolves with the enriched idea, or null when nothing arrived.
-  async function loadMetadata(idea: Idea, profiles: PlaceProfiles): Promise<Idea | null> {
+  async function loadMetadata(idea: Idea, index: PlaceIndex): Promise<Idea | null> {
     if (!roomCode || (idea.platform !== "tiktok" && idea.platform !== "youtube")) return null;
     setLoadingIds((prev) => new Set(prev).add(idea.id));
     const meta = await fetchMetadata(roomCode, idea);
@@ -112,25 +130,46 @@ export function useIdeas(roomCode: string | null) {
         tags: meta.tags ?? i.tags,
         transcript: meta.transcript ?? i.transcript,
       };
-      return mergeSuggestion(withMeta, rulesSuggestion(withMeta, profiles), true) ?? withMeta;
+      return mergeSuggestion(withMeta, rulesSuggestion(withMeta, index), true) ?? withMeta;
     };
     setIdeas((prev) => prev.map((i) => (i.id === idea.id ? enrich(i) : i)));
     return enrich(idea);
   }
 
-  function refreshMetadata(id: string, profiles: PlaceProfiles): Promise<Idea | null> {
+  function refreshMetadata(id: string, index: PlaceIndex): Promise<Idea | null> {
     const idea = ideas.find((i) => i.id === id);
-    return idea ? loadMetadata(idea, profiles) : Promise.resolve(null);
+    return idea ? loadMetadata(idea, index) : Promise.resolve(null);
   }
 
   // Editing the note re-runs the rules from scratch for what isn't confirmed yet.
-  function setNote(id: string, note: string, profiles: PlaceProfiles) {
+  function setNote(id: string, note: string, index: PlaceIndex) {
     setIdeas((prev) => prev.map((i) => {
       if (i.id !== id) return i;
       const withNote = { ...i, note: note.trim() || undefined, suggestion: undefined };
-      const rules = rulesSuggestion(withNote, profiles);
+      const rules = rulesSuggestion(withNote, index);
       return mergeSuggestion(withNote, rules, false) ?? withNote;
     }));
+  }
+
+  // When the trip's places change (new activities, or a better place list), the
+  // rules run again. Pending suggestions are replaced; a confirmed place that the
+  // rules now read differently gets a suggestion to review, once per place list.
+  function reclassify(index: PlaceIndex, placesKey: string) {
+    setIdeas((prev) => {
+      let changed = false;
+      const next = prev.map((i) => {
+        if (i.placesKey === placesKey || i.status === "discarded") return i;
+        changed = true;
+        const rules = rulesSuggestion(i, index);
+        const ai = i.suggestion?.source === "ai" ? i.suggestion : undefined;
+        const place = rules?.place && rules.place !== i.place ? rules.place : i.place ? undefined : ai?.place;
+        const cat = i.cat ? undefined : rules?.cat ?? ai?.cat;
+        const fromRules = (place && place === rules?.place) || (!place && cat && cat === rules?.cat);
+        const suggestion: IdeaSuggestion | undefined = place || cat ? { place, cat, source: fromRules ? "rules" : "ai" } : undefined;
+        return { ...i, placesKey, suggestion };
+      });
+      return changed ? next : prev;
+    });
   }
 
   // "Aceptar todas": confirms every pending suggestion at once.
@@ -154,7 +193,8 @@ export function useIdeas(roomCode: string | null) {
   }
 
   return {
-    ideas, setIdeas, loadingIds, customPlaces, setCustomPlaces, renamePlace,
-    updateIdea, removeIdea, toggleVote, applySuggestions, acceptAllSuggestions, addFromText, refreshMetadata, setNote,
+    ideas, loadingIds, customPlaces, setCustomPlaces, renamePlace,
+    loadPayload, payload, planLinks, planLinksAt, savePlan,
+    updateIdea, removeIdea, toggleVote, applySuggestions, acceptAllSuggestions, addFromText, refreshMetadata, setNote, reclassify,
   };
 }

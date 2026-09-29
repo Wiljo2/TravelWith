@@ -1,4 +1,5 @@
 import type { Day, IdeaPlatform } from "@/types";
+import type { TripPlace } from "@/utils/places";
 import { IDEA_TYPES, IDEA_TYPE_PRIORITY } from "@/constants/ideaTypes";
 import { extractUrls } from "@/utils/linkify";
 
@@ -42,7 +43,7 @@ const asWords = (s: string) => ` ${normalizeText(s).replace(/[^a-z0-9ñ]+/g, " "
 
 export const CRUISE_PLACE = "Crucero";
 const CRUISE_RE = /crucero|cruise|barco|a bordo|en el mar|navegaci/i;
-const CRUISE_ALIASES = ["crucero", "cruise", "barco", "ship", "a bordo", "onboard", "royal caribbean", "cabina", "cubierta", "deck"];
+const CRUISE_ALIASES = ["crucero", "cruise", "barco", "ship", "a bordo", "onboard", "royal caribbean", "cabina", "cubierta", "deck", "of the seas"];
 // Itinerary wording that describes a moment of the trip, not a place.
 const LEADING_GENERIC = /^(vuelo|llegada a|llegada|traslado a|traslado|embarque|desembarque|regreso a|regreso|salida de|salida a|salida|tiempo libre en|perfect day at|visita a|dia libre en|dia en)\s+/;
 const GENERIC_ONLY = /^(dia( \d+| libre)?|libre|vuelo|llegada|traslado|embarque|desembarque|regreso|salida)$/;
@@ -75,22 +76,35 @@ export function seedPlaces(destination: string | undefined, days: Day[]): string
 
 export type PlaceProfiles = Record<string, string[]>;
 
-// Texts that describe each place: its name plus the itinerary activities held
-// there. A day's activity goes to the places it names ("Check-in hotel Miami
-// (Brickell)" → Miami), or to all of the day's places when it names none.
+// What the classifiers know about the trip's places: names, aliases and the
+// itinerary text of each one.
+export interface PlaceIndex {
+  places: TripPlace[];
+  profiles: PlaceProfiles;
+}
+
+// Texts that describe each place: its names plus the itinerary activities held
+// there. An area gets its days' activities (only those naming it when they name
+// one: "Check-in hotel Miami (Brickell)" → Miami); a venue gets its own.
 // This is what tells the classifiers that Hogsmeade is at Universal.
-export function placeProfiles(places: string[], days: Day[]): PlaceProfiles {
-  const profiles: PlaceProfiles = Object.fromEntries(places.map((p) => [p, [p]]));
-  const byKey = new Map(places.map((p) => [normalizeText(p), p]));
+export function placeProfiles(places: TripPlace[], days: Day[]): PlaceProfiles {
+  const profiles: PlaceProfiles = Object.fromEntries(places.map((p) => [p.name, [p.name, ...p.aliases]]));
+  const areas = places.filter((p) => p.eventIds.length === 0);
   for (const day of days) {
-    const dayPlaces = seedPlaces(undefined, [day]).map((p) => byKey.get(normalizeText(p))).filter((p): p is string => !!p);
+    const dayAreas = areas.filter((a) => a.dayIds.includes(day.id));
     for (const e of day.events) {
       const text = `${e.title} ${e.note}`.trim();
-      const named = dayPlaces.filter((p) => nameMatches(text, p));
-      for (const p of named.length ? named : dayPlaces) profiles[p].push(text);
+      const named = dayAreas.filter((a) => nameMatches(text, a.name));
+      for (const a of named.length ? named : dayAreas) profiles[a.name].push(text);
     }
   }
+  const events = new Map(days.flatMap((d) => d.events.map((e) => [e.id, `${e.title} ${e.note}`.trim()] as const)));
+  for (const v of places) for (const id of v.eventIds) if (events.has(id)) profiles[v.name].push(events.get(id)!);
   return profiles;
+}
+
+export function placeIndex(places: TripPlace[], days: Day[]): PlaceIndex {
+  return { places, profiles: placeProfiles(places, days) };
 }
 
 function nameMatches(text: string, place: string): boolean {
@@ -106,20 +120,27 @@ const STOPWORDS = new Set(normalizeText(
   "desayuno comida regreso check reservar opcional temprano",
 ).split(" "));
 
-function vocab(text: string): string[] {
+// Distinctive words of a text (accent-free, 4+ letters, no stopwords).
+export function vocab(text: string): string[] {
   return normalizeText(text).split(/[^a-z0-9ñ]+/).filter((t) => t.length >= 4 && !STOPWORDS.has(t));
 }
 
 // Fallback when no place is named: words that only appear in one place's
-// activities point to it (1 / number of places using the word).
-function placeByVocabulary(text: string, profiles: PlaceProfiles): string | undefined {
+// activities point to it (1 / number of places using the word). A venue's words
+// are also in its area's profile; the venue, being more specific, keeps them.
+function placeByVocabulary(text: string, index: PlaceIndex): string | undefined {
   const words = new Set(vocab(text));
   if (words.size === 0) return undefined;
-  const sets = Object.entries(profiles).map(([p, texts]) => [p, new Set(vocab(texts.join(" ")))] as const);
-  const df = new Map<string, number>();
-  for (const [, s] of sets) for (const w of s) df.set(w, (df.get(w) ?? 0) + 1);
-  const ranked = sets
-    .map(([p, s]) => ({ p, score: [...words].reduce((sum, w) => sum + (s.has(w) ? 1 / df.get(w)! : 0), 0) }))
+  const sets = new Map(Object.entries(index.profiles).map(([p, texts]) => [p, new Set(vocab(texts.join(" ")))]));
+  const parentsOf = new Map(index.places.map((p) => [p.name, p.parents]));
+  const credit = new Map<string, string[]>();   // word → places it points to
+  for (const w of words) {
+    const users = [...sets].filter(([, s]) => s.has(w)).map(([p]) => p);
+    const covered = new Set(users.flatMap((u) => parentsOf.get(u) ?? []));
+    credit.set(w, users.filter((u) => !covered.has(u)));
+  }
+  const ranked = [...sets.keys()]
+    .map((p) => ({ p, score: [...credit.values()].reduce((sum, us) => sum + (us.includes(p) ? 1 / us.length : 0), 0) }))
     .sort((a, b) => b.score - a.score);
   const [first, second] = ranked;
   if (!first || first.score < 0.99 || (second && first.score - second.score < 0.5)) return undefined;
@@ -132,27 +153,66 @@ function inTags(word: string, tags: string[]): boolean {
   return word.length >= 4 && tags.some((t) => normalizeText(t).replace(/[^a-z0-9ñ]/g, "").includes(word));
 }
 
-// Picks the place whose name best matches the text. Multi-word places need the
-// larger share of their words ("Universal Studios Orlando" beats "Orlando" when
-// the text says "Universal Orlando").
-export function suggestPlace(text: string, places: string[], tags: string[] = []): string | undefined {
+const NAME_CONNECTORS = new Set(["the", "and", "del", "las", "los"]);
+const nameWords = (name: string) =>
+  normalizeText(name).split(/[^a-z0-9ñ]+/).filter((w) => w.length >= 3 && !NAME_CONNECTORS.has(w));
+const asPlace = (p: string | TripPlace): TripPlace =>
+  typeof p === "string" ? { name: p, aliases: [], dayIds: [], eventIds: [], parents: [] } : p;
+
+// Picks the place the text names. Each name (or alias) needs at least two of its
+// words, or half of them, and rare words weigh more ("Orlando" is in several
+// names; "Outlets" only in one). A venue beats its area ("Premium Outlets en
+// Orlando" → the outlets), unless the text names several spots of that area
+// (a video about all of Universal's parks stays at Universal).
+export function suggestPlace(text: string, places: (string | TripPlace)[], tags: string[] = []): string | undefined {
+  const list = places.map(asPlace);
+  return pickPlace(placeScores(text, list, tags), list);
+}
+
+// How strongly a text names each place (only places it names).
+function placeScores(text: string, list: TripPlace[], tags: string[] = []): Map<string, number> {
   const t = asWords(`${text} ${tags.join(" ")}`);
-  let best: { place: string; ratio: number; hits: number } | undefined;
-  for (const place of places) {
-    const words = place === CRUISE_PLACE
-      ? CRUISE_ALIASES.filter((a) => t.includes(asWords(a))).map(() => "x")
-      : normalizeText(place).split(/[^a-z0-9ñ]+/).filter((w) => w.length >= 3);
-    const total = place === CRUISE_PLACE ? 1 : words.length;
-    const hits = place === CRUISE_PLACE
-      ? Math.min(1, words.length)
-      : words.filter((w) => t.includes(` ${w} `) || inTags(w, tags)).length;
-    if (hits === 0 || total === 0) continue;
-    const ratio = hits / total;
-    if (ratio < 0.5) continue;
-    // More matched words = more specific; ties go to the earlier (day-derived) place.
-    if (!best || hits > best.hits || (hits === best.hits && ratio > best.ratio)) best = { place, ratio, hits };
+  const namesOf = (p: TripPlace) =>
+    [...p.name.split(" / "), ...p.aliases].map(nameWords).filter((ws) => ws.length > 0);
+  const df = new Map<string, number>();
+  for (const p of list) for (const w of new Set(namesOf(p).flat())) df.set(w, (df.get(w) ?? 0) + 1);
+  const found = (w: string) => t.includes(` ${w} `) || inTags(w, tags);
+
+  const scores = new Map<string, number>();
+  for (const p of list) {
+    if (p.name === CRUISE_PLACE) {
+      if (CRUISE_ALIASES.some((a) => t.includes(asWords(a)))) scores.set(p.name, 1);
+      continue;
+    }
+    let score = 0;
+    for (const words of namesOf(p)) {
+      const hits = words.filter(found);
+      if (hits.length < Math.min(2, words.length) || hits.length / words.length < 0.5) continue;
+      score = Math.max(score, hits.reduce((sum, w) => sum + 1 / df.get(w)!, 0));
+    }
+    if (score > 0) scores.set(p.name, score);
   }
-  return best?.place;
+  return scores;
+}
+
+const TIE = 1e-6;   // scores are sums of fractions: equal ones may differ in the last digit
+
+// The best place among the scored ones. An area with one named spot yields to
+// it; with several, the area is the answer.
+function pickPlace(scores: Map<string, number>, list: TripPlace[]): string | undefined {
+  const matched = list.filter((p) => scores.has(p.name));
+  const children = new Map<string, number>();
+  for (const p of matched) for (const parent of p.parents) children.set(parent, (children.get(parent) ?? 0) + 1);
+  const broad = list.filter((p) => (children.get(p.name) ?? 0) >= 2);
+  if (broad.length) return broad[0].name;
+  const ranked = matched
+    .filter((p) => children.get(p.name) !== 1)
+    // Ties go to the venue, then to the earlier place (trip order).
+    .sort((a, b) => {
+      const d = scores.get(b.name)! - scores.get(a.name)!;
+      return Math.abs(d) > TIE ? d : Number(b.parents.length > 0) - Number(a.parents.length > 0);
+    });
+  return ranked[0]?.name;
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -169,13 +229,15 @@ export function suggestType(text: string): string | undefined {
 }
 
 // Named place first; otherwise the itinerary vocabulary of each place.
-export function classifyIdea(text: string, profiles: PlaceProfiles, tags: string[] = []) {
-  const places = Object.keys(profiles);
+export function classifyIdea(text: string, index: PlaceIndex, tags: string[] = []) {
   return {
-    place: suggestPlace(text, places, tags) ?? placeByVocabulary(`${text} ${tags.join(" ")}`, profiles),
+    place: suggestPlace(text, index.places, tags) ?? placeByVocabulary(`${text} ${tags.join(" ")}`, index),
     cat: suggestType(`${text} ${tags.join(" ")}`),
   };
 }
+
+// Bump when the rules change, so saved ideas get classified again.
+export const CLASSIFIER_VERSION = 2;
 
 export interface IdeaTextFields {
   note?: string;
@@ -188,19 +250,37 @@ export interface IdeaTextFields {
 // then the caption + hashtags, then what the video says. Each field (place, type)
 // takes the first source that answers, so a passing word in the audio can't
 // override an explicit caption.
-export function classifyIdeaFields(fields: IdeaTextFields, profiles: PlaceProfiles) {
-  const tiers = [
-    { text: fields.note ?? "", tags: [] as string[] },
-    { text: fields.title ?? "", tags: fields.tags ?? [] },
-    { text: fields.transcript ?? "", tags: [] as string[] },
-  ].filter((t) => t.text.trim() || t.tags.length);
-  let place: string | undefined;
-  let cat: string | undefined;
-  for (const tier of tiers) {
-    const r = classifyIdea(tier.text, profiles, tier.tags);
-    place ??= r.place;
-    cat ??= r.cat;
-    if (place && cat) break;
+export function classifyIdeaFields(fields: IdeaTextFields, index: PlaceIndex) {
+  // The member's note states the intent: it wins alone.
+  const note = fields.note?.trim();
+  const fromNote = note ? classifyIdea(note, index) : { place: undefined, cat: undefined };
+
+  // Otherwise every source adds evidence. TikTok's extra keywords are search
+  // suggestions ("universal studios orlando" on an outlets video), so they weigh
+  // less than what the creator wrote or said.
+  let place = fromNote.place;
+  if (!place) {
+    const caption = fields.title ?? "";
+    const hashtags = caption.match(/#[\p{L}\p{N}_]+/gu)?.map((h) => h.slice(1)) ?? [];
+    const sources = [
+      { weight: 1, scores: placeScores(caption, index.places, hashtags) },
+      { weight: 0.5, scores: placeScores("", index.places, fields.tags ?? []) },
+      { weight: 1, scores: placeScores(fields.transcript ?? "", index.places) },
+    ];
+    const total = new Map<string, number>();
+    for (const { weight, scores } of sources) for (const [p, sc] of scores) total.set(p, (total.get(p) ?? 0) + weight * sc);
+    place = pickPlace(total, index.places);
   }
+  if (!place) {
+    for (const text of [fields.title, fields.transcript]) {
+      place = text ? classifyIdea(text, index, text === fields.title ? fields.tags : []).place : undefined;
+      if (place) break;
+    }
+  }
+
+  // The type: first source that answers, from the most intentional.
+  const cat = fromNote.cat
+    ?? suggestType(`${fields.title ?? ""} ${(fields.tags ?? []).join(" ")}`)
+    ?? suggestType(fields.transcript ?? "");
   return { place, cat };
 }

@@ -3,13 +3,14 @@ import { useState } from "react";
 import { Plus, X } from "lucide-react";
 
 interface PlacesEditorProps {
-  places: string[];
+  places: string[];            // areas: editable
+  venues: string[];            // spots read from the itinerary
   onAdd: (place: string) => void;
   onRemove: (place: string) => void;
 }
 
 // The trip's places used to organize ideas. Seeded from the itinerary; editable.
-export default function PlacesEditor({ places, onAdd, onRemove }: PlacesEditorProps) {
+export default function PlacesEditor({ places, venues, onAdd, onRemove }: PlacesEditorProps) {
   const [draft, setDraft] = useState("");
 
   function add() {
@@ -21,7 +22,7 @@ export default function PlacesEditor({ places, onAdd, onRemove }: PlacesEditorPr
   return (
     <div>
       <p className="mb-2 text-xs text-muted-foreground">
-        Salen del itinerario. Agrega o quita lugares para organizar mejor las ideas.
+        Zonas del viaje. Salen del itinerario; agrega o quita para organizar mejor las ideas.
       </p>
       <div className="flex flex-wrap gap-1.5">
         {places.map((p) => (
@@ -45,6 +46,18 @@ export default function PlacesEditor({ places, onAdd, onRemove }: PlacesEditorPr
           </button>
         </span>
       </div>
+      {venues.length > 0 && (
+        <>
+          <p className="mb-2 mt-4 text-xs text-muted-foreground">
+            Sitios de las actividades del itinerario. Se actualizan solos cuando cambia el plan.
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {venues.map((v) => (
+              <span key={v} className="rounded-full bg-secondary px-3 py-1 text-xs text-secondary-foreground">{v}</span>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

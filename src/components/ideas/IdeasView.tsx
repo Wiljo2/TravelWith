@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Check, Lightbulb, Plus } from "lucide-react";
 import IdeaRow from "@/components/ideas/IdeaRow";
 import IdeaGroup from "@/components/ideas/IdeaGroup";
+import IdeasByDay from "@/components/ideas/IdeasByDay";
 import AddIdeaForm from "@/components/ideas/AddIdeaForm";
 import OrganizeWithAI from "@/components/ideas/OrganizeWithAI";
 import PlacesEditor from "@/components/ideas/PlacesEditor";
@@ -13,12 +14,13 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { PANEL } from "@/components/home/shared";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { cn } from "@/lib/utils";
-import type { Idea, IdeaSuggestion } from "@/types";
-import type { PlaceProfiles } from "@/utils/ideas";
+import type { Day, Idea, IdeaLink, IdeaSuggestion } from "@/types";
+import type { PlaceIndex } from "@/utils/ideas";
+import { isVenue } from "@/utils/places";
 
 interface IdeasViewProps {
   ideas: Idea[];
-  profiles: PlaceProfiles;
+  index: PlaceIndex;
   loadingIds: Set<string>;
   mobile: boolean;
   voter: string;
@@ -32,6 +34,11 @@ interface IdeasViewProps {
   onRetry: (id: string) => Promise<Idea | null>;
   onAddPlace: (place: string) => void;
   onRemovePlace: (place: string) => void;
+  days: Day[];
+  planLinks?: IdeaLink[];
+  planLinksAt?: string;
+  onAnalyze: () => Promise<{ links: IdeaLink[]; at: string }>;
+  onSavePlan: (links: IdeaLink[], at: string) => void;
 }
 
 const ALL = "all";
@@ -40,11 +47,15 @@ const REVIEW = "review";
 // Inspiration board: reels/TikToks about the trip's places, grouped by place and
 // filtered by type. Kept apart from the itinerary on purpose.
 export default function IdeasView({
-  ideas, profiles, loadingIds, mobile, voter,
+  ideas, index, loadingIds, mobile, voter,
   onAdd, onUpdate, onRemove, onVote, onApplySuggestions, onAcceptAll, onSetNote, onRetry, onAddPlace, onRemovePlace,
+  days, planLinks, planLinksAt, onAnalyze, onSavePlan,
 }: IdeasViewProps) {
-  const places = Object.keys(profiles);
+  const places = index.places.map((p) => p.name);
+  const areas = index.places.filter((p) => !isVenue(p)).map((p) => p.name);
+  const venues = index.places.filter(isVenue).map((p) => p.name);
   const [filter, setFilter] = useState<string>(ALL);
+  const [view, setView] = useState<"place" | "day">("place");
   const [adding, setAdding] = useState(false);
   // Remounts the add form each time it opens, so it starts empty.
   const [formKey, setFormKey] = useState(0);
@@ -70,7 +81,7 @@ export default function IdeasView({
     (b.votes?.length ?? 0) - (a.votes?.length ?? 0) || b.createdAt.localeCompare(a.createdAt);
   const groups = [
     { key: "__none", title: "Sin lugar", items: visible.filter((i) => !placeOf(i)) },
-    ...places.map((p) => ({ key: p, title: p, items: visible.filter((i) => placeOf(i) === p) })),
+    ...index.places.map((p) => ({ key: p.name, title: p.name, sub: [...p.parents].sort((x, y) => x.length - y.length)[0], items: visible.filter((i) => placeOf(i) === p.name) })),
   ].filter((g) => g.items.length > 0);
 
   const row = (idea: Idea, showPlace: boolean) => (
@@ -96,7 +107,7 @@ export default function IdeasView({
         <Button onClick={openForm} className="h-9 gap-1.5 rounded-full px-4 font-semibold">
           <Plus className="size-4" /> Agregar idea
         </Button>
-        <OrganizeWithAI ideas={toClassify} profiles={profiles} onApply={onApplySuggestions} onEnrich={(i) => onRetry(i.id)} />
+        <OrganizeWithAI ideas={toClassify} profiles={index.profiles} onApply={onApplySuggestions} onEnrich={(i) => onRetry(i.id)} />
         {withSuggestion > 1 && (
           <Button variant="ghost" onClick={onAcceptAll} className="ml-auto h-9 gap-1.5 rounded-full px-3 text-emerald-800">
             <Check className="size-4" /> Aceptar todas ({withSuggestion})
@@ -104,6 +115,37 @@ export default function IdeasView({
         )}
       </div>
 
+      {active.length > 0 && (
+        <div className="inline-flex gap-1 self-start rounded-full bg-muted p-1">
+          {([["place", "📍 Por lugar"], ["day", "📅 Por día"]] as const).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setView(id)}
+              aria-pressed={view === id}
+              className={cn(
+                "cursor-pointer rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors",
+                view === id ? "bg-card text-foreground shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {view === "day" && active.length > 0 ? (
+        <IdeasByDay
+          loadingIds={loadingIds}
+          ideas={ideas}
+          days={days}
+          places={index.places}
+          planLinks={planLinks}
+          planLinksAt={planLinksAt}
+          onAnalyze={onAnalyze}
+          onSavePlan={onSavePlan}
+        />
+      ) : (
+      <>
       {active.length > 0 && (
         <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-wrap md:px-0">
           <FilterChip label="Todas" count={active.length} active={filter === ALL} onClick={() => setFilter(ALL)} />
@@ -138,16 +180,18 @@ export default function IdeasView({
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-2">
           {groups.map((g) => (
-            <IdeaGroup key={g.key} title={g.title} count={g.items.length} muted={g.key === "__none"}>
+            <IdeaGroup key={g.key} title={g.title} subtitle={"sub" in g ? g.sub : undefined} count={g.items.length} muted={g.key === "__none"}>
               {[...g.items].sort(order).map((i) => row(i, false))}
             </IdeaGroup>
           ))}
         </div>
       )}
+      </>
+      )}
 
       <div>
         <Disclosure title="Lugares del viaje" hint={places.length} className={discarded.length ? "" : "border-b"}>
-          <PlacesEditor places={places} onAdd={onAddPlace} onRemove={onRemovePlace} />
+          <PlacesEditor places={areas} venues={venues} onAdd={onAddPlace} onRemove={onRemovePlace} />
         </Disclosure>
         {discarded.length > 0 && (
           <Disclosure title="Descartadas" hint={discarded.length} className="border-b">

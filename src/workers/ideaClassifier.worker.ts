@@ -20,21 +20,30 @@ async function run(req: ClassifyRequest) {
 
   const targets: (ClassifyRequest["targets"][number] & { vecs: number[][] })[] = [];
   for (const t of req.targets) targets.push({ ...t, vecs: await embed(t.texts) });
+  const groups = [...new Set(targets.map((t) => t.group))];
 
-  const results: { id: string; place?: Match; cat?: Match }[] = [];
+  const results: { id: string; matches: Record<string, Match> }[] = [];
   for (const [i, item] of req.items.entries()) {
     const vs = await embed(item.texts);
-    // Score = best pair between the idea's texts (note, caption, transcript chunks)
-    // and the target's texts (e.g. the closest activity of a place).
-    const best = (group: "place" | "cat"): Match | undefined => {
+    const matches: Record<string, Match> = {};
+    for (const group of groups) {
+      // Score = best pair between the idea's texts (note, caption, transcript
+      // chunks) and the target's texts; remember which idea text matched.
       const ranked = targets
         .filter((t) => t.group === group)
-        .map((t) => ({ key: t.key, score: Math.max(...vs.flatMap((v) => t.vecs.map((tv) => dot(tv, v)))) }))
+        .map((t) => {
+          let score = -1;
+          let textIdx = 0;
+          vs.forEach((v, vi) => t.vecs.forEach((tv) => {
+            const s = dot(tv, v);
+            if (s > score) { score = s; textIdx = vi; }
+          }));
+          return { key: t.key, score, textIdx };
+        })
         .sort((a, b) => b.score - a.score);
-      if (ranked.length === 0) return undefined;
-      return { ...ranked[0], margin: ranked[0].score - (ranked[1]?.score ?? 0) };
-    };
-    results.push({ id: item.id, place: best("place"), cat: best("cat") });
+      if (ranked.length) matches[group] = { ...ranked[0], margin: ranked[0].score - (ranked[1]?.score ?? 0) };
+    }
+    results.push({ id: item.id, matches });
     post({ type: "progress", phase: "classify", done: i + 1, total: req.items.length });
   }
   post({ type: "result", results });

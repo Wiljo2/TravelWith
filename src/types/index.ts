@@ -135,8 +135,20 @@ export interface Idea {
   suggestion?: IdeaSuggestion;
   status?: IdeaStatus;      // default "idea"
   votes?: string[];         // voter keys
+  placesKey?: string;       // the place list its suggestion was computed with
   dayId?: string;           // legacy, ignored
   eventId?: string;         // legacy, ignored
+}
+
+// Where an idea fits the existing plan — shown read-only, never schedules anything.
+// Either a specific activity (eventId), a free gap of a day (slot), or the day in general.
+export interface IdeaLink {
+  ideaId: string;
+  dayId: string;
+  eventId?: string;
+  slot?: { start: number; end: number };
+  reason?: string;           // why it fits (Claude) or the matching phrase (rules)
+  source: "rules" | "ai" | "claude";
 }
 
 export interface RoomMember {
