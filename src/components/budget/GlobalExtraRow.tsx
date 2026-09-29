@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { Extra, Day } from "@/types";
-import { fmtUSDNum, fmtCOPNum } from "@/utils/currency";
+import { fmtNum, fmtUSDNum, fmtCOPNum } from "@/utils/currency";
 import {
   toUSD, toCOP, parse, CELL_CLASS, CALC_NUM_CLASS, SUB_LINE_CLASS,
   InlineNumber, CurrencyToggle, ModeToggle, EventLinkCell,
@@ -69,7 +69,7 @@ export default function GlobalExtraRow({
           <CurrencyToggle currency={liveCur} onClick={toggleCurrency} />
           {liveMode === "group"
             ? <InlineNumber value={liveCur === "USD" ? groupUSD : groupCOP} onChange={(raw) => { setAmount(parse(raw)); setDirty(true); }} />
-            : <span className={CALC_NUM_CLASS} title="Calculado: por persona × viajeros">{liveCur === "USD" ? `$${fmtUSDNum(groupUSD)}` : fmtCOPNum(groupCOP)}</span>}
+            : <span className={CALC_NUM_CLASS} title="Calculado: por persona × viajeros">{liveCur === "USD" ? fmtNum(groupUSD) : fmtNum(groupCOP)}</span>}
         </div>
         <div className={SUB_LINE_CLASS}>{liveCur === "USD" ? `${fmtCOPNum(groupCOP)} COP` : `${fmtUSDNum(groupUSD)} USD`}</div>
       </td>
@@ -78,11 +78,11 @@ export default function GlobalExtraRow({
           {liveCur === "USD" && <span className="font-mono text-[13px] text-muted-foreground">$</span>}
           {liveMode === "perPerson"
             ? <InlineNumber value={liveCur === "USD" ? paxUSD : paxCOP} onChange={(raw) => { setAmount(parse(raw)); setDirty(true); }} />
-            : <span className={CALC_NUM_CLASS} title="Calculado: total ÷ viajeros">{liveCur === "USD" ? fmtUSDNum(paxUSD) : fmtCOPNum(paxCOP)}</span>}
+            : <span className={CALC_NUM_CLASS} title="Calculado: total ÷ viajeros">{fmtNum(liveCur === "USD" ? paxUSD : paxCOP)}</span>}
           {liveCur === "COP" && <span className="ml-0.5 text-[10px] text-muted-foreground">COP</span>}
         </div>
         <div className={SUB_LINE_CLASS}>
-          {liveCur === "USD" ? `${fmtCOPNum(paxCOP)} COP` : `$${fmtUSDNum(paxUSD)} USD`}
+          {liveCur === "USD" ? `${fmtCOPNum(paxCOP)} COP` : `${fmtUSDNum(paxUSD)} USD`}
         </div>
       </td>
       <td className={cn(CELL_CLASS, CELL_ACTIONS_CLASS, "w-[60px] px-1.5")}>

@@ -56,7 +56,7 @@ export default function TasksView({ days, tasks, people, exchangeRate, onAdd, on
 
   function renderList(list: Task[]) {
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         {list.map((task) => (
           <TaskRow
             key={task.id}
@@ -83,9 +83,9 @@ export default function TasksView({ days, tasks, people, exchangeRate, onAdd, on
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden bg-secondary">
-      <div className="flex flex-1 flex-col items-center overflow-y-auto py-4 md:py-6">
-        <div className="w-full max-w-[640px] md:px-5">
+    <div>
+      <div>
+        <div className="mx-auto w-full max-w-[720px]">
 
           <div className="mb-3 flex gap-2">
             <Input
@@ -94,9 +94,9 @@ export default function TasksView({ days, tasks, people, exchangeRate, onAdd, on
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="Nueva tarea, cosa por decidir..."
-              className="flex-1 bg-card py-2.5 text-sm"
+              className="h-11 flex-1 rounded-xl bg-card text-sm shadow-[0_1px_2px_rgba(0,0,0,.04)]"
             />
-            <Button onClick={submit} disabled={!draft.trim()} className="font-semibold">
+            <Button onClick={submit} disabled={!draft.trim()} className="h-11 rounded-xl px-5 font-semibold">
               Añadir
             </Button>
           </div>
@@ -107,14 +107,14 @@ export default function TasksView({ days, tasks, people, exchangeRate, onAdd, on
 
           {pending.length > 0 && (
             <section className="mb-8">
-              <p className="mb-2.5 text-[11px] font-semibold tracking-[.07em] text-muted-foreground">POR HACER · {pending.length}</p>
+              <SectionLabel title="Por hacer" count={pending.length} />
               {renderList(pending)}
             </section>
           )}
 
           {done.length > 0 && (
             <section>
-              <p className="mb-2.5 text-[11px] font-semibold tracking-[.07em] text-muted-foreground">COMPLETADAS · {done.length}</p>
+              <SectionLabel title="Completadas" count={done.length} />
               {renderList(done)}
             </section>
           )}
@@ -129,6 +129,15 @@ export default function TasksView({ days, tasks, people, exchangeRate, onAdd, on
         </div>
       </div>
     </div>
+  );
+}
+
+function SectionLabel({ title, count }: { title: string; count: number }) {
+  return (
+    <h2 className="mb-3 flex items-center gap-2 text-[15px] font-semibold">
+      {title}
+      <span className="rounded-full bg-muted px-2 py-px text-xs font-medium text-muted-foreground">{count}</span>
+    </h2>
   );
 }
 
@@ -176,7 +185,7 @@ function TaskRow({
   }, [expanded, task.note]);
 
   return (
-    <div className={cn("overflow-hidden rounded-[10px] border border-border bg-card transition-opacity", task.done && "opacity-60")}>
+    <div className={cn("overflow-hidden rounded-2xl bg-card shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-border/70 transition-opacity", task.done && "opacity-60")}>
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 px-3.5 py-3">
         <Checkbox
           checked={task.done}
@@ -222,8 +231,8 @@ function TaskRow({
             title="Decisión pendiente: elige una opción para confirmarla"
           >
             🔀 {options.length} opc · {optionRange.low === optionRange.high
-              ? `$${fmtUSDNum(optionRange.low)}`
-              : `$${fmtUSDNum(optionRange.low)}–${fmtUSDNum(optionRange.high)}`}
+              ? fmtUSDNum(optionRange.low)
+              : `${fmtUSDNum(optionRange.low)}–${fmtUSDNum(optionRange.high)}`}
           </span>
         )}
         {pr && (

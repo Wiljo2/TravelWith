@@ -22,7 +22,7 @@ export const CELL_CLASS = "px-3 py-2.5 border-b border-border align-middle max-m
 
 // Below md the budget tables collapse into stacked cards: each row becomes a
 // two-column grid and every cell prints its column name from data-label.
-export const TABLE_CLASS = "w-full border-collapse overflow-hidden rounded-xl border border-border bg-card max-md:block";
+export const TABLE_CLASS = "w-full border-collapse max-md:block md:[&_td:first-child]:pl-5 md:[&_th:first-child]:pl-5 md:[&_td:last-child]:pr-4";
 export const THEAD_CLASS = "max-md:hidden";
 export const TBODY_CLASS = "max-md:block";
 export const TFOOT_CLASS = "max-md:block [&_tr]:max-md:flex [&_tr]:max-md:items-end [&_tr]:max-md:justify-between [&_td]:max-md:block [&_td:only-child]:max-md:w-full";
@@ -34,11 +34,11 @@ export const ACTION_BTN_CLASS = "flex h-[26px] w-[26px] max-md:h-9 max-md:w-9 cu
 export const CALC_NUM_CLASS = "inline-block w-20 text-right font-mono text-[13px] italic text-muted-foreground";
 export const SUB_LINE_CLASS = "mt-px text-right font-mono text-[10px] text-muted-foreground";
 
-export function SectionHeader({ label, hint }: { label: string; hint: string }) {
+export function SectionHeader({ label, hint, className }: { label: string; hint?: string; className?: string }) {
   return (
-    <div className="mb-3">
-      <div className="text-xs font-bold tracking-[.06em]">{label}</div>
-      <div className="mt-0.5 text-[11px] text-muted-foreground">{hint}</div>
+    <div className={cn("mb-3", className)}>
+      <h2 className="text-[15px] font-semibold">{label}</h2>
+      {hint && <p className="mt-0.5 text-[13px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }

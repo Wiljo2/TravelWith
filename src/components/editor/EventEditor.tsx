@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import NoteLinks from "@/components/NoteLinks";
-import type { CalendarEvent } from "@/types";
+import type { CalendarEvent, Day } from "@/types";
 
 const CAT_KEYS = Object.keys(CATEGORIES) as (keyof typeof CATEGORIES)[];
 
@@ -25,18 +25,40 @@ function fromTimeStr(t: string): number {
 interface EventEditorProps {
   ev: CalendarEvent;
   onChange: (patch: Partial<CalendarEvent>) => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   deleteLabel?: string;
+  // With these, a "Día" picker moves the activity to another day.
+  days?: Day[];
+  dayId?: string;
+  onMoveDay?: (toDayId: string) => void;
 }
 
-export default function EventEditor({ ev, onChange, onDelete, deleteLabel = "Eliminar actividad" }: EventEditorProps) {
+export default function EventEditor({
+  ev, onChange, onDelete, deleteLabel = "Eliminar actividad", days, dayId, onMoveDay,
+}: EventEditorProps) {
   return (
-    <div className="flex flex-col gap-[9px]">
+    <div className="flex flex-col gap-2.5">
       <Input
         value={ev.title}
         onChange={(e) => onChange({ title: e.target.value })}
-        className="bg-secondary text-[12.5px]"
+        aria-label="Título"
+        className="h-10 bg-secondary text-[15px] font-medium"
       />
+
+      {days && dayId && onMoveDay && (
+        <label className="text-xs text-secondary-foreground">
+          Día
+          <select
+            value={dayId}
+            onChange={(e) => onMoveDay(e.target.value)}
+            className="mt-[3px] h-9 w-full cursor-pointer rounded-lg border border-input bg-secondary px-2.5 text-[13px] text-foreground outline-none"
+          >
+            {days.map((d) => (
+              <option key={d.id} value={d.id}>{d.label}{d.sub ? ` — ${d.sub}` : ""}</option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <div className="flex gap-2">
         <TimeField label="Inicio" value={ev.start} min={HOUR_START} max={HOUR_END - 0.25}
@@ -50,12 +72,12 @@ export default function EventEditor({ ev, onChange, onDelete, deleteLabel = "Eli
         onChange={(e) => onChange({ note: e.target.value })}
         placeholder="Nota, precios, links…"
         rows={2}
-        className="min-h-0 bg-secondary text-[12.5px] leading-snug"
+        className="min-h-0 bg-secondary text-[13px] leading-snug"
       />
       <NoteLinks note={ev.note} />
 
       <div>
-        <div className="mb-1.5 text-[11px] text-muted-foreground">Categoría</div>
+        <div className="mb-1.5 text-xs text-secondary-foreground">Categoría</div>
         <div className="flex flex-wrap gap-[5px]">
           {CAT_KEYS.map((key) => {
             const c = CATEGORIES[key];
@@ -78,13 +100,15 @@ export default function EventEditor({ ev, onChange, onDelete, deleteLabel = "Eli
         </div>
       </div>
 
-      <Button
-        variant="outline"
-        onClick={onDelete}
-        className="w-full border-[#F09595] bg-[#FCEBEB] text-xs font-medium text-[#A32D2D] hover:bg-[#FCEBEB]/80 hover:text-[#A32D2D]"
-      >
-        {deleteLabel}
-      </Button>
+      {onDelete && (
+        <Button
+          variant="outline"
+          onClick={onDelete}
+          className="w-full border-[#F09595] bg-[#FCEBEB] text-xs font-medium text-[#A32D2D] hover:bg-[#FCEBEB]/80 hover:text-[#A32D2D]"
+        >
+          {deleteLabel}
+        </Button>
+      )}
     </div>
   );
 }
@@ -115,14 +139,14 @@ function TimeField({ label, value, min, max, onChange }: TimeFieldProps) {
   }
 
   return (
-    <label className="flex-1 text-[11px] text-secondary-foreground">
+    <label className="flex-1 text-xs text-secondary-foreground">
       {label}
       <Input
         type="time"
         value={displayed}
         onChange={(e) => handleChange(e.target.value)}
         onBlur={handleBlur}
-        className="mt-[3px] w-full bg-secondary font-mono text-[12.5px]"
+        className="mt-[3px] h-9 w-full bg-secondary text-[13px] tabular-nums"
       />
     </label>
   );
