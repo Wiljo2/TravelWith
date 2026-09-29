@@ -1,5 +1,4 @@
-import type { RoomPayload } from "@/hooks/useRoom";
-import type { Task, TaskPriority } from "@/types";
+import type { RoomPayload, Task, TaskPriority } from "@/types";
 import { TASK_CATEGORIES, PRIORITIES } from "@/constants/taskCategories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { uid } from "@/utils/uid";

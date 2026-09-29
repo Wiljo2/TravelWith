@@ -1,5 +1,5 @@
+import type { RoomPayload } from "@/types";
 import { describe, it, expect } from "vitest";
-import type { RoomPayload } from "@/hooks/useRoom";
 import { DomainError } from "./core";
 import { addEvent, updateEvent, deleteEvent } from "./events";
 import { addTask, updateTask, deleteTask } from "./tasks";

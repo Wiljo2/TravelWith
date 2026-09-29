@@ -1,6 +1,5 @@
 import { createServerClient } from "@/lib/supabase-server";
-import type { RoomPayload } from "@/hooks/useRoom";
-import type { RoomMember } from "@/types";
+import type { RoomPayload, RoomMember } from "@/types";
 
 export interface LoadedRoom {
   payload: RoomPayload;

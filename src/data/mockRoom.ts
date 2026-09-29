@@ -1,5 +1,4 @@
-import type { RoomPayload } from "@/hooks/useRoom";
-import type { Extra, Task, TripSpan } from "@/types";
+import type { RoomPayload, Extra, Task, TripSpan } from "@/types";
 import { initialDays } from "./initialDays";
 
 // Local mode: boots the whole app against in-memory mock data — no Supabase, no

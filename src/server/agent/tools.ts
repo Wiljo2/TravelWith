@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { RoomPayload } from "@/hooks/useRoom";
+import type { RoomPayload } from "@/types";
 import { loadRoom, mutateRoom } from "@/server/trip-store";
 import { DomainError } from "@/server/domain/core";
 import { addEvent, updateEvent, deleteEvent } from "@/server/domain/events";

@@ -1,5 +1,4 @@
-import type { RoomPayload } from "@/hooks/useRoom";
-import type { CalendarEvent, Day } from "@/types";
+import type { RoomPayload, CalendarEvent, Day } from "@/types";
 
 // Validation failure with a message the agent (or an API consumer) can act on.
 export class DomainError extends Error {}

@@ -1,5 +1,4 @@
-import type { RoomPayload } from "@/hooks/useRoom";
-import type { Extra } from "@/types";
+import type { RoomPayload, Extra } from "@/types";
 import { DomainError, requireDay, findEvent } from "./core";
 
 function validateCurrency(currency: string): asserts currency is "USD" | "COP" {

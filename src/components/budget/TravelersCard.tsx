@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { RoomMember } from "@/types";
-import type { MockPerson } from "@/hooks/useRoom";
+import type { MockPerson } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";

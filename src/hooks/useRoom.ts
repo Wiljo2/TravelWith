@@ -1,21 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Day, Extra, RoomMember, Task, TripInfo, TripSpan } from "@/types";
+import type { RoomMember, RoomPayload } from "@/types";
 
-export interface MockPerson {
-  id: string;
-  name: string;
-}
-
-export interface RoomPayload {
-  days: Day[];
-  extras: Extra[];
-  exchangeRate: number;
-  trip?: TripInfo;
-  mockPeople?: MockPerson[];
-  tripSpans?: TripSpan[];
-  tasks?: Task[];
-}
+export type { MockPerson, RoomPayload } from "@/types";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
 

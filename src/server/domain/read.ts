@@ -1,4 +1,4 @@
-import type { RoomPayload } from "@/hooks/useRoom";
+import type { RoomPayload } from "@/types";
 import { extraGroupUSD, extraPerPersonUSD } from "@/utils/currency";
 import { requireDay } from "./core";
 

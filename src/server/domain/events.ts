@@ -1,5 +1,4 @@
-import type { RoomPayload } from "@/hooks/useRoom";
-import type { CalendarEvent } from "@/types";
+import type { RoomPayload, CalendarEvent } from "@/types";
 import { CATEGORIES } from "@/constants/categories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { uid } from "@/utils/uid";

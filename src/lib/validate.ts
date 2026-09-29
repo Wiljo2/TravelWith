@@ -1,5 +1,4 @@
-import type { RoomPayload } from "@/hooks/useRoom";
-import type { TripInfo } from "@/types";
+import type { RoomPayload, TripInfo } from "@/types";
 import { parseISODate } from "@/utils/tripDays";
 
 const CODE_RE = /^[A-Z0-9]{4,10}$/;

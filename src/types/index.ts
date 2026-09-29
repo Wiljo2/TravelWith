@@ -105,6 +105,24 @@ export interface Task {
   options?: TaskOption[];  // candidate choices (a decision to resolve); unchosen options never sum into the confirmed total
 }
 
+// A traveler without an account, counted in per-person math.
+export interface MockPerson {
+  id: string;
+  name: string;
+}
+
+// The persisted trip document (rooms.payload). Every field added after the
+// first release is optional; consumers apply defaults at read time.
+export interface RoomPayload {
+  days: Day[];
+  extras: Extra[];
+  exchangeRate: number;
+  trip?: TripInfo;
+  mockPeople?: MockPerson[];
+  tripSpans?: TripSpan[];
+  tasks?: Task[];
+}
+
 export interface RoomMember {
   userId: string;
   name: string;

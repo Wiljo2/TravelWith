@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabase-server";
 import { validateTripInput } from "@/lib/validate";
 import { generateDays } from "@/utils/tripDays";
 import { DEFAULT_RATE } from "@/utils/currency";
-import type { RoomPayload } from "@/hooks/useRoom";
+import type { RoomPayload } from "@/types";
 
 function genCode(): string {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
