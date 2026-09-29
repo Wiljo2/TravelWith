@@ -26,7 +26,7 @@ describe("events", () => {
     const { payload, event } = addEvent(basePayload(), { dayId: "d1", title: "Cena", start: 19, end: 21 });
     expect(payload.days[1].events).toHaveLength(1);
     expect(payload.days[0].events).toHaveLength(0);
-    expect(event.cat).toBe("miami");
+    expect(event.cat).toBe("actividad");
   });
 
   it("rejects unknown days, empty titles, bad hours, bad categories", () => {

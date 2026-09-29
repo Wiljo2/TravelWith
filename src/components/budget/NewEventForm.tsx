@@ -4,6 +4,7 @@ import { HOUR_START, HOUR_END } from "@/constants/time";
 import EventEditor from "@/components/editor/EventEditor";
 import { Button } from "@/components/ui/button";
 import type { CalendarEvent } from "@/types";
+import { DEFAULT_EVENT_CAT } from "@/constants/categories";
 
 interface NewEventFormProps {
   defaultHour: number;
@@ -18,7 +19,7 @@ export default function NewEventForm({ defaultHour, dayLabel, onSave, onCancel }
     title: "",
     start: Math.max(HOUR_START, Math.min(defaultHour, HOUR_END - 1)),
     end:   Math.min(defaultHour + 1, HOUR_END),
-    cat:   "miami",
+    cat:   DEFAULT_EVENT_CAT,
     note:  "",
   });
 

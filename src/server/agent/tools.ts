@@ -6,11 +6,11 @@ import { addEvent, updateEvent, deleteEvent } from "@/server/domain/events";
 import { addTask, updateTask, deleteTask } from "@/server/domain/tasks";
 import { addExtra, updateExtra, removeExtra, setExchangeRate } from "@/server/domain/extras";
 import { tripOverview, dayDetail, budgetDetail } from "@/server/domain/read";
-import { CATEGORIES } from "@/constants/categories";
+import { DEFAULT_EVENT_CAT, EVENT_CATEGORY_KEYS } from "@/constants/categories";
 import { TASK_CATEGORIES } from "@/constants/taskCategories";
 
 const HOURS_DESC = "Decimal hour between 6 and 26 (e.g. 19.5 = 7:30pm, 25 = 1:00am next day)";
-const EVENT_CATS = Object.keys(CATEGORIES).join(" | ");
+const EVENT_CATS = EVENT_CATEGORY_KEYS.join(" | ");
 const TASK_CATS = Object.keys(TASK_CATEGORIES).join(" | ");
 
 function schema(properties: Record<string, unknown>, required: string[] = []) {
@@ -58,7 +58,7 @@ const ALL_TOOLS: Anthropic.Tool[] = [
         title: { type: "string" },
         start: { type: "number", description: HOURS_DESC },
         end: { type: "number", description: `${HOURS_DESC}; must be greater than start` },
-        cat: { type: "string", description: `Category: ${EVENT_CATS}. Default miami.` },
+        cat: { type: "string", description: `Category: ${EVENT_CATS}. Default ${DEFAULT_EVENT_CAT}.` },
         note: { type: "string", description: "Optional note shown on the event" },
       },
       ["dayId", "title", "start", "end"],

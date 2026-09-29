@@ -195,7 +195,7 @@ export default function RoomGate({
                     autoFocus
                     value={tripName}
                     onChange={(e) => setTripName(e.target.value)}
-                    placeholder="Nombre del viaje (ej. Bahamas 2026)"
+                    placeholder="Nombre del viaje (ej. Vacaciones 2027)"
                     maxLength={80}
                     className="bg-secondary text-sm"
                   />

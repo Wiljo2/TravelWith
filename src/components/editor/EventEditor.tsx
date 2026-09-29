@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { CATEGORIES } from "@/constants/categories";
+import { CATEGORIES, EVENT_CATEGORY_KEYS } from "@/constants/categories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -9,8 +9,6 @@ import { Button } from "@/components/ui/button";
 import NoteLinks from "@/components/NoteLinks";
 import type { CalendarEvent } from "@/types";
 import { LIMITS } from "@/constants/limits";
-
-const CAT_KEYS = Object.keys(CATEGORIES) as (keyof typeof CATEGORIES)[];
 
 // Decimal hours ↔ "HH:MM"
 function toTimeStr(h: number): string {
@@ -60,7 +58,7 @@ export default function EventEditor({ ev, onChange, onDelete, deleteLabel = "Eli
       <div>
         <div className="mb-1.5 text-[11px] text-muted-foreground">Categoría</div>
         <div className="flex flex-wrap gap-[5px]">
-          {CAT_KEYS.map((key) => {
+          {(EVENT_CATEGORY_KEYS.includes(ev.cat) || !CATEGORIES[ev.cat] ? EVENT_CATEGORY_KEYS : [...EVENT_CATEGORY_KEYS, ev.cat]).map((key) => {
             const c = CATEGORIES[key];
             const active = ev.cat === key;
             return (

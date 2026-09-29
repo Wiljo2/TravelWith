@@ -1,5 +1,5 @@
 import type { RoomPayload, CalendarEvent } from "@/types";
-import { CATEGORIES } from "@/constants/categories";
+import { CATEGORIES, DEFAULT_EVENT_CAT } from "@/constants/categories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { uid } from "@/utils/uid";
 import { LIMITS } from "@/constants/limits";
@@ -54,7 +54,7 @@ export function addEvent(payload: RoomPayload, args: AddEventArgs): { payload: R
   }
   if (!args.title.trim()) throw new DomainError("title is required");
   validateHours(args.start, args.end);
-  const cat = args.cat ?? "miami";
+  const cat = args.cat ?? DEFAULT_EVENT_CAT;
   validateCat(cat);
 
   const event: CalendarEvent = {

@@ -22,8 +22,7 @@ import Toast from "@/components/Toast";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
 import type { MockPerson, RoomPayload, Task, ToastAction, TripInfo, TripSpan } from "@/types";
-import { initialDays } from "@/data/initialDays";
-import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE, mockRoomPayload } from "@/data/mockRoom";
+import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
 import { generateDays } from "@/utils/tripDays";
 
 export default function App() {
@@ -148,11 +147,13 @@ export default function App() {
 
   // useRoom fetches nothing for LOCAL, so the mock payload is seeded here. The
   // ref keeps edits from being wiped: onRemoteUpdate is a new function each render.
+  // The demo is imported lazily and never in production builds.
   const localSeeded = useRef(false);
   useEffect(() => {
-    if (!localMode || localSeeded.current) return;
+    // Inline NODE_ENV check (not LOCAL_MODE_ENABLED) so the bundler can drop the import.
+    if (process.env.NODE_ENV === "production" || !localMode || localSeeded.current) return;
     localSeeded.current = true;
-    onRemoteUpdate(mockRoomPayload);
+    import("@/data/mockRoom").then(({ mockRoomPayload }) => onRemoteUpdate(mockRoomPayload));
   }, [localMode, onRemoteUpdate]);
 
   const people = Math.max(1, members.length + mockPeople.length);
@@ -248,7 +249,7 @@ export default function App() {
         onReset={() => {
           if (confirm("¿Restablecer el itinerario? Se perderán las actividades del calendario.")) {
             const regenerated = trip ? generateDays(trip.startDate, trip.endDate) : null;
-            loadDays(regenerated ?? initialDays);
+            loadDays(regenerated ?? days.map((d) => ({ ...d, events: [], spans: [] })));
             setTripSpans([]);
           }
         }}

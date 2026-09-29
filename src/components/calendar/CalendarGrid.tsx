@@ -4,7 +4,7 @@ import HourGutter from "./HourGutter";
 import DayColumn from "./DayColumn";
 import { cn } from "@/lib/utils";
 import type { Day, CalendarEvent, DragPreview, TripSpan, DaySpan, Task } from "@/types";
-import { CATEGORIES } from "@/constants/categories";
+import { CATEGORIES, EVENT_CATEGORY_KEYS } from "@/constants/categories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { cssZoom } from "@/utils/zoom";
 
@@ -106,7 +106,7 @@ export default function CalendarGrid({
     >
       {/* Category legend */}
       <div className="flex h-[34px] shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-background px-3">
-        {Object.entries(CATEGORIES).map(([, c]) => (
+        {EVENT_CATEGORY_KEYS.map((key) => CATEGORIES[key]).map((c) => (
           <div key={c.label} className="flex shrink-0 items-center gap-1 whitespace-nowrap">
             <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: c.dot }} />
             <span className="text-[11px] text-muted-foreground">{c.label}</span>

@@ -18,10 +18,10 @@ interface AppHeaderProps {
   onLeaveRoom: () => void;
 }
 
-// Shown for the LOCAL demo room, which has no trip metadata
-const DEMO = {
-  eyebrow: "Wonder of the Seas · Orlando · Miami · Bahamas · CocoCay",
-  title: "Bahamas & Perfect Day · Nov 26 – Dic 4, 2026",
+// Shown while the trip loads and for legacy rooms saved without trip metadata
+const FALLBACK = {
+  eyebrow: "Viaje en grupo",
+  title: "Tu viaje",
 };
 
 const SAVE_LABEL: Record<SaveState, string> = {
@@ -34,10 +34,10 @@ const SAVE_LABEL: Record<SaveState, string> = {
 export default function AppHeader({
   roomCode, connected, saveState, trip, grandTotal, exchangeRate, onReset, onLeaveRoom,
 }: AppHeaderProps) {
-  const eyebrow = trip ? (trip.destination ?? "Viaje en grupo") : DEMO.eyebrow;
+  const eyebrow = trip ? (trip.destination ?? FALLBACK.eyebrow) : FALLBACK.eyebrow;
   const title = trip
     ? `${trip.name} · ${fmtTripDates(trip.startDate, trip.endDate)}`
-    : DEMO.title;
+    : FALLBACK.title;
 
   return (
     <div className="mb-3.5 flex flex-wrap items-end justify-between gap-3.5">

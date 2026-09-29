@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
-import { initialDays } from "@/data/initialDays";
 import { uid } from "@/utils/uid";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import type { Day, CalendarEvent } from "@/types";
+import { DEFAULT_EVENT_CAT } from "@/constants/categories";
 
 // Repairs payloads saved before ids were globally unique: the legacy counter
 // restarted at 0 each session, so older rooms can hold repeated event ids.
@@ -40,7 +40,7 @@ export function useItinerary(): {
   removeDaySpan: (dayId: string, spanId: string) => void;
   updateDaySpan: (dayId: string, spanId: string, patch: Partial<import("../types").DaySpan>) => void;
 } {
-  const [days, setDays] = useState<Day[]>(initialDays);
+  const [days, setDays] = useState<Day[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const selectedEvent = useMemo(() => {
@@ -74,7 +74,7 @@ export function useItinerary(): {
     setSelectedId(null);
   }
 
-  function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = "miami") {
+  function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = DEFAULT_EVENT_CAT) {
     const nev: CalendarEvent = { id: uid(), start, end, title, cat, note };
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: [...d.events, nev] } : d)));
     setSelectedId(nev.id);
