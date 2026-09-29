@@ -101,3 +101,32 @@ describe("matchIdeasToPlan with itinerary venues", () => {
     expect(eventTitle(links[0].dayId, links[0].eventId)).toMatch(/Check-in puerto/);
   });
 });
+
+describe("real itineraries (edited plans)", () => {
+  const ev = (id: string, start: number, title: string, cat: string, note = "") => ({ id, start, end: start + 2, title, cat, note });
+  const days = [
+    { id: "a", label: "Vie · Nov 27", sub: "Universal Studios Orlando ⏳", flexible: true, events: [
+      ev("kp", 7, " Kelly Park/Rock Springs (1h desde el hotel)", "miami", "https://www.ocfl.net/cultureparks/parks.aspx?d=22"),
+      ev("po", 14, "Orlando Premium Outlets", "miami", "15 min del hotel · Nike, Coach"),
+    ] },
+    { id: "b", label: "Sáb · Nov 28", sub: "Orlando · Día libre", flexible: true, events: [ev("un", 8, "Universal", "miami")] },
+    { id: "c", label: "Dom · Nov 29", sub: "Traslado Orlando → Miami", flexible: false, events: [
+      ev("br", 11.5, "Almuerzo en Miami en Brickell", "comida", "La idea es comprar celulares y pasar por Design District."),
+    ] },
+  ];
+  const places = tripPlaces(undefined, days);
+  const find = (name: string) => places.find((p) => p.name === name);
+
+  it("trusts the activities over a stale day subtitle", () => {
+    expect(find("Universal Studios Orlando")?.dayIds).toEqual(["b"]);
+    expect(find("Orlando")?.dayIds).toEqual(["a", "b", "c"]);
+    const links = matchIdeasToPlan([idea("u", { note: "tips", place: "Universal Studios Orlando" })], days, places);
+    expect(links.map((l) => l.eventId)).toEqual(["un"]);
+  });
+
+  it("reads venues from titles and prose, and skips links", () => {
+    expect(places.map((p) => p.name)).toEqual(expect.arrayContaining(["Kelly Park / Rock Springs", "Brickell", "Design District"]));
+    expect(places.some((p) => /https|www/i.test(p.name))).toBe(false);
+    expect(find("Orlando Premium Outlets")?.aliases).toEqual(["Nike", "Coach"]);
+  });
+});

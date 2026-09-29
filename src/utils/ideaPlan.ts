@@ -128,6 +128,14 @@ export function matchIdeasToPlan(ideas: Idea[], days: Day[], places: TripPlace[]
       continue;
     }
 
+    // A park-like area has an activity that is the visit itself: tips go there.
+    if (place?.anchors?.length) {
+      for (const { day, ev } of events.filter(({ ev }) => place.anchors!.includes(ev.id)).slice(0, 2)) {
+        links.push({ ideaId: idea.id, dayId: day.id, eventId: ev.id, source: "rules" });
+      }
+      continue;
+    }
+
     // No activity fits: suggest the largest free gap on a day at that place.
     if (!place) continue;
     const options = days

@@ -14,6 +14,7 @@ export interface TripPlace {
   dayIds: string[];       // days it is visited
   eventIds: string[];     // activities held there; empty = the whole day (an area)
   parents: string[];      // the areas of those days (venues only)
+  anchors?: string[];     // activities that are the visit itself ("Universal" for Universal Studios Orlando)
 }
 
 // Well-known synonyms the itinerary wouldn't spell out.
@@ -27,7 +28,8 @@ const CONNECTORS = new Set(["of", "the", "at", "de", "del", "la", "el", "los", "
 // Capitalized words that still describe an activity, not a spot.
 const GENERIC = new Set(normalizeText(
   "piscina playa libre cubierta show cena almuerzo desayuno brunch casino teatro descanso hotel puerto barco " +
-  "compras excursion regreso traslado vuelo drill tiempo visita noche empacar llegada salida pool bar",
+  "compras excursion regreso traslado vuelo drill tiempo visita noche empacar llegada salida pool bar " +
+  "incluido reserva opcional temprano idea",
 ).split(" "));
 const LEADING_MEAL = /^(ultima |primera )?(cena|almuerzo|desayuno|brunch|comida|tiempo libre|visita|tour)( en| a| al| de)?\s+/i;
 
@@ -36,14 +38,15 @@ const isCapitalized = (w: string) => /^[\p{Lu}\d]/u.test(w);
 // Proper names in a phrase: runs of capitalized words ("Mini golf Wonder Dunes"
 // → "Wonder Dunes"). A single capitalized word counts only when it is the whole
 // phrase, since Spanish capitalizes the first word of any label.
-function properNames(phrase: string): string[] {
+// `listed`: the name is the whole phrase ("Nike, Coach"), not part of a sentence.
+function properNames(phrase: string): { name: string; listed: boolean }[] {
   const clean = phrase.replace(/\([^)]*\)/g, " ").replace(/[^\p{L}\p{N}\s'&-]/gu, " ").replace(/\s+/g, " ").trim();
   // "Cena Disney Springs" → "Disney Springs" (accent removal keeps the length).
   const meal = normalizeText(clean).match(LEADING_MEAL);
   const words = (meal ? clean.slice(meal[0].length) : clean).split(" ").filter(Boolean);
   const isConnector = (w: string) => CONNECTORS.has(w.toLowerCase());
   const total = words.filter((w) => !isConnector(w)).length;
-  const out: string[] = [];
+  const out: { name: string; listed: boolean }[] = [];
   let run: string[] = [];
   const flush = () => {
     while (run.length && isConnector(run[run.length - 1])) run.pop();
@@ -52,7 +55,7 @@ function properNames(phrase: string): string[] {
     const content = run.filter((w) => !isConnector(w));
     const whole = content.length === total;
     if (content.length >= 2 || (content.length === 1 && whole && content[0].length >= 4 && !GENERIC.has(normalizeText(content[0])))) {
-      out.push(run.join(" "));
+      out.push({ name: run.join(" "), listed: whole });
     }
     run = [];
   };
@@ -64,9 +67,13 @@ function properNames(phrase: string): string[] {
   return out;
 }
 
-// Names in a title or note: each " / ", "+", "·", "," or " o " part.
-const namesIn = (text: string) =>
-  text.split(/\s+[—–-]\s+|\/|\+|·|,|\s+o\s+|\s+or\s+/).flatMap((part) => properNames(part.trim()));
+// Names in a title or note: each " / ", "+", "·", ",", " o " or " en " part
+// ("Almuerzo en Miami en Brickell" → Miami, Brickell). Links are skipped.
+const namesDetail = (text: string) =>
+  text.replace(/https?:\/\/\S+/g, " ")
+    .split(/\s+[—–-]\s+|\/|\+|·|,|\s+o\s+|\s+or\s+|\s+en\s+/)
+    .flatMap((part) => properNames(part.trim()));
+const namesIn = (text: string) => namesDetail(text).map((n) => n.name);
 
 const key = (s: string) => normalizeText(s).replace(/[^a-z0-9ñ]+/g, " ").trim();
 
@@ -84,15 +91,39 @@ export function tripPlaces(destination: string | undefined, days: Day[], custom?
   const dayAreas = new Map(days.map((d) => [
     d.id, seedPlaces(undefined, [d]).map((p) => baseByKey.get(key(p))).filter((p): p is string => !!p),
   ]));
-
-  const base = new Map<string, TripPlace>(baseNames.map((name) => [name, {
-    name, aliases: [], dayIds: days.filter((d) => dayAreas.get(d.id)!.includes(name)).map((d) => d.id), eventIds: [], parents: [],
-  }]));
   // A name that is (part of) an area: "Universal Studios" → "Universal Studios Orlando".
   const areaOf = (n: string) => {
     const k = key(n);
-    return baseNames.find((b) => key(b) === k || ` ${key(b)} `.includes(` ${k} `));
+    return baseNames.find((b) => key(b) === k) ?? baseNames.find((b) => ` ${key(b)} `.includes(` ${k} `));
   };
+
+  // Day subtitles go stale when the plan is edited (Friday still says "Universal"
+  // after the park moved to Saturday). An area inside a wider one ("Universal
+  // Studios Orlando" ⊃ "Orlando") that activities name lives on those days; a day
+  // it no longer has keeps the wider area.
+  const anchors = new Map<string, string[]>();
+  for (const area of baseNames) {
+    const wider = baseNames.find((b) => b !== area && ` ${key(area)} `.includes(` ${key(b)} `));
+    if (!wider) continue;
+    anchors.set(area, days.flatMap((d) => d.events)
+      .filter((e) => e.cat !== "logist" && namesIn(e.title).some((n) => areaOf(n) === area)).map((e) => e.id));
+    const named = new Set(days.filter((d) => d.events.some((e) => namesIn(e.title).some((n) => areaOf(n) === area))).map((d) => d.id));
+    if (named.size === 0) continue;
+    for (const d of days) {
+      const list = dayAreas.get(d.id)!;
+      if (list.includes(area) && !named.has(d.id)) {
+        list.splice(list.indexOf(area), 1);
+        if (!list.includes(wider)) list.push(wider);
+      } else if (!list.includes(area) && named.has(d.id)) {
+        list.push(area);
+      }
+    }
+  }
+
+  const base = new Map<string, TripPlace>(baseNames.map((name) => [name, {
+    name, aliases: [], dayIds: days.filter((d) => dayAreas.get(d.id)!.includes(name)).map((d) => d.id), eventIds: [], parents: [],
+    ...(anchors.get(name)?.length ? { anchors: anchors.get(name) } : {}),
+  }]));
 
   const venues: TripPlace[] = [];
   const byName = new Map<string, TripPlace>();
@@ -114,16 +145,18 @@ export function tripPlaces(destination: string | undefined, days: Day[], custom?
     for (const ev of day.events) {
       if (ev.cat === "logist") continue;
       const titleNames = namesIn(ev.title);
-      const noteNames = namesIn(ev.note ?? "");
+      const noteDetail = namesDetail(ev.note ?? "");
+      const noteNames = noteDetail.map((n) => n.name);
       const areas = titleNames.map(areaOf).filter((a): a is string => !!a);
       const own = titleNames.filter((n) => !areaOf(n));
-      if (areas.length) {
-        // "Universal Studios — Hollywood / NYC": the other names are parts of the area,
-        // and the note lists its spots ("Tiempo libre en Miami: South Beach / Wynwood").
-        base.get(areas[0])?.aliases.push(...own);
+      if (own.length) {
+        // A list in the note describes this venue ("Nike, Coach"); a name inside a
+        // sentence is another stop ("…y pasar por Design District").
+        addVenue(own, day, ev.id, noteDetail.filter((n) => n.listed).map((n) => n.name));
+        for (const n of noteDetail) if (!n.listed && !areaOf(n.name)) addVenue([n.name], day, ev.id, []);
+      } else if (areas.length) {
+        // "Tiempo libre en Miami: South Beach / Wynwood": the note lists the area's spots.
         for (const n of noteNames) if (!areaOf(n)) addVenue([n], day, ev.id, []);
-      } else if (own.length) {
-        addVenue(own, day, ev.id, noteNames);                 // the note's names describe this venue
       } else {
         for (const n of noteNames) if (!areaOf(n)) addVenue([n], day, ev.id, []); // "Cena especialidad: Wonderland / 150 Central Park"
       }
