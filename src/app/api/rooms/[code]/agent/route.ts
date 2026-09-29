@@ -5,6 +5,7 @@ import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
 import { LIMITS } from "@/constants/limits";
 import { AGENT_TOOLS, TOOL_LABELS, executeTool } from "@/server/agent/tools";
 import { SYSTEM_PROMPT } from "@/server/agent/prompt";
+import { addUsage, dailyTokenLimit, recordUsage, tokensUsedToday, type Usage } from "@/server/agent/usage";
 
 const AGENT_MODEL = process.env.AGENT_MODEL ?? "claude-sonnet-5";
 const MAX_ITERATIONS = 15;
@@ -22,10 +23,14 @@ type Params = Promise<{ code: string }>;
 // {type:"text",delta} | {type:"tool",name,label} | {type:"done",usage} | {type:"error",message}
 export async function POST(req: Request, { params }: { params: Params }) {
   let code: string;
+  let userId: string;
   try {
     code = roomCodeParam((await params).code);
     // Beta rule: only the trip owner can run the (paid) assistant.
-    await requireMember(req, code, "owner");
+    ({ user: { id: userId } } = await requireMember(req, code, "owner"));
+    if ((await tokensUsedToday(userId)) >= dailyTokenLimit()) {
+      throw new HttpError(429, "Alcanzaste el límite diario del asistente. Vuelve a intentarlo mañana.");
+    }
   } catch (e) {
     return errorResponse(e, "POST /api/rooms/[code]/agent");
   }
@@ -68,29 +73,32 @@ export async function POST(req: Request, { params }: { params: Params }) {
         content: t.content,
       }));
 
-      let inputTokens = 0;
-      let outputTokens = 0;
+      const usage: Usage = { input: 0, output: 0 };
 
       try {
         for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
           if (req.signal.aborted) break;
 
-          const msgStream = client.messages.stream({
-            model: AGENT_MODEL,
-            max_tokens: 8192,
-            thinking: { type: "adaptive" },
-            system: [
-              { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-            ],
-            tools: AGENT_TOOLS,
-            messages,
-          });
+          // The request signal aborts the model call when the user disconnects,
+          // so tokens stop being generated (and billed).
+          const msgStream = client.messages.stream(
+            {
+              model: AGENT_MODEL,
+              max_tokens: 8192,
+              thinking: { type: "adaptive" },
+              system: [
+                { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+              ],
+              tools: AGENT_TOOLS,
+              messages,
+            },
+            { signal: req.signal },
+          );
 
           msgStream.on("text", (delta) => send({ type: "text", delta }));
 
           const message = await msgStream.finalMessage();
-          inputTokens += message.usage.input_tokens;
-          outputTokens += message.usage.output_tokens;
+          addUsage(usage, message.usage);
 
           if (message.stop_reason === "pause_turn") {
             messages.push({ role: "assistant", content: message.content });
@@ -126,10 +134,11 @@ export async function POST(req: Request, { params }: { params: Params }) {
           }
         }
 
-        send({ type: "done", usage: { input_tokens: inputTokens, output_tokens: outputTokens } });
+        send({ type: "done", usage: { input_tokens: usage.input, output_tokens: usage.output } });
       } catch (e) {
-        send({ type: "error", message: friendlyError(e) });
+        if (!req.signal.aborted) send({ type: "error", message: friendlyError(e) });
       } finally {
+        await recordUsage(userId, code, usage);
         try {
           controller.close();
         } catch {

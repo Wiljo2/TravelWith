@@ -41,6 +41,8 @@ export default function App() {
   const [resumeAttempted, setResumeAttempted] = useState(false);
 
   const localMode = roomCode === LOCAL_ROOM_CODE;
+  // Beta: the assistant is owner-only (enforced server-side too).
+  const canUseAgent = localMode || userRooms.some((r) => r.room_code === roomCode && r.role === "owner");
 
   useEffect(() => {
     if (resumeAttempted) return;
@@ -281,22 +283,24 @@ export default function App() {
             pendingNew={pendingNew ?? (slotDraft && !slotDraft.task ? { dayId: slotDraft.dayId, hour: slotDraft.hour } : null)}
           />
           <div className="flex w-[300px] shrink-0 flex-col gap-2">
-            <div className="flex overflow-hidden rounded-lg border border-border bg-card">
-              {([["budget", "Presupuesto"], ["agent", "✨ Asistente"]] as const).map(([id, label]) => (
-                <button
-                  key={id}
-                  onClick={() => setSidePanel(id)}
-                  className={cn(
-                    "flex-1 cursor-pointer py-1.5 text-xs font-semibold transition-colors",
-                    sidePanel === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            {canUseAgent && (
+              <div className="flex overflow-hidden rounded-lg border border-border bg-card">
+                {([["budget", "Presupuesto"], ["agent", "✨ Asistente"]] as const).map(([id, label]) => (
+                  <button
+                    key={id}
+                    onClick={() => setSidePanel(id)}
+                    className={cn(
+                      "flex-1 cursor-pointer py-1.5 text-xs font-semibold transition-colors",
+                      sidePanel === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
-            {sidePanel === "agent" ? (
+            {sidePanel === "agent" && canUseAgent ? (
               <AgentPanel roomCode={roomCode} accessToken={session?.access_token} messages={agentMessages} setMessages={setAgentMessages} />
             ) : (
               <BudgetPanel
