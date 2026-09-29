@@ -155,7 +155,7 @@ All trip state is stored as **a single JSONB `payload`** in the `rooms` table. O
 
 ### Known backend debt (do not make it worse)
 - Saving is **last-write-wins of the full payload**: two people editing simultaneously can overwrite each other. Mitigated by the debounce, realtime, and the `updated_at` conflict check (409). Any new collaborative feature must keep this in mind.
-- The `rooms` RLS policies are open (`using (true)`): anyone with the code can write. Acceptable for the share-by-code model, but never store sensitive data in the payload.
+- The permissive `rooms` policies from `001_init.sql` are still `using (true)`, but `005_rls_lockdown.sql` adds restrictive policies on top: browser clients (anon key, signed in or not) can only read/write rooms they are members of, and cannot insert or delete `user_rooms` rows. Route handlers use the service role and bypass RLS, so **every route must enforce membership itself**. Never add a permissive policy that widens this, and never grant clients direct writes to `user_rooms`.
 
 ---
 
