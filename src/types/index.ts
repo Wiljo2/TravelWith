@@ -151,6 +151,13 @@ export interface IdeaLink {
   source: "rules" | "ai" | "claude";
 }
 
+// One "Analizar con Claude" run: its links and the ideas it actually read.
+export interface IdeaPlanResult {
+  links: IdeaLink[];
+  at: string;
+  ideaIds: string[];
+}
+
 export interface RoomMember {
   userId: string;
   name: string;

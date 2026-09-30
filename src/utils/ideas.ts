@@ -13,12 +13,18 @@ export function findIdeaUrls(text: string): string[] {
   return extractUrls(withScheme);
 }
 
+// `domain` itself or a subdomain of it — never a lookalike ("eviltiktok.com").
+export function isHostOf(host: string, domain: string): boolean {
+  const h = host.toLowerCase();
+  return h === domain || h.endsWith(`.${domain}`);
+}
+
 export function detectPlatform(url: string): IdeaPlatform {
   let host = "";
-  try { host = new URL(url).host.replace(/^www\./, ""); } catch { return "other"; }
-  if (host.endsWith("tiktok.com")) return "tiktok";
-  if (host.endsWith("instagram.com")) return "instagram";
-  if (host.endsWith("youtube.com") || host === "youtu.be") return "youtube";
+  try { host = new URL(url).hostname; } catch { return "other"; }
+  if (isHostOf(host, "tiktok.com")) return "tiktok";
+  if (isHostOf(host, "instagram.com")) return "instagram";
+  if (isHostOf(host, "youtube.com") || host === "youtu.be") return "youtube";
   return "other";
 }
 

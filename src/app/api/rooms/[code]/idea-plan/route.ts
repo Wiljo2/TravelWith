@@ -33,8 +33,8 @@ export async function POST(req: Request, { params }: { params: Params }) {
   }
 
   try {
-    const { links, usage } = await planIdeasWithClaude(payload, ideaIds);
-    return NextResponse.json({ links, at: new Date().toISOString(), usage });
+    const { links, ideaIds: analyzed, usage } = await planIdeasWithClaude(payload, ideaIds);
+    return NextResponse.json({ links, ideaIds: analyzed, at: new Date().toISOString(), usage });
   } catch (e) {
     if (e instanceof IdeaPlanError) return NextResponse.json({ error: e.message }, { status: 503 });
     if (e instanceof Anthropic.RateLimitError) return NextResponse.json({ error: "Claude está ocupado, intenta en un minuto." }, { status: 429 });

@@ -45,19 +45,25 @@ export function useIdeas(roomCode: string | null) {
   // Last "Analizar con Claude" result (where each idea fits the itinerary).
   const [planLinks, setPlanLinks] = useState<IdeaLink[] | undefined>();
   const [planLinksAt, setPlanLinksAt] = useState<string | undefined>();
+  // Ideas that analysis actually read (with or without a link).
+  const [planIdeaIds, setPlanIdeaIds] = useState<string[] | undefined>();
 
   // The ideas part of the room payload, in and out. Stable: safe in callbacks.
+  // A missing field means "none": otherwise the previous room's ideas would stay
+  // on screen (and be autosaved into this one), e.g. for rooms saved before ideas.
   const loadPayload = useCallback((p: RoomPayload) => {
-    if (Array.isArray(p.ideas)) setIdeas(p.ideas);
-    if (Array.isArray(p.ideaPlaces)) setCustomPlaces(p.ideaPlaces);
-    if (Array.isArray(p.ideaLinks)) setPlanLinks(p.ideaLinks);
-    if (p.ideaLinksAt) setPlanLinksAt(p.ideaLinksAt);
+    setIdeas(Array.isArray(p.ideas) ? p.ideas : []);
+    setCustomPlaces(Array.isArray(p.ideaPlaces) ? p.ideaPlaces : undefined);
+    setPlanLinks(Array.isArray(p.ideaLinks) ? p.ideaLinks : undefined);
+    setPlanLinksAt(p.ideaLinksAt || undefined);
+    setPlanIdeaIds(Array.isArray(p.ideaLinksIds) ? p.ideaLinksIds : undefined);
   }, []);
-  const payload = { ideas, ideaPlaces: customPlaces, ideaLinks: planLinks, ideaLinksAt: planLinksAt };
+  const payload = { ideas, ideaPlaces: customPlaces, ideaLinks: planLinks, ideaLinksAt: planLinksAt, ideaLinksIds: planIdeaIds };
 
-  function savePlan(links: IdeaLink[], at: string) {
+  function savePlan(links: IdeaLink[], at: string, ideaIds: string[]) {
     setPlanLinks(links);
     setPlanLinksAt(at);
+    setPlanIdeaIds(ideaIds);
   }
 
   function updateIdea(id: string, patch: Partial<Idea>) {
@@ -194,7 +200,7 @@ export function useIdeas(roomCode: string | null) {
 
   return {
     ideas, loadingIds, customPlaces, setCustomPlaces, renamePlace,
-    loadPayload, payload, planLinks, planLinksAt, savePlan,
+    loadPayload, payload, planLinks, planLinksAt, planIdeaIds, savePlan,
     updateIdea, removeIdea, toggleVote, applySuggestions, acceptAllSuggestions, addFromText, refreshMetadata, setNote, reclassify,
   };
 }

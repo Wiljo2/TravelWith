@@ -18,7 +18,7 @@ interface IdeasTabProps {
   trip: TripInfo | null;
   // The full room payload right now, and the way to persist it immediately.
   currentPayload: () => RoomPayload;
-  save: (payload: RoomPayload) => Promise<void>;
+  save: (payload: RoomPayload, opts?: { force?: boolean }) => Promise<boolean>;
 }
 
 // Wires the Ideas board to the room: the trip's places, who is voting/adding,
@@ -36,11 +36,14 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, days,
   const voter = user?.id ?? "local";
   const addedBy = user ? String(user.user_metadata?.full_name ?? user.email ?? "").split(" ")[0] || undefined : undefined;
 
-  // The server reads the saved room (so save first); the local demo room isn't in
+  // The server reads the saved room (so save first, and stop if that fails: it
+  // would analyze a room without the new ideas); the local demo room isn't in
   // the database and sends its data inline.
   async function analyze(ideaIds?: string[]) {
     const payload = currentPayload();
-    if (!localMode) await save(payload);
+    if (!localMode && !(await save(payload, { force: true }))) {
+      throw new Error("No se pudo guardar el viaje (quizá otro miembro lo cambió). Intenta de nuevo.");
+    }
     const res = await fetch(`/api/rooms/${roomCode}/idea-plan`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -48,7 +51,7 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, days,
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !Array.isArray(data?.links)) throw new Error(data?.error ?? "No se pudo analizar");
-    return { links: data.links as IdeaLink[], at: data.at as string };
+    return { links: data.links as IdeaLink[], at: data.at as string, ideaIds: (data.ideaIds ?? []) as string[] };
   }
 
   return (
@@ -71,6 +74,7 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, days,
       days={days}
       planLinks={api.planLinks}
       planLinksAt={api.planLinksAt}
+      planIdeaIds={api.planIdeaIds}
       onAnalyze={analyze}
       onSavePlan={api.savePlan}
     />

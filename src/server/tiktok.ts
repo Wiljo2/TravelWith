@@ -1,9 +1,26 @@
+import { isHostOf } from "@/utils/ideas";
+
 // Public data of a TikTok video, read from its web page. Server-only: TikTok
 // blocks these requests from browsers (CORS). No account or API key needed.
 
 const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36";
 const SHORT_HOSTS = new Set(["vm.tiktok.com", "vt.tiktok.com"]);
 const TRANSCRIPT_MAX = 3000;
+// Subtitle files are served from TikTok's own CDNs. Anything else in the page's
+// JSON is not fetched: the server must never request an arbitrary URL (SSRF).
+const SUBTITLE_DOMAINS = ["tiktok.com", "tiktokcdn.com", "tiktokcdn-us.com", "tiktokv.com", "tiktokv.us", "byteoversea.com", "ibytedtos.com"];
+
+const isTikTokUrl = (url: URL) =>
+  (url.protocol === "https:" || url.protocol === "http:") && !url.port && isHostOf(url.hostname, "tiktok.com");
+
+export function isSubtitleUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" && !url.port && SUBTITLE_DOMAINS.some((d) => isHostOf(url.hostname, d));
+  } catch {
+    return false;
+  }
+}
 
 export interface TikTokData {
   title?: string;        // caption
@@ -22,7 +39,7 @@ export async function resolveTikTokUrl(url: URL, timeoutMs = 5000): Promise<URL>
   const location = res.headers.get("location");
   if (!location) return url;
   const target = new URL(location, url);
-  return target.host.endsWith("tiktok.com") ? target : url;
+  return isTikTokUrl(target) ? target : url;
 }
 
 // WebVTT → plain text: drops the header, cue numbers and timings, and repeated lines.
@@ -36,12 +53,21 @@ export function vttToText(vtt: string): string {
   return out.join(" ").replace(/\s+/g, " ").trim();
 }
 
+// Follows redirects by hand, only while they stay on tiktok.com.
+async function fetchTikTokPage(url: URL, hops = 3): Promise<Response | null> {
+  const res = await fetch(url, { headers: { "User-Agent": BROWSER_UA }, redirect: "manual", signal: AbortSignal.timeout(8000) });
+  const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
+  if (!location) return res;
+  const next = new URL(location, url);
+  return hops > 0 && isTikTokUrl(next) ? fetchTikTokPage(next, hops - 1) : null;
+}
+
 // The video page embeds its data as JSON (`__UNIVERSAL_DATA_FOR_REHYDRATION__`):
 // caption, author, cover, hashtags, keywords and subtitle tracks.
 export async function fetchTikTokData(url: URL): Promise<TikTokData | null> {
-  if (!url.host.endsWith("tiktok.com") || !url.pathname.includes("/video/")) return null;
-  const res = await fetch(url, { headers: { "User-Agent": BROWSER_UA }, signal: AbortSignal.timeout(8000) });
-  if (!res.ok) return null;
+  if (!isTikTokUrl(url) || !url.pathname.includes("/video/")) return null;
+  const res = await fetchTikTokPage(url);
+  if (!res?.ok) return null;
   const json = (await res.text()).match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/)?.[1];
   if (!json) return null;
   const item = JSON.parse(json)?.__DEFAULT_SCOPE__?.["webapp.video-detail"]?.itemInfo?.itemStruct;
@@ -62,11 +88,13 @@ export async function fetchTikTokData(url: URL): Promise<TikTokData | null> {
 
 // Prefers the original-language speech recognition (ASR) over machine translations.
 async function fetchTranscript(tracks: SubtitleInfo[]): Promise<string> {
-  const track = tracks.find((t) => t.Source === "ASR" && t.Url) ?? tracks.find((t) => t.Url);
+  const safe = tracks.filter((t) => t.Url && isSubtitleUrl(t.Url));
+  const track = safe.find((t) => t.Source === "ASR") ?? safe[0];
   if (!track?.Url) return "";
   try {
     const res = await fetch(track.Url, {
       headers: { "User-Agent": BROWSER_UA, Referer: "https://www.tiktok.com/" },
+      redirect: "error",   // a redirect could leave the allowed hosts
       signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return "";

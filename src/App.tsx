@@ -51,7 +51,7 @@ export default function App() {
   const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
   const { tasks, setTasks, addTask, toggleTask, updateTask, deleteTask, swapTaskDays } = useTasks();
   const ideasApi = useIdeas(roomCode);
-  const { ideas, loadPayload: loadIdeasPayload, payload: ideasPayload, customPlaces, planLinks, planLinksAt } = ideasApi;
+  const { ideas, loadPayload: loadIdeasPayload, payload: ideasPayload, customPlaces, planLinks, planLinksAt, planIdeaIds } = ideasApi;
   const [trip, setTrip] = useState<TripInfo | null>(null);
 
   function addTripSpan(span: TripSpan) { setTripSpans((p) => [...p, span]); }
@@ -144,7 +144,7 @@ export default function App() {
     }, 600);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, planLinks, planLinksAt, roomCode, connected]);
+  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, planLinks, planLinksAt, planIdeaIds, roomCode, connected]);
 
   function handleSelect(id: string | null) {
     setSelectedId(id);

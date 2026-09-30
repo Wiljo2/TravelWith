@@ -149,10 +149,12 @@ export function buildPlanPrompt(payload: RoomPayload, onlyIds?: string[]) {
 
 export async function planIdeasWithClaude(
   payload: RoomPayload, onlyIds?: string[],
-): Promise<{ links: IdeaLink[]; usage: { input: number; output: number } }> {
+): Promise<{ links: IdeaLink[]; ideaIds: string[]; usage: { input: number; output: number } }> {
   if (!process.env.ANTHROPIC_API_KEY) throw new IdeaPlanError("Falta ANTHROPIC_API_KEY en el servidor.");
   const { system, user, ideaIds, targets, count } = buildPlanPrompt(payload, onlyIds);
-  if (count === 0) return { links: [], usage: { input: 0, output: 0 } };
+  // The ideas actually sent: the client marks exactly these as analyzed.
+  const sent = [...ideaIds.values()];
+  if (count === 0) return { links: [], ideaIds: sent, usage: { input: 0, output: 0 } };
 
   const client = new Anthropic();
   const response = await client.messages.create({
@@ -176,5 +178,5 @@ export async function planIdeasWithClaude(
     if (!ideaId || !target) continue;   // "none" or anything invented is dropped
     links.push({ ideaId, ...target, reason: cut(l.reason, 160), source: "claude" });
   }
-  return { links, usage: { input: response.usage.input_tokens, output: response.usage.output_tokens } };
+  return { links, ideaIds: sent, usage: { input: response.usage.input_tokens, output: response.usage.output_tokens } };
 }

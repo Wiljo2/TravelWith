@@ -13,6 +13,8 @@ describe("detectPlatform", () => {
     expect(detectPlatform("https://youtu.be/abc")).toBe("youtube");
     expect(detectPlatform("https://example.com/x")).toBe("other");
     expect(detectPlatform("not a url")).toBe("other");
+    expect(detectPlatform("https://eviltiktok.com/@a/video/1")).toBe("other");
+    expect(detectPlatform("https://tiktok.com.evil.io/x")).toBe("other");
   });
 });
 

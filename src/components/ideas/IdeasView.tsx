@@ -14,7 +14,7 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { PANEL } from "@/components/home/shared";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { cn } from "@/lib/utils";
-import type { Day, Idea, IdeaLink, IdeaSuggestion } from "@/types";
+import type { Day, Idea, IdeaLink, IdeaPlanResult, IdeaSuggestion } from "@/types";
 import type { PlaceIndex } from "@/utils/ideas";
 import { isVenue } from "@/utils/places";
 
@@ -37,8 +37,9 @@ interface IdeasViewProps {
   days: Day[];
   planLinks?: IdeaLink[];
   planLinksAt?: string;
-  onAnalyze: () => Promise<{ links: IdeaLink[]; at: string }>;
-  onSavePlan: (links: IdeaLink[], at: string) => void;
+  planIdeaIds?: string[];
+  onAnalyze: (ideaIds?: string[]) => Promise<IdeaPlanResult>;
+  onSavePlan: (links: IdeaLink[], at: string, ideaIds: string[]) => void;
 }
 
 const ALL = "all";
@@ -49,7 +50,7 @@ const REVIEW = "review";
 export default function IdeasView({
   ideas, index, loadingIds, mobile, voter,
   onAdd, onUpdate, onRemove, onVote, onApplySuggestions, onAcceptAll, onSetNote, onRetry, onAddPlace, onRemovePlace,
-  days, planLinks, planLinksAt, onAnalyze, onSavePlan,
+  days, planLinks, planLinksAt, planIdeaIds, onAnalyze, onSavePlan,
 }: IdeasViewProps) {
   const places = index.places.map((p) => p.name);
   const areas = index.places.filter((p) => !isVenue(p)).map((p) => p.name);
@@ -141,6 +142,7 @@ export default function IdeasView({
           places={index.places}
           planLinks={planLinks}
           planLinksAt={planLinksAt}
+          planIdeaIds={planIdeaIds}
           onAnalyze={onAnalyze}
           onSavePlan={onSavePlan}
         />

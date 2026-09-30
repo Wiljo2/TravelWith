@@ -11,7 +11,7 @@ import { matchIdeasToPlan } from "@/utils/ideaPlan";
 import { findPlace, type TripPlace } from "@/utils/places";
 import { fmtHour } from "@/utils/time";
 import { cn } from "@/lib/utils";
-import type { Day, Idea, IdeaLink } from "@/types";
+import type { Day, Idea, IdeaLink, IdeaPlanResult } from "@/types";
 
 interface IdeasByDayProps {
   ideas: Idea[];
@@ -20,14 +20,15 @@ interface IdeasByDayProps {
   loadingIds: Set<string>;     // ideas whose video is still being read
   planLinks?: IdeaLink[];
   planLinksAt?: string;
+  planIdeaIds?: string[];      // ideas the last analysis read
   // Runs "Analizar con Claude" on the server (only `ideaIds` when given).
-  onAnalyze: (ideaIds?: string[]) => Promise<{ links: IdeaLink[]; at: string }>;
-  onSavePlan: (links: IdeaLink[], at: string) => void;
+  onAnalyze: (ideaIds?: string[]) => Promise<IdeaPlanResult>;
+  onSavePlan: (links: IdeaLink[], at: string, ideaIds: string[]) => void;
 }
 
 // Read-only view: the itinerary as it is, with the ideas that fit each activity,
 // free gap or day. Nothing here changes the plan.
-export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks, planLinksAt, onAnalyze, onSavePlan }: IdeasByDayProps) {
+export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks, planLinksAt, planIdeaIds, onAnalyze, onSavePlan }: IdeasByDayProps) {
   // Ideas still being read aren't placed yet: their text is about to change.
   const active = useMemo(
     () => ideas.filter((i) => i.status !== "discarded" && !loadingIds.has(i.id)),
@@ -57,8 +58,10 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run only when unmatched ideas change
   }, [unmatchedKey, days]);
 
-  // Claude's analysis covers the ideas that existed when it ran; newer ones use the free match.
-  const analyzed = (i: Idea) => !!planLinksAt && i.createdAt <= planLinksAt;
+  // Claude's analysis covers the ideas it actually read; the rest use the free
+  // match. Analyses saved before the ids were recorded fall back to the linked ideas.
+  const analyzedIds = new Set(planIdeaIds ?? (planLinks ?? []).map((l) => l.ideaId));
+  const analyzed = (i: Idea) => !!planLinksAt && analyzedIds.has(i.id);
   const fresh = planLinksAt ? active.filter((i) => !analyzed(i)) : [];
   const newSinceAnalysis = fresh.length;
   // Links to activities removed from the plan since the analysis are dropped.
@@ -81,9 +84,9 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
     setClaude("running");
     try {
       const ids = onlyNew ? fresh.map((i) => i.id) : undefined;
-      const { links: next, at } = await onAnalyze(ids);
+      const { links: next, at, ideaIds: read } = await onAnalyze(ids);
       const kept = ids ? (planLinks ?? []).filter((l) => !ids.includes(l.ideaId)) : [];
-      onSavePlan([...kept, ...next], at);
+      onSavePlan([...kept, ...next], at, ids ? [...new Set([...analyzedIds, ...read])] : read);
       setClaude("idle");
     } catch (e) {
       setClaude({ error: e instanceof Error ? e.message : "No se pudo analizar" });
