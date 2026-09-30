@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { LIMITS } from "@/constants/limits";
 
-interface CalendarSpansCardProps {
+interface SpansManagerProps {
   days: Day[];
   tripSpans: TripSpan[];
   onRemoveTripSpan: (id: string) => void;
@@ -36,7 +36,7 @@ function SpanCard({ label, bg, border, onRename, onDelete, onColor, subtitle }: 
   const active = matchColor(bg, border);
   const preview = previewColor(bg, border);
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
+    <div className="overflow-hidden rounded-xl ring-1 ring-border">
       <div className="h-1.5 opacity-70" style={{ background: preview }} />
       <div className="bg-secondary px-2.5 py-2">
         <div className="mb-[7px] flex items-center gap-1.5">
@@ -77,12 +77,11 @@ function SpanCard({ label, bg, border, onRename, onDelete, onColor, subtitle }: 
   );
 }
 
-export default function CalendarSpansCard({
+// Lists every calendar background ("fondo"): day-level spans and trip-level ranges.
+export default function SpansManager({
   days, tripSpans,
   onRemoveTripSpan, onUpdateTripSpan, onRemoveDaySpan, onUpdateDaySpan,
-}: CalendarSpansCardProps) {
-  const [open, setOpen] = useState(true);
-
+}: SpansManagerProps) {
   const allDaySpans = days.flatMap((d) =>
     (d.spans ?? []).map((s) => ({ dayId: d.id, dayLabel: d.label, span: s }))
   );
@@ -90,59 +89,42 @@ export default function CalendarSpansCard({
   const allEvents = days.flatMap((d) => d.events);
 
   return (
-    <div className="overflow-hidden rounded-[10px] border border-border bg-card">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full cursor-pointer items-center justify-between px-3.5 py-[11px] text-[13px] font-semibold text-foreground"
-      >
-        <span>Fondos del calendario</span>
-        <div className="flex items-center gap-1.5">
-          {total > 0 && (
-            <span className="rounded-full border border-border bg-secondary px-[7px] py-0.5 text-[10px] font-bold text-muted-foreground">{total}</span>
-          )}
-          <span className="text-sm opacity-40">{open ? "▲" : "▼"}</span>
-        </div>
-      </button>
-
-      {open && (
-        <div className="flex flex-col gap-[7px] border-t border-border px-3.5 py-2.5">
-          {total === 0 && (
-            <p className="py-2 text-center text-xs leading-normal text-muted-foreground">
-              Sin fondos. Selecciona una actividad y usa la sección <strong>RANGOS</strong> para crear uno.
-            </p>
-          )}
-
-          {allDaySpans.map(({ dayId, dayLabel, span }) => (
-            <SpanCard
-              key={span.id}
-              label={span.label}
-              bg={span.bg}
-              border={span.border}
-              subtitle={dayLabel}
-              onRename={(v) => onUpdateDaySpan(dayId, span.id, { label: v })}
-              onDelete={() => onRemoveDaySpan(dayId, span.id)}
-              onColor={(bg, border) => onUpdateDaySpan(dayId, span.id, { bg, border })}
-            />
-          ))}
-
-          {tripSpans.map((span) => {
-            const startEv = allEvents.find((e) => e.id === span.startEventId);
-            const endEv   = allEvents.find((e) => e.id === span.endEventId);
-            return (
-              <SpanCard
-                key={span.id}
-                label={span.label}
-                bg={span.bg}
-                border={span.border}
-                subtitle={`${startEv?.title ?? "?"} → ${endEv?.title ?? "?"}`}
-                onRename={(v) => onUpdateTripSpan(span.id, { label: v })}
-                onDelete={() => onRemoveTripSpan(span.id)}
-                onColor={(bg, border) => onUpdateTripSpan(span.id, { bg, border })}
-              />
-            );
-          })}
-        </div>
+    <div className="flex flex-col gap-2">
+      {total === 0 && (
+        <p className="py-2 text-center text-xs leading-normal text-muted-foreground">
+          Sin fondos. Abre una actividad y usa <strong>Rangos</strong> para crear uno.
+        </p>
       )}
+
+      {allDaySpans.map(({ dayId, dayLabel, span }) => (
+        <SpanCard
+          key={span.id}
+          label={span.label}
+          bg={span.bg}
+          border={span.border}
+          subtitle={dayLabel}
+          onRename={(v) => onUpdateDaySpan(dayId, span.id, { label: v })}
+          onDelete={() => onRemoveDaySpan(dayId, span.id)}
+          onColor={(bg, border) => onUpdateDaySpan(dayId, span.id, { bg, border })}
+        />
+      ))}
+
+      {tripSpans.map((span) => {
+        const startEv = allEvents.find((e) => e.id === span.startEventId);
+        const endEv   = allEvents.find((e) => e.id === span.endEventId);
+        return (
+          <SpanCard
+            key={span.id}
+            label={span.label}
+            bg={span.bg}
+            border={span.border}
+            subtitle={`${startEv?.title ?? "?"} → ${endEv?.title ?? "?"}`}
+            onRename={(v) => onUpdateTripSpan(span.id, { label: v })}
+            onDelete={() => onRemoveTripSpan(span.id)}
+            onColor={(bg, border) => onUpdateTripSpan(span.id, { bg, border })}
+          />
+        );
+      })}
     </div>
   );
 }

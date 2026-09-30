@@ -46,8 +46,10 @@ export default function RangesSection({
   }
 
   return (
-    <div className="mt-3.5 border-t border-border pt-3">
-      <div className="mb-2 text-[11px] font-semibold tracking-[.06em] text-muted-foreground">RANGOS</div>
+    <div>
+      <p className="mb-2 text-xs leading-snug text-muted-foreground">
+        Un rango pinta un fondo en el calendario entre esta actividad y otra (por ejemplo, los días a bordo).
+      </p>
 
       {mySpans.length > 0 && (
         <div className="mb-2 flex flex-col gap-1">
@@ -116,8 +118,8 @@ export default function RangesSection({
         </div>
       ) : (
         <button onClick={() => setShowForm(true)}
-          className="w-full cursor-pointer rounded-md border border-dashed border-border bg-transparent py-[5px] text-[11px] text-muted-foreground hover:text-foreground">
-          + Crear rango desde este evento
+          className="w-full cursor-pointer rounded-lg border border-dashed border-border bg-transparent py-2 text-xs text-muted-foreground hover:text-foreground">
+          + Crear rango desde esta actividad
         </button>
       )}
     </div>

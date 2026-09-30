@@ -11,6 +11,8 @@ interface DragData {
 
 export function useDragDrop(onDrop: (fromDayId: string, toDayId: string, ev: CalendarEvent, droppedHour: number) => void): {
   onDragStart: (e: React.DragEvent, ev: CalendarEvent, fromDayId: string, grabOffsetHours: number) => void;
+  beginDrag: (ev: CalendarEvent, fromDayId: string, grabOffsetHours: number) => void;
+  cancelDrag: () => void;
   onDragEnter: (dayId: string) => void;
   onDragMove: (dayId: string, cursorHour: number) => void;
   onDropInDay: (dayId: string, droppedHour: number) => void;
@@ -22,8 +24,13 @@ export function useDragDrop(onDrop: (fromDayId: string, toDayId: string, ev: Cal
   const [dragTarget, setDragTarget] = useState<string | null>(null);
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
 
-  function onDragStart(e: React.DragEvent, ev: CalendarEvent, fromDayId: string, grabOffsetHours = 0) {
+  // Touch drags have no DataTransfer; they enter through here directly.
+  function beginDrag(ev: CalendarEvent, fromDayId: string, grabOffsetHours = 0) {
     dragData.current = { ev, fromDayId, grabOffsetHours };
+  }
+
+  function onDragStart(e: React.DragEvent, ev: CalendarEvent, fromDayId: string, grabOffsetHours = 0) {
+    beginDrag(ev, fromDayId, grabOffsetHours);
     e.dataTransfer.effectAllowed = "move";
   }
 
@@ -51,11 +58,15 @@ export function useDragDrop(onDrop: (fromDayId: string, toDayId: string, ev: Cal
     dragData.current = null;
   }
 
-  function onDragEnd(_e: React.DragEvent) {
+  function cancelDrag() {
     setDragTarget(null);
     setDragPreview(null);
     dragData.current = null;
   }
 
-  return { onDragStart, onDragEnter, onDragMove, onDropInDay, onDragEnd, dragTarget, dragPreview };
+  function onDragEnd(_e: React.DragEvent) {
+    cancelDrag();
+  }
+
+  return { onDragStart, beginDrag, cancelDrag, onDragEnter, onDragMove, onDropInDay, onDragEnd, dragTarget, dragPreview };
 }

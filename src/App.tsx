@@ -3,73 +3,55 @@ import { useItinerary } from "@/hooks/useItinerary";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useBudget } from "@/hooks/useBudget";
 import { useRoom } from "@/hooks/useRoom";
-import { useAuth } from "@/hooks/useAuth";
-import { useUserRooms } from "@/hooks/useUserRooms";
+import { useTripSession } from "@/hooks/useTripSession";
+import { useTasks } from "@/hooks/useTasks";
+import { useIdeas } from "@/hooks/useIdeas";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { snapHour } from "@/utils/time";
 import { extraGroupUSD } from "@/utils/currency";
 import CalendarGrid from "@/components/calendar/CalendarGrid";
 import SlotCreateModal from "@/components/calendar/SlotCreateModal";
-import BudgetPanel from "@/components/budget/BudgetPanel";
 import AgentPanel from "@/components/agent/AgentPanel";
 import type { AgentChatMessage } from "@/components/agent/AgentPanel";
-import { cn } from "@/lib/utils";
 import BudgetView from "@/components/budget/BudgetView";
+import HomeView from "@/components/home/HomeView";
 import TabBar from "@/components/TabBar";
 import type { Tab } from "@/components/TabBar";
 import AppHeader from "@/components/AppHeader";
 import Toast from "@/components/Toast";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
+import IdeasTab from "@/components/ideas/IdeasTab";
 import type { MockPerson, RoomPayload, Task, ToastAction, TripInfo, TripSpan } from "@/types";
 import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
-import { generateDays } from "@/utils/tripDays";
+import { generateDays, tripDayIndex } from "@/utils/tripDays";
+import { useIsMobile } from "@/hooks/useMediaQuery";
+import ItineraryView from "@/components/itinerary/ItineraryView";
+import type { ItinerarySheet } from "@/components/itinerary/ItineraryView";
+import ItineraryAgenda from "@/components/itinerary/ItineraryAgenda";
+import ActivityDetail from "@/components/itinerary/ActivityDetail";
+import SpansManager from "@/components/itinerary/SpansManager";
 
 export default function App() {
-  const [roomCode, setRoomCode] = useState<string | null>(null);
-
-  // Auto-resume: the user↔room relation (last_active_at) is persisted in
-  // Supabase (user_rooms), not localStorage, so this works across devices.
-  // Only auto-enters when there's a SINGLE trip — no ambiguity to resolve.
-  // With multiple trips, RoomGate's "Mis viajes" list is shown instead so the
-  // user can see and pick among all of them (auto-jumping to just one would
-  // hide the rest). A later explicit "leave" (onLeaveRoom) won't be undone by
-  // this, since resumeAttempted stays true afterward.
-  const { user, session, loading: authLoading, signInWithGoogle, signOut } = useAuth();
-  const { rooms: userRooms, roomsLoading, addRoom, removeRoom } = useUserRooms(user, session?.access_token);
-  const [resumeAttempted, setResumeAttempted] = useState(false);
-
-  const localMode = roomCode === LOCAL_ROOM_CODE;
+  const { roomCode, setRoomCode, resumeAttempted, localMode, auth, userRooms: rooms } = useTripSession();
+  const { user, session, loading: authLoading, signInWithGoogle, signOut } = auth;
+  const { rooms: userRooms, addRoom, removeRoom } = rooms;
   // Beta: the assistant is owner-only (enforced server-side too).
   const canUseAgent = localMode || userRooms.some((r) => r.room_code === roomCode && r.role === "owner");
 
-  useEffect(() => {
-    if (resumeAttempted) return;
-    if (authLoading || roomsLoading) return;
-    setResumeAttempted(true);
-    if (user && userRooms.length === 1) setRoomCode(userRooms[0].room_code);
-  }, [resumeAttempted, authLoading, roomsLoading, user, userRooms]);
-
-  // `?local=1` boots straight into local mode, skipping sign-in and the
-  // auto-resume above (which is what redirects a returning user into their room).
-  useEffect(() => {
-    if (!LOCAL_MODE_ENABLED) return;
-    if (!new URLSearchParams(window.location.search).has("local")) return;
-    setResumeAttempted(true);
-    setRoomCode(LOCAL_ROOM_CODE);
-  }, []);
-
-  const [activeTab, setActiveTab] = useState<Tab>("calendar");
-  const [pendingNew, setPendingNew] = useState<{ dayId: string; hour: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("home");
   const [slotDraft, setSlotDraft] = useState<{ dayId: string; hour: number; x: number; y: number; task: Task | null } | null>(null);
-  const [sidePanel, setSidePanel] = useState<"budget" | "agent">("budget");
+  const isMobile = useIsMobile();
+  const [sheet, setSheet] = useState<ItinerarySheet | null>(null);
   const [agentMessages, setAgentMessages] = useState<AgentChatMessage[]>([]);
 
   const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, loadDays, removeDaySpan, updateDaySpan } = useItinerary();
   const { extras, exchangeRate, setExchangeRate, updateExtra, addExtra, removeExtra, loadBudget } = useBudget();
   const [mockPeople, setMockPeople] = useState<MockPerson[]>([]);
   const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const { tasks, setTasks, addTask, toggleTask, updateTask, deleteTask, swapTaskDays } = useTasks();
+  const ideasApi = useIdeas(roomCode, session?.access_token);
+  const { ideas, loadPayload: loadIdeasPayload, payload: ideasPayload, customPlaces, planLinks, planLinksAt, planIdeaIds } = ideasApi;
   const [trip, setTrip] = useState<TripInfo | null>(null);
 
   function addTripSpan(span: TripSpan) { setTripSpans((p) => [...p, span]); }
@@ -81,20 +63,6 @@ export default function App() {
   }
   function removeMockPerson(id: string) {
     setMockPeople((prev) => prev.filter((p) => p.id !== id));
-  }
-
-  // Task helpers
-  function addTask(partial: Partial<Task> & { title: string }) {
-    setTasks((prev) => [...prev, { id: crypto.randomUUID(), done: false, ...partial }]);
-  }
-  function toggleTask(id: string) {
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, done: !t.done } : t));
-  }
-  function updateTask(id: string, patch: Partial<Task>) {
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, ...patch } : t));
-  }
-  function deleteTask(id: string) {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
   }
 
   // Confirm a decision: choosing an option promotes the task to a real activity
@@ -121,14 +89,11 @@ export default function App() {
     deleteTask(taskId);
   }
 
-  // Swap the whole contents of two days (events + spans in useItinerary) and
-  // remap scheduled tasks' dayId, which live in this component's state.
+  // Swap the whole contents of two days (events + spans) and their scheduled tasks.
   function swapDaysWithTasks(aId: string, bId: string) {
     if (aId === bId) return;
     swapDays(aId, bId);
-    setTasks((prev) => prev.map((t) =>
-      t.dayId === aId ? { ...t, dayId: bId } : t.dayId === bId ? { ...t, dayId: aId } : t,
-    ));
+    swapTaskDays(aId, bId);
   }
 
   const [toastAction, setToastAction] = useState<ToastAction | null>(null);
@@ -141,7 +106,8 @@ export default function App() {
     if (Array.isArray(payload.mockPeople)) setMockPeople(payload.mockPeople);
     if (Array.isArray(payload.tripSpans))  setTripSpans(payload.tripSpans);
     if (Array.isArray(payload.tasks))      setTasks(payload.tasks);
-  }, [loadDays, loadBudget]);
+    loadIdeasPayload(payload);
+  }, [loadDays, loadBudget, loadIdeasPayload]);
 
   const { connected, members, saveState, save } = useRoom(roomCode, session?.access_token, onRemoteUpdate);
 
@@ -176,24 +142,23 @@ export default function App() {
     if (!connected) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      save({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks });
+      save({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ...ideasPayload });
     }, 600);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, roomCode, connected]);
+  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, planLinks, planLinksAt, planIdeaIds, roomCode, connected]);
 
   function handleSelect(id: string | null) {
     setSelectedId(id);
-    if (id !== null) setPendingNew(null);
+    if (id !== null && isMobile) setSheet("detail");
   }
 
-  function commitNewEvent(title: string, start: number, end: number, note: string) {
-    if (!pendingNew) return;
-    addEvent(pendingNew.dayId, title, start, end, note);
-    setPendingNew(null);
+  function openSlot(dayId: string, hour: number, x: number, y: number) {
+    setSelectedId(null);
+    setSlotDraft({ dayId, hour, x, y, task: null });
   }
 
-  const { onDragStart, onDragEnter, onDragMove, onDropInDay, onDragEnd, dragTarget, dragPreview } = useDragDrop(
+  const { onDragStart, beginDrag, cancelDrag, onDragEnter, onDragMove, onDropInDay, onDragEnd, dragTarget, dragPreview } = useDragDrop(
     (fromDayId, toDayId, ev, droppedHour) => {
       const dur = ev.end - ev.start;
       const newStart = snapHour(droppedHour, dur, HOUR_START, HOUR_END);
@@ -216,7 +181,7 @@ export default function App() {
     // user doesn't see a flash of "Mis viajes" before being auto-redirected.
     if (!resumeAttempted) {
       return (
-        <div className="flex min-h-screen items-center justify-center text-[13px] text-muted-foreground">
+        <div className="flex min-h-dvh items-center justify-center text-[13px] text-muted-foreground">
           Cargando...
         </div>
       );
@@ -237,15 +202,44 @@ export default function App() {
     );
   }
 
+  const todayIdx = trip ? tripDayIndex(trip.startDate, days.length) : undefined;
+  const detail = selectedEvent && (
+    <ActivityDetail
+      key={selectedEvent.ev.id}
+      selected={selectedEvent}
+      days={days}
+      extras={extras}
+      tripSpans={tripSpans}
+      people={people}
+      exchangeRate={exchangeRate}
+      onUpdate={updateEvent}
+      onDelete={() => { deleteEvent(); setSheet(null); }}
+      onMoveDay={(toDayId) => moveEvent(selectedEvent.dayId, toDayId, selectedEvent.ev, selectedEvent.ev.start)}
+      onLinkExtra={linkExtra}
+      onAddExtra={addExtra}
+      onRemoveExtra={removeExtra}
+      onAddTripSpan={addTripSpan}
+      onRemoveTripSpan={removeTripSpan}
+    />
+  );
+  const agentPanel = canUseAgent && (
+    <AgentPanel
+      roomCode={roomCode}
+      accessToken={session?.access_token}
+      messages={agentMessages}
+      setMessages={setAgentMessages}
+      className={isMobile ? "h-[75dvh] rounded-none border-x-0 border-b-0" : "rounded-2xl border-0 shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-border/70"}
+      embedded={isMobile}
+    />
+  );
+
   return (
-    <div className="mx-auto max-w-[1280px] rounded-[14px] p-4">
+    <div className="mx-auto max-w-[1200px] px-4 pb-[calc(env(safe-area-inset-bottom)+84px)] pt-[max(16px,env(safe-area-inset-top))] md:px-8 md:py-7">
       <AppHeader
         roomCode={roomCode}
         connected={connected || localMode}
         saveState={saveState}
         trip={trip}
-        grandTotal={grandTotal}
-        exchangeRate={exchangeRate}
         onReset={() => {
           if (confirm("¿Restablecer el itinerario? Se perderán las actividades del calendario.")) {
             const regenerated = trip ? generateDays(trip.startDate, trip.endDate) : null;
@@ -258,13 +252,59 @@ export default function App() {
 
       <TabBar active={activeTab} onChange={setActiveTab} pendingTaskCount={pendingTaskCount} />
 
+      {activeTab === "home" && (
+        <HomeView
+          trip={trip}
+          days={days}
+          tasks={tasks}
+          ideas={ideas}
+          grandTotal={grandTotal}
+          people={people}
+          exchangeRate={exchangeRate}
+          onNavigate={setActiveTab}
+        />
+      )}
+
       {activeTab === "calendar" && (
-        <div className="flex items-start gap-3.5">
+        <ItineraryView
+          mobile={isMobile}
+          selectedId={selectedId}
+          detail={detail || null}
+          agent={agentPanel}
+          sheet={sheet}
+          onOpenSheet={setSheet}
+          onCloseSheet={() => { setSheet(null); setSelectedId(null); }}
+          settings={
+            <SpansManager
+              days={days}
+              tripSpans={tripSpans}
+              onRemoveTripSpan={removeTripSpan}
+              onUpdateTripSpan={updateTripSpan}
+              onRemoveDaySpan={removeDaySpan}
+              onUpdateDaySpan={updateDaySpan}
+            />
+          }
+          agenda={
+            <ItineraryAgenda
+              days={days}
+              tripSpans={tripSpans}
+              tasks={tasks}
+              selectedId={selectedId}
+              todayIdx={todayIdx}
+              onSelect={handleSelect}
+              onAdd={openSlot}
+              onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
+              onToggleTask={toggleTask}
+            />
+          }
+          grid={
           <CalendarGrid
             days={days}
             tripSpans={tripSpans}
             tasks={tasks}
             onDragStart={onDragStart}
+            onTouchDragStart={beginDrag}
+            onTouchDragCancel={cancelDrag}
             onDragEnter={onDragEnter}
             onDragMove={onDragMove}
             onDrop={onDropInDay}
@@ -273,67 +313,34 @@ export default function App() {
             selectedId={selectedId}
             dragTarget={dragTarget}
             dragPreview={dragPreview}
-            onAddEvent={(dayId, h, x, y) => {
-              setPendingNew(null);
-              setSelectedId(null);
-              setSlotDraft({ dayId, hour: h, x, y, task: null });
-            }}
+            onAddEvent={openSlot}
             onToggleTask={toggleTask}
             onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
             onSwapDays={swapDaysWithTasks}
-            pendingNew={pendingNew ?? (slotDraft && !slotDraft.task ? { dayId: slotDraft.dayId, hour: slotDraft.hour } : null)}
+            pendingNew={slotDraft && !slotDraft.task ? { dayId: slotDraft.dayId, hour: slotDraft.hour } : null}
+            initialDayIdx={todayIdx}
           />
-          <div className="flex w-[300px] shrink-0 flex-col gap-2">
-            {canUseAgent && (
-              <div className="flex overflow-hidden rounded-lg border border-border bg-card">
-                {([["budget", "Presupuesto"], ["agent", "✨ Asistente"]] as const).map(([id, label]) => (
-                  <button
-                    key={id}
-                    onClick={() => setSidePanel(id)}
-                    className={cn(
-                      "flex-1 cursor-pointer py-1.5 text-xs font-semibold transition-colors",
-                      sidePanel === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
+          }
+        />
+      )}
 
-            {sidePanel === "agent" && canUseAgent ? (
-              <AgentPanel roomCode={roomCode} accessToken={session?.access_token} messages={agentMessages} setMessages={setAgentMessages} />
-            ) : (
-              <BudgetPanel
-                selectedEvent={selectedEvent}
-                onUpdateEvent={updateEvent}
-                onDeleteEvent={deleteEvent}
-                days={days}
-                extras={extras}
-                grandTotal={grandTotal}
-                exchangeRate={exchangeRate}
-                people={people}
-                onLinkExtra={linkExtra}
-                onAddExtra={addExtra}
-                onRemoveExtra={removeExtra}
-                tripSpans={tripSpans}
-                onAddTripSpan={addTripSpan}
-                onRemoveTripSpan={removeTripSpan}
-                onRemoveDaySpan={removeDaySpan}
-                onUpdateDaySpan={updateDaySpan}
-                onUpdateTripSpan={updateTripSpan}
-                tasks={tasks}
-                pendingNew={pendingNew}
-                onCommitNew={commitNewEvent}
-                onCancelNew={() => setPendingNew(null)}
-              />
-            )}
-          </div>
-        </div>
+      {activeTab === "ideas" && (
+        <IdeasTab
+          api={ideasApi}
+          roomCode={roomCode}
+          localMode={localMode}
+          mobile={isMobile}
+          user={user}
+          accessToken={session?.access_token}
+          days={days}
+          trip={trip}
+          currentPayload={() => ({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ...ideasPayload })}
+          save={save}
+        />
       )}
 
       {activeTab === "budget" && (
-        <div className="flex flex-1 overflow-hidden">
+        <div>
           <BudgetView
             extras={extras}
             grandTotal={grandTotal}

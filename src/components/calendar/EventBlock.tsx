@@ -34,16 +34,15 @@ export function EventCard({ ev, start, end, height, selected, cat, conflict, sty
   const punctual = end <= start;
   return (
     <div
-      className="h-full overflow-hidden rounded-[7px] px-[7px] py-1"
+      className="h-full overflow-hidden rounded-lg px-2 py-1"
       style={{
         background: c.bg,
-        border: `1px solid ${c.border}`,
-        borderLeft: `3px solid ${c.border}`,
+        borderLeft: `3px solid ${conflict ? c.border : c.dot}`,
         boxShadow: selected
           ? `0 0 0 2px ${c.border}`
           : conflict
-            ? `0 1px 4px rgba(239,68,68,.18)`
-            : "none",
+            ? `inset 0 0 0 1px ${c.border}, 0 1px 4px rgba(239,68,68,.18)`
+            : "0 1px 2px rgba(0,0,0,.05)",
         ...style,
       }}
     >
@@ -95,12 +94,15 @@ interface EventBlockProps {
   selected: boolean;
   onMouseEnter?: () => void;
   onMouseLeave?: (e: React.MouseEvent) => void;
+  // Set on touch screens: long-press drag replaces HTML5 drag and drop.
+  onTouchPress?: (e: React.TouchEvent<HTMLElement>, ev: CalendarEvent, dayId: string) => void;
+  touchDragging?: boolean;
 }
 
 export default function EventBlock({
   ev, dayId, col, total, conflict,
   onDragStart, onDragEnd, onSelect, selected,
-  onMouseEnter, onMouseLeave,
+  onMouseEnter, onMouseLeave, onTouchPress, touchDragging,
 }: EventBlockProps) {
   const [dragging, setDragging] = useState(false);
   const cat    = CATEGORIES[ev.cat] ?? CATEGORIES.logist;
@@ -120,7 +122,9 @@ export default function EventBlock({
 
   return (
     <div
-      draggable
+      draggable={!onTouchPress}
+      onTouchStart={onTouchPress && ((e) => onTouchPress(e, ev, dayId))}
+      onContextMenu={onTouchPress && ((e) => e.preventDefault())}
       onDragStart={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const grabOffsetHours = (e.clientY - rect.top) / (PX_PER_HOUR * cssZoom(e.currentTarget));
@@ -135,9 +139,12 @@ export default function EventBlock({
       onClick={(e) => { e.stopPropagation(); onSelect(ev.id); }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className={cn("absolute cursor-grab select-none transition-opacity duration-[80ms]", dragging ? "opacity-0" : "opacity-100")}
+      className={cn(
+        "absolute cursor-grab select-none transition-opacity duration-[80ms] [-webkit-touch-callout:none]",
+        dragging || touchDragging ? "opacity-0" : "opacity-100",
+      )}
       style={{ top, left: slotL, width: slotW, height }}
-      title="Arrastra para mover · clic para editar"
+      title={onTouchPress ? undefined : "Arrastra para mover · clic para editar"}
     >
       <EventCard
         ev={ev}

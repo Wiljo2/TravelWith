@@ -11,7 +11,9 @@ interface UseRoomResult {
   connected: boolean;
   members: RoomMember[];
   saveState: SaveState;
-  save: (payload: RoomPayload) => void;
+  // Resolves true only when this payload reached the database. `force` saves even
+  // right after a remote update (autosave skips that echo).
+  save: (payload: RoomPayload, opts?: { force?: boolean }) => Promise<boolean>;
 }
 
 export function useRoom(
@@ -32,11 +34,11 @@ export function useRoom(
   const hasToken = !!accessToken;
 
   const save = useCallback(
-    async (payload: RoomPayload) => {
-      if (!code || code === "LOCAL") return;
-      if (skipSave.current) {
+    async (payload: RoomPayload, opts?: { force?: boolean }) => {
+      if (!code || code === "LOCAL") return false;
+      if (skipSave.current && !opts?.force) {
         skipSave.current = false;
-        return;
+        return false;
       }
       setSaveState("saving");
       try {
@@ -55,19 +57,21 @@ export function useRoom(
             onRemoteUpdate(data.payload);
           }
           setSaveState("saved");
-          return;
+          return false;
         }
 
         if (!res.ok) {
           setSaveState("error");
-          return;
+          return false;
         }
 
         const data = await res.json();
         if (data?.updated_at) lastUpdatedAt.current = data.updated_at;
         setSaveState("saved");
+        return true;
       } catch {
         setSaveState("error");
+        return false;
       }
     },
     [code, onRemoteUpdate],

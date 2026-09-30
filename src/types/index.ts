@@ -105,6 +105,59 @@ export interface Task {
   options?: TaskOption[];  // candidate choices (a decision to resolve); unchosen options never sum into the confirmed total
 }
 
+export type IdeaPlatform = "tiktok" | "instagram" | "youtube" | "other";
+export type IdeaStatus = "idea" | "planned" | "discarded";
+
+// Where a place/type suggestion came from: keyword rules or the in-browser model.
+export interface IdeaSuggestion {
+  place?: string;
+  cat?: string;           // key of IDEA_TYPES
+  dayId?: string;         // legacy (early builds suggested days); ignored
+  source: "rules" | "ai";
+}
+
+// Inspiration a member shared (reel, TikTok, link) about places of the trip.
+// Lives apart from the itinerary: organized by place and type, never scheduled.
+export interface Idea {
+  id: string;
+  url: string;
+  platform: IdeaPlatform;
+  createdAt: string;        // ISO
+  title?: string;           // post caption, from oEmbed when available
+  tags?: string[];          // hashtags + platform keywords (TikTok)
+  transcript?: string;      // what the video says (TikTok's automatic captions); "" = video has none
+  author?: string;
+  thumbnail?: string;
+  note?: string;            // what the member wrote when sharing it
+  addedBy?: string;
+  place?: string;           // confirmed place (one of the trip's idea places)
+  cat?: string;             // confirmed type (key of IDEA_TYPES; unknown keys = unset)
+  suggestion?: IdeaSuggestion;
+  status?: IdeaStatus;      // default "idea"
+  votes?: string[];         // voter keys
+  placesKey?: string;       // the place list its suggestion was computed with
+  dayId?: string;           // legacy, ignored
+  eventId?: string;         // legacy, ignored
+}
+
+// Where an idea fits the existing plan — shown read-only, never schedules anything.
+// Either a specific activity (eventId), a free gap of a day (slot), or the day in general.
+export interface IdeaLink {
+  ideaId: string;
+  dayId: string;
+  eventId?: string;
+  slot?: { start: number; end: number };
+  reason?: string;           // why it fits (Claude) or the matching phrase (rules)
+  source: "rules" | "ai" | "claude";
+}
+
+// One "Analizar con Claude" run: its links and the ideas it actually read.
+export interface IdeaPlanResult {
+  links: IdeaLink[];
+  at: string;
+  ideaIds: string[];
+}
+
 // A traveler without an account, counted in per-person math.
 export interface MockPerson {
   id: string;
@@ -121,6 +174,11 @@ export interface RoomPayload {
   mockPeople?: MockPerson[];
   tripSpans?: TripSpan[];
   tasks?: Task[];
+  ideas?: Idea[];
+  ideaPlaces?: string[];   // places for organizing ideas; unset = derived from the trip
+  ideaLinks?: IdeaLink[];  // last "Analizar con Claude" result (free matches are computed live)
+  ideaLinksAt?: string;    // ISO time of that analysis
+  ideaLinksIds?: string[]; // ideas that analysis read (the others are "new")
 }
 
 export interface RoomMember {

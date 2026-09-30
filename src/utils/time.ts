@@ -24,6 +24,16 @@ export function snapHour(hour: number, dur: number, hourStart: number, hourEnd: 
   return Math.max(hourStart, Math.min(s, hourEnd - Math.max(dur, 0.25)));
 }
 
+// "en 5 min", "en 2 h", "en 1 h 30 min" — for an upcoming hour relative to `from`.
+export function untilLabel(from: number, to: number): string {
+  const mins = Math.max(0, Math.round((to - from) * 60));
+  if (mins < 1) return "ahora";
+  const hh = Math.floor(mins / 60);
+  const mm = mins % 60;
+  if (!hh) return `en ${mm} min`;
+  return mm ? `en ${hh} h ${mm} min` : `en ${hh} h`;
+}
+
 export function durLabel(start: number, end: number): string {
   const d = end - start;
   if (d <= 0) return "puntual";

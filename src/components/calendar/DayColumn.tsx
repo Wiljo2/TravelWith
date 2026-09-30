@@ -100,6 +100,8 @@ interface DayColumnProps {
   isDragTarget: boolean;
   dragPreview: DragPreview | null;
   pendingHour: number | null;
+  onTouchPress?: (e: React.TouchEvent<HTMLElement>, ev: CalendarEvent, dayId: string) => void;
+  touchDraggingId?: string | null;
 }
 
 const DAY_SWAP_MIME = "application/x-day-swap";
@@ -107,7 +109,9 @@ const DAY_SWAP_MIME = "application/x-day-swap";
 export default function DayColumn({
   day, tasks, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd,
   onSelect, onAddEvent, onToggleTask, onEditTask, onSwapDays, selectedId, isDragTarget, dragPreview, pendingHour,
+  onTouchPress, touchDraggingId,
 }: DayColumnProps) {
+  const touch = !!onTouchPress;
   const totalHeight = (HOUR_END - HOUR_START + 1) * PX_PER_HOUR;
   const colRef  = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
@@ -126,9 +130,9 @@ export default function DayColumn({
     <div className="flex min-w-0 flex-1 flex-col">
 
       {/* Header: fixed 56px so all grid lines align across columns.
-          Draggable onto another day header to swap the two days' contents. */}
+          Draggable onto another day header to swap the two days' contents (mouse only). */}
       <div
-        draggable
+        draggable={!touch}
         onDragStart={(e) => {
           e.dataTransfer.setData(DAY_SWAP_MIME, day.id);
           e.dataTransfer.effectAllowed = "move";
@@ -142,14 +146,15 @@ export default function DayColumn({
           const sourceId = e.dataTransfer.getData(DAY_SWAP_MIME);
           if (sourceId && sourceId !== day.id) { e.preventDefault(); onSwapDays(sourceId, day.id); }
         }}
-        title="Arrastra este día sobre otro para intercambiar sus actividades"
+        title={touch ? undefined : "Arrastra este día sobre otro para intercambiar sus actividades"}
         className={cn(
-          "box-border h-14 shrink-0 cursor-grab overflow-hidden border-b border-border bg-secondary px-2.5 py-2 active:cursor-grabbing",
+          "box-border h-14 shrink-0 overflow-hidden border-b border-border bg-secondary px-2.5 py-2",
+          !touch && "cursor-grab active:cursor-grabbing",
           swapOver && "bg-primary/15 ring-2 ring-inset ring-primary",
         )}
       >
         <div className="truncate text-[13px] font-medium text-foreground">
-          <span className="mr-1 opacity-40">⇄</span>{day.label}
+          {!touch && <span className="mr-1 opacity-40">⇄</span>}{day.label}
         </div>
         <div className="mt-0.5 truncate text-[11px] text-secondary-foreground">
           {day.sub}
@@ -159,11 +164,12 @@ export default function DayColumn({
       {/* Time grid */}
       <div
         ref={colRef}
+        data-day-grid={day.id}
         onDragOver={(e) => { e.preventDefault(); dragging.current = true; onDragMove(day.id, getHour(e.clientY)); }}
         onDragEnter={() => onDragEnter(day.id)}
         onDrop={(e) => { e.preventDefault(); dragging.current = false; onDrop(day.id, getHour(e.clientY)); }}
-        onMouseMove={(e) => { if (!dragging.current) setHoverY(getHour(e.clientY)); }}
-        onMouseLeave={() => setHoverY(null)}
+        onPointerMove={(e) => { if (e.pointerType === "mouse" && !dragging.current) setHoverY(getHour(e.clientY)); }}
+        onPointerLeave={() => setHoverY(null)}
         onClick={(e) => {
           if (dragging.current) { dragging.current = false; return; }
           const h = snapHour(getHour(e.clientY), 1, HOUR_START, HOUR_END - 1);
@@ -239,7 +245,9 @@ export default function DayColumn({
                 onSelect={onSelect}
                 selected={selectedId === ev.id}
                 onMouseEnter={() => setHoverY(null)}
-                onMouseLeave={(e) => setHoverY(getHour(e.clientY))}
+                onMouseLeave={(e) => { if (!touch) setHoverY(getHour(e.clientY)); }}
+                onTouchPress={onTouchPress}
+                touchDragging={touchDraggingId === ev.id}
               />
             );
           });

@@ -1,5 +1,7 @@
 "use client";
 import { useAuth } from "@/hooks/useAuth";
+import { Menu } from "@base-ui/react/menu";
+import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AuthButton() {
@@ -11,7 +13,8 @@ export default function AuthButton() {
     return (
       <Button variant="outline" size="sm" onClick={signInWithGoogle} className="gap-2 whitespace-nowrap bg-card">
         <GoogleIcon />
-        Iniciar con Google
+        <span className="hidden sm:inline">Iniciar con Google</span>
+        <span className="sm:hidden">Entrar</span>
       </Button>
     );
   }
@@ -20,18 +23,32 @@ export default function AuthButton() {
   const name = (user.user_metadata?.full_name ?? user.email) as string;
 
   return (
-    <div className="flex items-center gap-2">
-      {avatar
-        ? <img src={avatar} alt={name} width={28} height={28} className="rounded-full border-2 border-border" />
-        : <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-primary-foreground">{name[0].toUpperCase()}</div>
-      }
-      <span className="max-w-[130px] truncate text-[13px] text-secondary-foreground">
-        {name}
-      </span>
-      <Button variant="ghost" size="sm" onClick={signOut} className="h-auto px-1.5 py-0.5 text-xs text-muted-foreground">
-        Salir
-      </Button>
-    </div>
+    <Menu.Root>
+      <Menu.Trigger aria-label="Tu cuenta" className="cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        {avatar
+          ? <img src={avatar} alt={name} width={32} height={32} className="rounded-full border-2 border-card shadow-[0_0_0_1px_var(--border)]" />
+          : <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-primary-foreground">{name[0].toUpperCase()}</div>
+        }
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner sideOffset={6} align="end" className="z-50 outline-none">
+          <Menu.Popup className="min-w-52 origin-[var(--transform-origin)] rounded-xl border border-border bg-popover p-1 shadow-[0_10px_30px_rgba(0,0,0,.12)] outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+            <div className="px-2.5 py-2">
+              <div className="truncate text-[13px] font-medium">{name}</div>
+              {user.email && user.email !== name && <div className="truncate text-xs text-muted-foreground">{user.email}</div>}
+            </div>
+            <Menu.Separator className="mx-1 my-1 h-px bg-border" />
+            <Menu.Item
+              onClick={signOut}
+              className="flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] outline-none data-highlighted:bg-secondary"
+            >
+              <LogOut className="size-4 text-muted-foreground" />
+              Cerrar sesión
+            </Menu.Item>
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }
 
