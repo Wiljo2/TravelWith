@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { TripStoreError } from "@/server/trip-store";
-import { requireMember } from "@/server/auth";
+import { requireMember, type MemberRole } from "@/server/auth";
 import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
 import { LIMITS } from "@/constants/limits";
 import { AGENT_TOOLS, TOOL_LABELS, executeTool } from "@/server/agent/tools";
@@ -24,10 +24,11 @@ type Params = Promise<{ code: string }>;
 export async function POST(req: Request, { params }: { params: Params }) {
   let code: string;
   let userId: string;
+  let role: MemberRole;
   try {
     code = roomCodeParam((await params).code);
     // Beta rule: only the trip owner can run the (paid) assistant.
-    ({ user: { id: userId } } = await requireMember(req, code, "owner"));
+    ({ user: { id: userId }, role } = await requireMember(req, code, "owner"));
     if ((await tokensUsedToday(userId)) >= dailyTokenLimit()) {
       throw new HttpError(429, "Alcanzaste el límite diario del asistente. Vuelve a intentarlo mañana.");
     }
@@ -115,7 +116,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
           const results: Anthropic.ToolResultBlockParam[] = [];
           for (const tool of toolUses) {
             send({ type: "tool", name: tool.name, label: TOOL_LABELS[tool.name] ?? tool.name });
-            const outcome = await executeTool(code, tool.name, tool.input as Record<string, unknown>);
+            const outcome = await executeTool({ code, userId, role }, tool.name, tool.input as Record<string, unknown>);
             results.push({
               type: "tool_result",
               tool_use_id: tool.id,

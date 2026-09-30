@@ -108,6 +108,8 @@ Step 3.6 (`017_task_ops.sql`, `src/server/ops/tasks.ts`, `domain/taskRows.ts`): 
 
 Step 3.7 (`src/server/ops/trip.ts`, `domain/tripRows.ts`): `trip.update` patches name, destination (`null`/empty clears) and dates on `rooms` (last-write-wins, broadcast by the `rooms` trigger), validating the merged date range and `MAX_TRIP_DAYS`; it does not regenerate days (that is `itinerary.reset`, owner-only). `traveler.add/remove` (limit `LIMITS.travelers`; client UUID ids accepted). A registry test pins the op list to the table above and `itinerary.reset` as the only owner-only op.
 
+Step 3.8 (`src/server/agent/tools.ts`): tool names and input shapes are unchanged (the byte-stable system prompt still matches them); read tools use `getTrip`, and each write tool maps to one or two registry ops run with the owner's `OpContext` (`update_event` with `dayId` → `event.move` then `event.update` for title/cat/note). Results list the changed rows without `room_code/updated_at/updated_by`. `DomainError`, 4xx `HttpError`, `RowConflictError` and `RowNotFoundError` become `is_error` tool results the model can act on; unexpected errors still throw. Destructive-tool gating, owner-only access and the token quota are unchanged. Two descriptions changed as static text (`update_event`, `delete_event`), which invalidates the tool-prefix cache once.
+
 Conflicts become per row: two members editing different items never conflict. Same item: the second write gets a 409 with the current row, the client shows it and a notice.
 
 ## Realtime (Broadcast from the database)
