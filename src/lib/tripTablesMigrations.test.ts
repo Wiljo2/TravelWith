@@ -105,6 +105,36 @@ describe("010_trip_triggers wires history and Broadcast", () => {
   });
 });
 
+describe("012_verify_rebuild", () => {
+  const verify = readFileSync(join(process.cwd(), "supabase/migrations/012_verify_rebuild.sql"), "utf8");
+  const fns = [...verify.matchAll(/create or replace function ([\w.]+)\(([^)]*)\)[\s\S]*?as \$\$/g)];
+
+  it("defines private functions with a pinned search_path and no client access", () => {
+    expect(fns.map((m) => m[1])).toEqual([
+      "private.trip_payload",
+      "private.verify_room",
+      "private.verify_all_rooms",
+      "private.rebuild_payload",
+    ]);
+    for (const [whole, name, params] of fns) {
+      expect(whole).toContain("set search_path = ''");
+      const types = params.split(",").map((p) => p.trim().split(/\s+/)[1]).filter(Boolean).join(", ");
+      expect(verify).toContain(`revoke all on function ${name}(${types}) from public, anon, authenticated;`);
+    }
+  });
+
+  it("assembles every RoomPayload collection", () => {
+    for (const key of ["'days'", "'events'", "'spans'", "'extras'", "'tripSpans'", "'tasks'", "'options'", "'mockPeople'", "'exchangeRate'", "'trip'"]) {
+      expect(verify).toContain(key);
+    }
+  });
+
+  it("only rebuild_payload writes rooms.payload", () => {
+    expect(verify.match(/set payload = /g)).toHaveLength(1);
+    expect(verify).toMatch(/function private\.rebuild_payload[\s\S]*set payload = v_payload/);
+  });
+});
+
 describe("011_migrate_rooms", () => {
   const migrate = readFileSync(join(process.cwd(), "supabase/migrations/011_migrate_rooms.sql"), "utf8");
   const fns = [...migrate.matchAll(/create or replace function ([\w.]+)\(([^)]*)\)[\s\S]*?as \$\$([\s\S]*?)\$\$;/g)];
