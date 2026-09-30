@@ -5,7 +5,7 @@ import { getTripDates } from "@/server/repo/trip";
 import type { OpDefinition, RowChange } from "@/server/ops/types";
 
 export const DAY_OPS: Record<string, OpDefinition> = {
-  // Exchanges the events and day spans of two days (atomic, SQL function).
+  // Exchanges the events, day spans and scheduled tasks of two days (atomic, SQL function).
   "day.swap": {
     async run(ctx, { args }) {
       const { a, b } = swapArgs(args);
@@ -14,6 +14,7 @@ export const DAY_OPS: Record<string, OpDefinition> = {
         changed: [
           ...moved.events.map((row): RowChange => ({ table: "trip_events", row })),
           ...moved.daySpans.map((row): RowChange => ({ table: "trip_day_spans", row })),
+          ...moved.tasks.map((row): RowChange => ({ table: "trip_tasks", row })),
         ],
         deleted: [],
       };

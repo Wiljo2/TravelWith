@@ -175,6 +175,22 @@ describe("016_room_broadcast", () => {
   });
 });
 
+describe("017_task_ops", () => {
+  const taskOps = readFileSync(join(process.cwd(), "supabase/migrations/017_task_ops.sql"), "utf8");
+
+  it("swap_days also moves scheduled tasks", () => {
+    expect(taskOps).toMatch(/update public\.trip_tasks\s+set day_id = case when day_id = p_a then p_b else p_a end/);
+  });
+
+  it("choose_task_option is server-only, guarded and attributed", () => {
+    expect(taskOps).not.toContain("security definer");
+    expect(taskOps).toContain("for update;");
+    expect(taskOps).toContain("perform set_config('app.user_id', coalesce(p_user::text, ''), true);");
+    expect(taskOps).toContain("revoke all on function public.choose_task_option(text, text, int, jsonb, jsonb, uuid) from public, anon, authenticated;");
+    expect(taskOps).toContain("grant execute on function public.choose_task_option(text, text, int, jsonb, jsonb, uuid) to service_role;");
+  });
+});
+
 describe("012_verify_rebuild", () => {
   const verify = readFileSync(join(process.cwd(), "supabase/migrations/012_verify_rebuild.sql"), "utf8");
   const fns = [...verify.matchAll(/create or replace function ([\w.]+)\(([^)]*)\)[\s\S]*?as \$\$/g)];

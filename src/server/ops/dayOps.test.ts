@@ -19,10 +19,10 @@ beforeEach(() => {
 
 describe("day ops", () => {
   it("day.swap calls swap_days and returns the moved rows", async () => {
-    handler = (q) => (q.op === "rpc" ? { data: { events: [{ id: "e1", version: 2 }], daySpans: [{ id: "s1", version: 2 }] } } : undefined);
+    handler = (q) => (q.op === "rpc" ? { data: { events: [{ id: "e1", version: 2 }], daySpans: [{ id: "s1", version: 2 }], tasks: [{ id: "k1", version: 3 }] } } : undefined);
     const result = await runOp("day.swap", member, { args: { a: "d0", b: "d1" } });
     expect(mock.log[0]).toMatchObject({ table: "swap_days", args: { p_code: "ABCD1234", p_a: "d0", p_b: "d1", p_user: "u1" } });
-    expect(result.changed.map((c) => c.table)).toEqual(["trip_events", "trip_day_spans"]);
+    expect(result.changed.map((c) => c.table)).toEqual(["trip_events", "trip_day_spans", "trip_tasks"]);
   });
 
   it("day.update is version-guarded", async () => {

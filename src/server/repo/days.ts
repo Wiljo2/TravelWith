@@ -1,15 +1,15 @@
 import { createServerClient } from "@/lib/supabase-server";
 import { tableRepo } from "@/server/repo/core";
 import { repoError } from "@/server/repo/errors";
-import type { TripDayRow, TripDaySpanRow, TripEventRow } from "@/types/database";
+import type { TripDayRow, TripDaySpanRow, TripEventRow, TripTaskRow } from "@/types/database";
 
 export const daysRepo = tableRepo("trip_days");
 
-// SQL function swap_days: exchanges the events and day spans of two days.
+// SQL function swap_days: exchanges the events, day spans and scheduled tasks of two days.
 export async function swapDays(code: string, a: string, b: string, userId: string) {
   const { data, error } = await createServerClient().rpc("swap_days", { p_code: code, p_a: a, p_b: b, p_user: userId });
   if (error) throw repoError(error);
-  return data as { events: TripEventRow[]; daySpans: TripDaySpanRow[] };
+  return data as { events: TripEventRow[]; daySpans: TripDaySpanRow[]; tasks: TripTaskRow[] };
 }
 
 export interface ResetDay {

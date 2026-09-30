@@ -1,5 +1,5 @@
 // Database types for the public schema, written by hand to match migrations
-// 001-015 (docs/plans/relational-broadcast.md, step 1.4). Once a Supabase
+// 001-017 (docs/plans/relational-broadcast.md, step 1.4). Once a Supabase
 // project with these migrations is available, replace this file with:
 //
 //   npx supabase gen types typescript --project-id <id> --schema public > src/types/database.ts
@@ -227,6 +227,10 @@ export type Database = {
       get_trip: { Args: { p_code: string }; Returns: Json };
       swap_days: { Args: { p_code: string; p_a: string; p_b: string; p_user: string }; Returns: Json };
       reset_itinerary: { Args: { p_code: string; p_days: Json; p_user: string }; Returns: Json };
+      choose_task_option: {
+        Args: { p_code: string; p_task_id: string; p_expected_version: number | null; p_event: Json | null; p_expense: Json | null; p_user: string };
+        Returns: Json;
+      };
       delete_trip_row: {
         Args: { p_table: TripTable; p_code: string; p_id: string; p_expected_version: number | null; p_user: string | null };
         Returns: Json;

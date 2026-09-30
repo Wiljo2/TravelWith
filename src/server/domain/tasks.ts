@@ -5,13 +5,13 @@ import { uid } from "@/utils/uid";
 import { LIMITS } from "@/constants/limits";
 import { DomainError, checkArgs, requireDay } from "./core";
 
-function validateTaskCat(cat: string) {
+export function validateTaskCat(cat: string) {
   if (!TASK_CATEGORIES[cat]) {
     throw new DomainError(`Unknown task category "${cat}". Valid: ${Object.keys(TASK_CATEGORIES).join(", ")}`);
   }
 }
 
-function validatePriority(priority: string): asserts priority is TaskPriority {
+export function validatePriority(priority: string): asserts priority is TaskPriority {
   if (!(priority in PRIORITIES)) {
     throw new DomainError(`Unknown priority "${priority}". Valid: ${Object.keys(PRIORITIES).join(", ")}`);
   }
@@ -29,7 +29,7 @@ const TASK_FIELDS = {
   unschedule: { type: "boolean" },
 } as const;
 
-function validateSchedule(start: number, end: number) {
+export function validateSchedule(start: number, end: number) {
   if (!Number.isFinite(start) || !Number.isFinite(end)) {
     throw new DomainError("start and end must be decimal hours (e.g. 19.5 = 7:30pm)");
   }
