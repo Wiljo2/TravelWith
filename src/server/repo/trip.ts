@@ -1,4 +1,5 @@
 import { createServerClient } from "@/lib/supabase-server";
+import { HttpError } from "@/server/http";
 import { repoError } from "@/server/repo/errors";
 import { DEFAULT_RATE } from "@/utils/currency";
 import type { RoomMember, RoomPayload } from "@/types";
@@ -8,6 +9,35 @@ export interface TripSnapshot {
   payload: RoomPayload;
   members: RoomMember[];
   updated_at: string;
+}
+
+// The trip header as stored on rooms (and as broadcast on the trip channel).
+export interface RoomHeaderRow {
+  code: string;
+  name: string | null;
+  destination: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  exchange_rate: number | null;
+}
+
+const HEADER_COLUMNS = "code, name, destination, start_date, end_date, exchange_rate";
+
+// Header fields are last-write-wins: rooms has no row version, and each field
+// is set on its own (rate, name, dates) rather than merged.
+export async function updateTripHeader(
+  code: string,
+  patch: Partial<Omit<RoomHeaderRow, "code">>,
+): Promise<RoomHeaderRow> {
+  const { data, error } = await createServerClient()
+    .from("rooms")
+    .update(patch)
+    .eq("code", code)
+    .select(HEADER_COLUMNS)
+    .maybeSingle();
+  if (error) throw repoError(error);
+  if (!data) throw new HttpError(404, "Sala no encontrada");
+  return data as RoomHeaderRow;
 }
 
 export async function getTripDates(code: string): Promise<{ startDate: string; endDate: string } | null> {

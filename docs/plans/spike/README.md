@@ -56,6 +56,7 @@ Paste into the log (and mark 0.1 `[x]`):
 2. The byte size of the INSERT message for the 200-character title.
 3. What B saw: channel status and whether any message arrived (must be none).
 4. Token refresh: whether A kept receiving after forced refreshes, and after the natural JWT expiry if tested; any `CHANNEL_ERROR` / `CLOSED` lines.
-5. Anything that differs from the plan (for example the event name not being `INSERT`/`UPDATE`/`DELETE`).
+5. The message A receives for the `realtime.send` statement at the end of `writes.sql` (used by the `rooms` header trigger), and whether B receives it.
+6. Anything that differs from the plan (for example the event name not being `INSERT`/`UPDATE`/`DELETE`).
 
 Step 3.10 (`useTripChannel`) is written against this record.

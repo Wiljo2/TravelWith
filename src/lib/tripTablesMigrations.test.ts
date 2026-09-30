@@ -159,6 +159,22 @@ describe("015_day_ops", () => {
   });
 });
 
+describe("016_room_broadcast", () => {
+  const room = readFileSync(join(process.cwd(), "supabase/migrations/016_room_broadcast.sql"), "utf8");
+
+  it("sends header and roster only, never the frozen payload", () => {
+    expect(room).not.toMatch(/'payload'|new\.payload|old\.payload/);
+    expect(room).not.toContain("realtime.broadcast_changes(");
+    expect(room.match(/perform realtime\.send\(/g)).toHaveLength(2);
+  });
+
+  it("skips bulk loads and runs from a locked-down private function", () => {
+    expect(room).toContain("if current_setting('app.bulk_load', true) = 'on' then");
+    expect(room).toContain("set search_path = ''");
+    expect(room).toContain("revoke all on function private.broadcast_room_change() from public, anon, authenticated;");
+  });
+});
+
 describe("012_verify_rebuild", () => {
   const verify = readFileSync(join(process.cwd(), "supabase/migrations/012_verify_rebuild.sql"), "utf8");
   const fns = [...verify.matchAll(/create or replace function ([\w.]+)\(([^)]*)\)[\s\S]*?as \$\$/g)];

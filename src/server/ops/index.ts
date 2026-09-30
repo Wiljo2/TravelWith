@@ -1,6 +1,7 @@
 import { HttpError } from "@/server/http";
 import { DAY_OPS } from "@/server/ops/days";
 import { EVENT_OPS } from "@/server/ops/events";
+import { EXPENSE_OPS } from "@/server/ops/expenses";
 import { SPAN_OPS } from "@/server/ops/spans";
 import type { OpContext, OpDefinition, OpInput, OpResult } from "@/server/ops/types";
 
@@ -9,6 +10,7 @@ export const OPS: Record<string, OpDefinition> = {
   ...EVENT_OPS,
   ...DAY_OPS,
   ...SPAN_OPS,
+  ...EXPENSE_OPS,
 };
 
 export function isKnownOp(name: string): boolean {

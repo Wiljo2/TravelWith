@@ -1,4 +1,5 @@
 import type { MemberRole } from "@/server/auth";
+import type { RoomHeaderRow } from "@/server/repo/trip";
 import type { TripTable } from "@/types/database";
 
 export interface OpContext {
@@ -28,6 +29,7 @@ export interface RowDeletion {
 export interface OpResult {
   changed: RowChange[];
   deleted: RowDeletion[];
+  trip?: RoomHeaderRow;
 }
 
 export interface OpDefinition {
