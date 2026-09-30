@@ -65,6 +65,7 @@ Foreign keys replace today's dangling-id handling (deleting an event unlinks its
 ## Access control
 
 - **Table RLS** (defense in depth; the API uses the service role): restrictive `for all to authenticated` policy on every trip table, `using/with check (exists (select 1 from user_rooms ur where ur.room_code = <table>.room_code and ur.user_id = (select auth.uid())))`. No `anon` access. Index `user_rooms (room_code, user_id)` if the PK order `(user_id, room_code)` isn't enough.
+- Implemented in `009_trip_tables_rls.sql`: the restrictive policy applies to `anon, authenticated`; there is no permissive policy, so clients read nothing directly (add a permissive `select` later if direct reads are ever needed). `anon` has no grants; `authenticated` keeps only `select`. `trip_changes` has RLS, no policies and no client grants.
 - **Routes:** unchanged pattern, `requireMember` on every endpoint; the ops endpoint also enforces role (future viewer role can't write).
 - **Realtime:** private channels only, authorized by a `select` policy on `realtime.messages` (see below). "Allow public access" in Realtime Settings is turned off at the cut-over (this also stops the legacy public `room-<code>` channel, so not earlier).
 

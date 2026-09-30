@@ -51,3 +51,24 @@ describe("008_trip_tables limits mirror LIMITS", () => {
     }
   });
 });
+
+describe("009_trip_tables_rls locks down every trip table", () => {
+  const rls = readFileSync(join(process.cwd(), "supabase/migrations/009_trip_tables_rls.sql"), "utf8");
+  const tables = [...sql.matchAll(/create table if not exists public\.(\w+)/g)].map((m) => m[1]);
+
+  it("covers all tables created in 008", () => {
+    expect(tables).toHaveLength(9);
+  });
+
+  it.each(tables)("%s has RLS and no client writes", (table) => {
+    expect(rls).toContain(`alter table public.${table} enable row level security;`);
+    expect(rls).toMatch(new RegExp(`revoke all on table public\.${table} from anon`));
+    if (table === "trip_changes") return;
+    expect(rls).toMatch(new RegExp(`create policy "members only" on public\\.${table}\\s+as restrictive for all\\s+to anon, authenticated`));
+    expect(rls).toContain(`revoke insert, update, delete, truncate, references, trigger on table public.${table} from authenticated;`);
+  });
+
+  it("adds no permissive policy", () => {
+    expect(rls).not.toMatch(/create policy (?![^;]*as restrictive)/);
+  });
+});
