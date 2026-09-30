@@ -98,6 +98,8 @@ Ops (first set, mapping today's hooks and agent tools):
 | Travelers | `traveler.add/remove` |
 | Trip | `trip.update` (name, destination, dates) |
 
+Implemented in step 3.3: `POST /api/rooms/[code]/ops` (body ≤ 32 KB; `requireMember`; op-level `minRole`), registry in `src/server/ops/` (`runOp`, one module per area), row-level domain validation in `src/server/domain/*Rows.ts` (pure, reusing the existing validators; the payload-based domain functions stay for the agent until 3.8 and are removed in 3.12). Responses: 200 `{ changed: [{table,row}], deleted: [{table,id}] }`; 400 for `DomainError`/bad body/unknown op; 404 row gone; 409 `{ error, table, current }`. Creates accept a client-chosen `id` (`[A-Za-z0-9_-]`, ≤ 100) so optimistic inserts keep their id. Rows changed by FK cascades (e.g. expenses unlinked by `event.delete`) are not in the response; clients get them over Broadcast. `event.move` = other day and/or other hours (drag and drop); `event.update` = title/hours/cat/note.
+
 Conflicts become per row: two members editing different items never conflict. Same item: the second write gets a 409 with the current row, the client shows it and a notice.
 
 ## Realtime (Broadcast from the database)

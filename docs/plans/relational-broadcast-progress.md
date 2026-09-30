@@ -1,7 +1,7 @@
 # Relational + Broadcast progress
-- Iteration: 10
-- Last commit: (iteration 10 commit; the next iteration records its sha in the log)
-- Next step: 3.3
+- Iteration: 11
+- Last commit: (iteration 11 commit; the next iteration records its sha in the log)
+- Next step: 3.4
 - Human actions pending: 0.1 run the spike on staging (`docs/plans/spike/README.md`) and record the `broadcast_changes` payload shape and token-refresh behavior here; 3.10 waits for it. 2.3 run the migration rehearsal (`docs/plans/migration-rehearsal.md`) on a staging copy of production and record the results here; 4.1 needs it done with 0 differences.
 
 ## Steps
@@ -15,7 +15,7 @@
 - [H] 2.3 HUMAN runbook `docs/plans/migration-rehearsal.md`
 - [x] 3.1 Repository layer `src/server/repo/*`
 - [x] 3.2 `get_trip(code)` + `GET /api/rooms/[code]` on it
-- [ ] 3.3 Op registry + `POST /api/rooms/[code]/ops` + event ops
+- [x] 3.3 Op registry + `POST /api/rooms/[code]/ops` + event ops
 - [ ] 3.4 Day, itinerary and span ops
 - [ ] 3.5 Expense ops + `trip.setExchangeRate`
 - [ ] 3.6 Task and task option ops + `task.chooseOption`
@@ -42,4 +42,5 @@
 | 7 | 2026-09-29 | 2.2 | dd316fa | Done | `012_verify_rebuild.sql`: `private.trip_payload`, `private.verify_room`, `private.verify_all_rooms`, `private.rebuild_payload`. On PGlite (Postgres 18, scratch): a clean payload migrates with 0 differences and `trip_payload` equals the original exactly; a legacy payload reports exactly the skipped rows (events, expenses, events per day); rebuild after an edit writes the edit, renamed trip, keeps unknown keys, bumps `updated_at`, and verifies clean. Static tests extended; libpg-query parse OK; tsc, lint (0 errors), 141 tests green. |
 | 8 | 2026-09-29 | 2.3 | d384a2b | Prepared `[H]` | `docs/plans/migration-rehearsal.md`: read-only `check-payloads` on production, `pg_dump` of `public.rooms` only into staging with 001–007, apply 008–012, timed `migrate_all_rooms` (run twice for idempotence), `verify_all_rooms` to CSV, rollback spot check, what to record (counts and codes only), fix paths, cleanup of the dump. tsc, lint (0 errors), 141 tests green. HUMAN: run it and record results. |
 | 9 | 2026-09-29 | 3.1 | 0dcbb75 | Done | `src/server/repo/` (`core.ts` generic typed `tableRepo`, `errors.ts`, one module per table) + `013_trip_row_writes.sql` (`public.delete_trip_row` for attributed, version-guarded deletes; `private.bump_trip_row_version` before-update trigger on all trip tables). Found on PGlite: FK `set null` cascades updated rows without bumping `version`, so the trigger was added and the plan updated. PGlite: stale/ok/gone/unguarded deletes, delete attribution, cascade version bump, guarded writers keep their version, no-op updates unchanged. `repo.test.ts` (13 tests) + static 013 tests; mock gained `limit()`; `delete_trip_row` added to `database.ts`. libpg-query parse OK; tsc, lint (0 errors), 163 tests green. Not imported by app code yet, so no `next build`. |
-| 10 | 2026-09-29 | 3.2 | (this commit) | Done | `014_get_trip.sql` (`public.get_trip`, stable, invoker, service role only); `src/server/repo/trip.ts` `getTrip` (rpc + `DEFAULT_RATE` at read time); `GET /api/rooms/[code]` uses it after `requireMember`, same response shape; `version?: number` on the 8 item types. PGlite: payload equals the original once versions are stripped; room without dates omits `trip`; missing room → null; edit bumps the returned version. Route tests (get_trip call, versions, default rate, 404, no `rooms` query) + static 014 tests; `resetDb` now returns the mock. libpg-query parse OK; tsc, lint (0 errors), 167 tests, `next build` green. Note: on this branch the client still PATCHes `rooms.payload` while GET reads the tables, so edits don't round-trip until 3.9 (expected; nothing deploys before the cut-over). |
+| 10 | 2026-09-29 | 3.2 | e681118 | Done | `014_get_trip.sql` (`public.get_trip`, stable, invoker, service role only); `src/server/repo/trip.ts` `getTrip` (rpc + `DEFAULT_RATE` at read time); `GET /api/rooms/[code]` uses it after `requireMember`, same response shape; `version?: number` on the 8 item types. PGlite: payload equals the original once versions are stripped; room without dates omits `trip`; missing room → null; edit bumps the returned version. Route tests (get_trip call, versions, default rate, 404, no `rooms` query) + static 014 tests; `resetDb` now returns the mock. libpg-query parse OK; tsc, lint (0 errors), 167 tests, `next build` green. Note: on this branch the client still PATCHes `rooms.payload` while GET reads the tables, so edits don't round-trip until 3.9 (expected; nothing deploys before the cut-over). |
+| 11 | 2026-09-29 | 3.3 | (this commit) | Done | `src/app/api/rooms/[code]/ops/route.ts`, `src/server/ops/{types,index,events}.ts` (`event.create/update/move/delete`), `src/server/domain/eventRows.ts` (pure row validation), `checkClientId`/`argId` in domain core, `validateHours`/`validateCat` exported. Tests: `eventRows.test.ts` (8) + ops route tests (10: auth, body, unknown op, create/update/move/delete, 400/404/409, no DB leak). tsc, lint (0 errors), 185 tests, `next build` green. |

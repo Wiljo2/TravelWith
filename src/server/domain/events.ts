@@ -14,7 +14,7 @@ const EVENT_FIELDS = {
   dayId: { type: "string", max: LIMITS.id },
 } as const;
 
-function validateHours(start: number, end: number) {
+export function validateHours(start: number, end: number) {
   if (!Number.isFinite(start) || !Number.isFinite(end)) {
     throw new DomainError("start and end must be decimal hours (e.g. 19.5 = 7:30pm)");
   }
@@ -25,7 +25,7 @@ function validateHours(start: number, end: number) {
   }
 }
 
-function validateCat(cat: string) {
+export function validateCat(cat: string) {
   if (!CATEGORIES[cat]) {
     throw new DomainError(`Unknown category "${cat}". Valid: ${Object.keys(CATEGORIES).join(", ")}`);
   }
