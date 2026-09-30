@@ -4,6 +4,7 @@ import { validateTripInput } from "@/lib/validate";
 import { generateDays } from "@/utils/tripDays";
 import { DEFAULT_RATE } from "@/utils/currency";
 import { requireUser } from "@/server/auth";
+import { assertWritable } from "@/server/maintenance";
 import { HttpError, errorResponse } from "@/server/http";
 import { deleteRoom, joinRoom } from "@/server/members";
 import { generateRoomCode } from "@/server/room-code";
@@ -16,6 +17,7 @@ const MAX_ATTEMPTS = 3;
 // and the creator becomes owner here: roles are never chosen by the client.
 export async function POST(req: Request) {
   try {
+    assertWritable();
     const user = await requireUser(req);
 
     let body: unknown;

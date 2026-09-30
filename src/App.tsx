@@ -23,6 +23,7 @@ import type { Tab } from "@/components/TabBar";
 import AppHeader from "@/components/AppHeader";
 import Toast from "@/components/Toast";
 import SyncNotice from "@/components/SyncNotice";
+import MaintenanceBanner from "@/components/MaintenanceBanner";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
 import type { RoomPayload, Task, ToastAction } from "@/types";
@@ -351,6 +352,7 @@ export default function App() {
 
       <Toast action={toastAction} onUndo={toastAction?.undo} onDismiss={dismissToast} />
       <SyncNotice message={ops.notice} onDismiss={ops.dismissNotice} />
+      {ops.maintenance && <MaintenanceBanner />}
 
       {slotDraft && (
         <SlotCreateModal

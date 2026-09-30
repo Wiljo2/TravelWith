@@ -6,6 +6,7 @@ import { TripConflictError, persistRoom } from "@/server/trip-store";
 import { requireMember } from "@/server/auth";
 import { deleteRoom } from "@/server/members";
 import { getTrip } from "@/server/repo/trip";
+import { assertWritable } from "@/server/maintenance";
 import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
 
 type Params = Promise<{ code: string }>;
@@ -28,6 +29,7 @@ export async function GET(req: Request, { params }: { params: Params }) {
 export async function DELETE(req: Request, { params }: { params: Params }) {
   try {
     const code = roomCodeParam((await params).code);
+    assertWritable();
     await requireMember(req, code, "owner");
     await deleteRoom(code);
     return NextResponse.json({ ok: true });
@@ -47,6 +49,7 @@ const SCHEMA_MODE = process.env.PAYLOAD_VALIDATION === "report" ? "report" : "en
 export async function PATCH(req: Request, { params }: { params: Params }) {
   try {
     const code = roomCodeParam((await params).code);
+    assertWritable();
     await requireMember(req, code);
 
     const raw = await req.text();

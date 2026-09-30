@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { TripStoreError } from "@/server/trip-store";
 import { requireMember, type MemberRole } from "@/server/auth";
+import { assertWritable } from "@/server/maintenance";
 import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
 import { LIMITS } from "@/constants/limits";
 import { AGENT_TOOLS, TOOL_LABELS, executeTool } from "@/server/agent/tools";
@@ -27,6 +28,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
   let role: MemberRole;
   try {
     code = roomCodeParam((await params).code);
+    assertWritable();
     // Beta rule: only the trip owner can run the (paid) assistant.
     ({ user: { id: userId }, role } = await requireMember(req, code, "owner"));
     if ((await tokensUsedToday(userId)) >= dailyTokenLimit()) {

@@ -11,6 +11,16 @@ export class HttpError extends Error {
   }
 }
 
+export const MAINTENANCE_MESSAGE = "Estamos actualizando TravelWith. Tus cambios se guardarán en unos minutos.";
+const MAINTENANCE_RETRY_SECONDS = 30;
+
+// Writes are paused (MAINTENANCE_MODE=on); clients keep the change and retry.
+export class MaintenanceError extends HttpError {
+  constructor() {
+    super(503, MAINTENANCE_MESSAGE);
+  }
+}
+
 export function roomCodeParam(raw: string): string {
   const code = normalizeRoomCode(raw);
   if (!code) throw new HttpError(400, "Código inválido");
@@ -20,6 +30,12 @@ export function roomCodeParam(raw: string): string {
 // Client errors keep their message; anything else (database, network, bugs) is
 // logged server-side and answered with a generic 500 so internals never leak.
 export function errorResponse(e: unknown, context: string): NextResponse {
+  if (e instanceof MaintenanceError) {
+    return NextResponse.json(
+      { error: e.message, maintenance: true },
+      { status: 503, headers: { "Retry-After": String(MAINTENANCE_RETRY_SECONDS) } },
+    );
+  }
   if ((e instanceof HttpError || e instanceof TripStoreError) && e.status < 500) {
     return NextResponse.json({ error: e.message }, { status: e.status });
   }

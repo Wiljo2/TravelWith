@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireMember } from "@/server/auth";
 import { DomainError } from "@/server/domain/core";
 import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
+import { assertWritable } from "@/server/maintenance";
 import { runOp } from "@/server/ops";
 import { RowConflictError } from "@/server/repo/errors";
 
@@ -39,6 +40,7 @@ function parseBody(raw: string): OpBody {
 export async function POST(req: Request, { params }: { params: Params }) {
   try {
     const code = roomCodeParam((await params).code);
+    assertWritable();
     const { user, role } = await requireMember(req, code);
     const { op, args, expectedVersion } = parseBody(await req.text());
     const result = await runOp(op, { code, userId: user.id, role }, { args, expectedVersion });

@@ -22,7 +22,11 @@ export interface OpQueueHandlers {
   onTrip: (header: Record<string, unknown>) => void;
   onRows: (rows: { table: TripTable; row: Row }[]) => void;
   onState: (state: SyncState) => void;
+  // Writes are paused server-side (503 during the cut-over); ops are kept and retried.
+  onMaintenance: (active: boolean) => void;
 }
+
+const MAINTENANCE_RETRY_MS = 15_000;
 
 interface QueuedOp {
   op: string;
@@ -62,8 +66,13 @@ export class OpQueue {
   private busy = new Set<string>();
   private pendingCreates = new Set<string>();
   private failed = false;
+  private maintenance = false;
 
-  constructor(private post: PostOp, private handlers: OpQueueHandlers) {}
+  constructor(
+    private post: PostOp,
+    private handlers: OpQueueHandlers,
+    private retryMs = MAINTENANCE_RETRY_MS,
+  ) {}
 
   // Replaces known versions (after loading or refetching the trip).
   seed(entries: Iterable<[string, number]>) {
@@ -121,6 +130,23 @@ export class OpQueue {
       res = await this.post(next.op, next.args, expected);
     } catch {
       res = { status: 0, body: null };
+    }
+
+    if (res.status === 503) {
+      this.queues.set(key, [next, ...(this.queues.get(key) ?? [])]);
+      if (!this.maintenance) {
+        this.maintenance = true;
+        this.handlers.onMaintenance(true);
+      }
+      setTimeout(() => {
+        this.busy.delete(key);
+        void this.pump(key);
+      }, this.retryMs);
+      return;
+    }
+    if (this.maintenance) {
+      this.maintenance = false;
+      this.handlers.onMaintenance(false);
     }
     this.pendingCreates.delete(key);
     this.handle(next.op, table, id, res);

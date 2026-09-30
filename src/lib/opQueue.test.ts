@@ -11,11 +11,12 @@ interface Call {
 function setup() {
   const calls: Call[] = [];
   const handlers: OpQueueHandlers = {
-    onConflict: vi.fn(), onFailure: vi.fn(), onResync: vi.fn(), onTrip: vi.fn(), onRows: vi.fn(), onState: vi.fn(),
+    onConflict: vi.fn(), onFailure: vi.fn(), onResync: vi.fn(), onTrip: vi.fn(), onRows: vi.fn(), onState: vi.fn(), onMaintenance: vi.fn(),
   };
   const queue = new OpQueue(
     (op, args, expectedVersion) => new Promise((resolve) => calls.push({ op, args, expectedVersion, resolve })),
     handlers,
+    5,
   );
   return { queue, calls, handlers };
 }
@@ -106,6 +107,25 @@ describe("OpQueue", () => {
     await flush();
     expect(handlers.onTrip).toHaveBeenCalledWith({ exchange_rate: 4100 });
     expect(calls[1].args).toEqual({ rate: 4200 });
+  });
+});
+
+describe("OpQueue during maintenance", () => {
+  it("keeps a 503'd op, retries it later and merges edits made meanwhile", async () => {
+    const { queue, calls, handlers } = setup();
+    queue.send("event.update", { id: "e1", title: "a" });
+    calls[0].resolve({ status: 503, body: { error: "mantenimiento", maintenance: true } });
+    await flush();
+    expect(handlers.onMaintenance).toHaveBeenCalledWith(true);
+    expect(handlers.onFailure).not.toHaveBeenCalled();
+    queue.send("event.update", { id: "e1", title: "ab" });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls).toHaveLength(2);
+    expect(calls[1].args).toEqual({ id: "e1", title: "ab" });
+    calls[1].resolve(ok());
+    await flush();
+    expect(handlers.onMaintenance).toHaveBeenLastCalledWith(false);
+    expect(handlers.onState).toHaveBeenLastCalledWith("saved");
   });
 });
 

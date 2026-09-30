@@ -27,6 +27,7 @@ const FAILURE_NOTICE = "No se pudo guardar un cambio. Se recargó el viaje.";
 export function useTripOps(code: string | null, accessToken: string | undefined, callbacks: TripOpsCallbacks) {
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [notice, setNotice] = useState<string | null>(null);
+  const [maintenance, setMaintenance] = useState(false);
   const token = useRef(accessToken);
   const cb = useRef(callbacks);
   useEffect(() => {
@@ -53,6 +54,7 @@ export function useTripOps(code: string | null, accessToken: string | undefined,
       onTrip: (header) => cb.current.applyHeader(header),
       onRows: (rows) => rows.forEach(({ table, row }) => cb.current.adoptRow(table, row.id, row)),
       onState: setSyncState,
+      onMaintenance: setMaintenance,
     };
     queueRef.current = new OpQueue(async (op, args, expectedVersion) => {
       const res = await apiFetch(`/api/rooms/${code}/ops`, token.current, {
@@ -75,5 +77,5 @@ export function useTripOps(code: string | null, accessToken: string | undefined,
   }, []);
   const dismissNotice = useCallback(() => setNotice(null), []);
 
-  return { send, isKnown, seedVersions, noteVersion, syncState, notice, dismissNotice };
+  return { send, isKnown, seedVersions, noteVersion, syncState, notice, dismissNotice, maintenance };
 }

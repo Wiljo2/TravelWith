@@ -1,7 +1,7 @@
 # Relational + Broadcast progress
-- Iteration: 17
-- Last commit: (iteration 17 commit; the next iteration records its sha in the log)
-- Next step: 3.10
+- Iteration: 18
+- Last commit: (iteration 18 commit; the next iteration records its sha in the log)
+- Next step: 3.10 (blocked on the 0.1 spike result); 3.12 after it
 - Human actions pending: 0.1 run the spike on staging (`docs/plans/spike/README.md`) and record the `broadcast_changes` payload shape and token-refresh behavior here; 3.10 waits for it. 2.3 run the migration rehearsal (`docs/plans/migration-rehearsal.md`) on a staging copy of production and record the results here; 4.1 needs it done with 0 differences.
 
 ## Steps
@@ -23,7 +23,7 @@
 - [x] 3.8 Agent tools on the op registry
 - [x] 3.9 Client hooks send ops; full-payload autosave removed
 - [ ] 3.10 `useTripChannel` (private Broadcast channel)
-- [ ] 3.11 Maintenance mode
+- [x] 3.11 Maintenance mode
 - [ ] 3.12 Remove full-payload write path; update `GUIDELINES.md` and `CLAUDE.md`
 - [ ] 4.1 HUMAN cut-over runbook
 - [ ] 5.1 Cleanup after cut-over
@@ -49,4 +49,5 @@
 | 14 | 2026-09-29 | 3.6 | 3479fc5 | Done | `017_task_ops.sql` (`choose_task_option`; `swap_days` replaced to also move scheduled tasks — parity gap with the client found while reading `App.tsx`); ops `task.create/update/toggle/delete`, `taskOption.create/update/delete`, `task.chooseOption`; `domain/taskRows.ts`; `repo/tasks.ts` `chooseTaskOption`; task/expense validators exported for reuse. PGlite: swap moves the task, stale/missing task → conflict, choose inserts event (end default +1h, next position) + linked expense and deletes task + options, backlog/free option creates nothing, deletes attributed. Tests: `taskRows.test.ts` (6), `taskOps.test.ts` (6), static 017 (2), swap test updated. libpg-query parse OK; tsc, lint (0 errors), 226 tests, `next build` green. |
 | 15 | 2026-09-29 | 3.7 | 1c496e5 | Done | Ops `trip.update`, `traveler.add`, `traveler.remove` (`src/server/ops/trip.ts`, `domain/tripRows.ts`); `getTripHeader` in `repo/trip.ts`. No SQL needed. `tripOps.test.ts` (7): header validation (merged dates, 60-day cap, destination clearing), traveler limit/attribution, registry = the plan's 28 ops, only `itinerary.reset` is owner-only. tsc, lint (0 errors), 233 tests, `next build` green. |
 | 16 | 2026-09-29 | 3.8 | d721173 | Done | Agent executor rewritten on `runOp` (`executeTool(ctx, name, input)`; route passes `{ code, userId, role }`); reads via `getTrip`; `mutateRoom`/`loadRoom` no longer used outside `trip-store.ts`. System prompt untouched; `update_event`/`delete_event` descriptions updated (static). `src/server/agent/tools.test.ts` (5): reads hit only `get_trip`, create maps to `event.create` with the owner as author and hides row metadata, update with `dayId` = move + update, domain/404/409 → `is_error`, DB errors still throw. tsc, lint (0 errors), 238 tests, `next build` green. |
-| 17 | 2026-09-29 | 3.9 | (this commit) | Done | Client on ops: `src/lib/opQueue.ts` (per-item ordering, merge of queued updates, version chain, 409/failure/resync handling), `src/hooks/useTripOps.ts`, `src/utils/tripRows.ts` (row → state), hooks `useItinerary` (+trip spans), `useBudget`, new `useTasks`, new `useTripInfo`, `useRoom` (load + roster only, no PATCH/autosave), `SyncNotice` (Spanish), owner-only reset in `AppHeader`; `App.tsx` 394 → 377 lines. Guards: empty title/label/name and invalid hour ranges are not sent until valid; option creates wait for a label. Tests: `opQueue.test.ts` (10), `tripRows.test.ts` (8). tsc, lint (0 errors), 256 tests, `next build` green. Not verified in a browser (needs a Supabase project with 008–017); the two-account manual test is part of the phase 3 exit criteria on staging. |
+| 17 | 2026-09-29 | 3.9 | ced0170 | Done | Client on ops: `src/lib/opQueue.ts` (per-item ordering, merge of queued updates, version chain, 409/failure/resync handling), `src/hooks/useTripOps.ts`, `src/utils/tripRows.ts` (row → state), hooks `useItinerary` (+trip spans), `useBudget`, new `useTasks`, new `useTripInfo`, `useRoom` (load + roster only, no PATCH/autosave), `SyncNotice` (Spanish), owner-only reset in `AppHeader`; `App.tsx` 394 → 377 lines. Guards: empty title/label/name and invalid hour ranges are not sent until valid; option creates wait for a label. Tests: `opQueue.test.ts` (10), `tripRows.test.ts` (8). tsc, lint (0 errors), 256 tests, `next build` green. Not verified in a browser (needs a Supabase project with 008–017); the two-account manual test is part of the phase 3 exit criteria on staging. |
+| 18 | 2026-09-29 | 3.11 | (this commit) | Done | `src/server/maintenance.ts` + `MaintenanceError` in `http.ts` (503, Spanish message, `Retry-After`); guard on ops, agent, legacy PATCH/DELETE and room creation; client queue retries 503s keeping and merging pending edits, `MaintenanceBanner`; `MAINTENANCE_MODE` in `.env.example`. Tests: `src/server/maintenance.test.ts` (3: all five write routes 503 with no DB access, reads available, only exact `on`), queue maintenance retry (1). tsc, lint (0 errors), 260 tests, `next build` green. 3.10 skipped: it waits for the 0.1 spike result (Broadcast payload shape, token refresh); 3.12 depends on 3.10. |
