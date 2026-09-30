@@ -23,6 +23,12 @@ export interface RoomHeaderRow {
 
 const HEADER_COLUMNS = "code, name, destination, start_date, end_date, exchange_rate";
 
+export async function getTripHeader(code: string): Promise<RoomHeaderRow | null> {
+  const { data, error } = await createServerClient().from("rooms").select(HEADER_COLUMNS).eq("code", code).maybeSingle();
+  if (error) throw repoError(error);
+  return (data ?? null) as RoomHeaderRow | null;
+}
+
 // Header fields are last-write-wins: rooms has no row version, and each field
 // is set on its own (rate, name, dates) rather than merged.
 export async function updateTripHeader(

@@ -106,6 +106,8 @@ Step 3.5 (`src/server/ops/expenses.ts`, `016_room_broadcast.sql`): `expense.crea
 
 Step 3.6 (`017_task_ops.sql`, `src/server/ops/tasks.ts`, `domain/taskRows.ts`): `task.create/update/toggle/delete`, `taskOption.create/update/delete`, `task.chooseOption`. `task.toggle` flips `done` guarded by the version the client saw (or the one just read), so concurrent toggles conflict instead of cancelling out. `task.chooseOption` keeps the client's rule (scheduled task → event with category `logist` and the option's note; option with amount > 0 → expense `"<task>: <option>"` linked to that event) and runs `choose_task_option`, which inserts both and deletes the task (options cascade) in one transaction, guarded by the task version; event/expense ids may come from the client. `017` also replaces `swap_days` to move the tasks scheduled on the two days, which the client's swap always did and 015 had missed.
 
+Step 3.7 (`src/server/ops/trip.ts`, `domain/tripRows.ts`): `trip.update` patches name, destination (`null`/empty clears) and dates on `rooms` (last-write-wins, broadcast by the `rooms` trigger), validating the merged date range and `MAX_TRIP_DAYS`; it does not regenerate days (that is `itinerary.reset`, owner-only). `traveler.add/remove` (limit `LIMITS.travelers`; client UUID ids accepted). A registry test pins the op list to the table above and `itinerary.reset` as the only owner-only op.
+
 Conflicts become per row: two members editing different items never conflict. Same item: the second write gets a 409 with the current row, the client shows it and a notice.
 
 ## Realtime (Broadcast from the database)

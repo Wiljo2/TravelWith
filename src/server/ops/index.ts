@@ -4,6 +4,7 @@ import { EVENT_OPS } from "@/server/ops/events";
 import { EXPENSE_OPS } from "@/server/ops/expenses";
 import { SPAN_OPS } from "@/server/ops/spans";
 import { TASK_OPS } from "@/server/ops/tasks";
+import { TRIP_OPS } from "@/server/ops/trip";
 import type { OpContext, OpDefinition, OpInput, OpResult } from "@/server/ops/types";
 
 // Every trip write goes through here: the ops route today, the agent tools next.
@@ -13,6 +14,7 @@ export const OPS: Record<string, OpDefinition> = {
   ...SPAN_OPS,
   ...EXPENSE_OPS,
   ...TASK_OPS,
+  ...TRIP_OPS,
 };
 
 export function isKnownOp(name: string): boolean {

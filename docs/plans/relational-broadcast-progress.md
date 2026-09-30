@@ -1,7 +1,7 @@
 # Relational + Broadcast progress
-- Iteration: 14
-- Last commit: (iteration 14 commit; the next iteration records its sha in the log)
-- Next step: 3.7
+- Iteration: 15
+- Last commit: (iteration 15 commit; the next iteration records its sha in the log)
+- Next step: 3.8
 - Human actions pending: 0.1 run the spike on staging (`docs/plans/spike/README.md`) and record the `broadcast_changes` payload shape and token-refresh behavior here; 3.10 waits for it. 2.3 run the migration rehearsal (`docs/plans/migration-rehearsal.md`) on a staging copy of production and record the results here; 4.1 needs it done with 0 differences.
 
 ## Steps
@@ -19,7 +19,7 @@
 - [x] 3.4 Day, itinerary and span ops
 - [x] 3.5 Expense ops + `trip.setExchangeRate`
 - [x] 3.6 Task and task option ops + `task.chooseOption`
-- [ ] 3.7 Traveler ops + `trip.update`
+- [x] 3.7 Traveler ops + `trip.update`
 - [ ] 3.8 Agent tools on the op registry
 - [ ] 3.9 Client hooks send ops; full-payload autosave removed
 - [ ] 3.10 `useTripChannel` (private Broadcast channel)
@@ -46,4 +46,5 @@
 | 11 | 2026-09-29 | 3.3 | 21bb8ef | Done | `src/app/api/rooms/[code]/ops/route.ts`, `src/server/ops/{types,index,events}.ts` (`event.create/update/move/delete`), `src/server/domain/eventRows.ts` (pure row validation), `checkClientId`/`argId` in domain core, `validateHours`/`validateCat` exported. Tests: `eventRows.test.ts` (8) + ops route tests (10: auth, body, unknown op, create/update/move/delete, 400/404/409, no DB leak). tsc, lint (0 errors), 185 tests, `next build` green. |
 | 12 | 2026-09-29 | 3.4 | 8312310 | Done | `015_day_ops.sql` (`swap_days`, `reset_itinerary`; invoker, service role only); ops `day.swap`, `day.update`, `itinerary.reset` (owner), `daySpan.create/update/delete`, `tripSpan.create/update/delete`; `domain/dayRows.ts`, `domain/spanRows.ts`; `ops/shared.ts`; `swapDays`/`resetItinerary`/`getTripDates` in repo; `repoError` maps `P0002`→404, `22023`→400; `COLOR_RE` exported from `lib/schemas.ts`. PGlite: swap moves events+spans (versions bumped, trip span/expense links intact), same-day and missing-day errors, reset clears calendar, drops extra days (expense day refs → null), keeps surviving task days, 5/5 deletes attributed. Tests: `dayRows.test.ts` (7), `dayOps.test.ts` (7), static 015 (2). libpg-query parse OK; tsc, lint (0 errors), 200 tests, `next build` green. |
 | 13 | 2026-09-29 | 3.5 | 334e00e | Done | Ops `expense.create/update/delete`, `trip.setExchangeRate` (`src/server/ops/expenses.ts`, `domain/expenseRows.ts`); `updateTripHeader` + `RoomHeaderRow` in `repo/trip.ts`; `OpResult.trip`. Gap found: `rooms` had no broadcast, so header/roster changes would stop reaching clients once `postgres_changes` goes (3.10): `016_room_broadcast.sql` sends header + members only via `realtime.send` (signature checked in the Supabase docs today). PGlite: 0 messages during migration, rate change and roster change each send one message, payload-only and no-op updates send none, delete sends `DELETE`; payload never included. Spike kit extended to record the `realtime.send` client shape. Tests: `expenseRows.test.ts` (7), `expenseOps.test.ts` (4), static 016 (2). libpg-query parse OK; tsc, lint (0 errors), 212 tests, `next build` green. |
-| 14 | 2026-09-29 | 3.6 | (this commit) | Done | `017_task_ops.sql` (`choose_task_option`; `swap_days` replaced to also move scheduled tasks — parity gap with the client found while reading `App.tsx`); ops `task.create/update/toggle/delete`, `taskOption.create/update/delete`, `task.chooseOption`; `domain/taskRows.ts`; `repo/tasks.ts` `chooseTaskOption`; task/expense validators exported for reuse. PGlite: swap moves the task, stale/missing task → conflict, choose inserts event (end default +1h, next position) + linked expense and deletes task + options, backlog/free option creates nothing, deletes attributed. Tests: `taskRows.test.ts` (6), `taskOps.test.ts` (6), static 017 (2), swap test updated. libpg-query parse OK; tsc, lint (0 errors), 226 tests, `next build` green. |
+| 14 | 2026-09-29 | 3.6 | 3479fc5 | Done | `017_task_ops.sql` (`choose_task_option`; `swap_days` replaced to also move scheduled tasks — parity gap with the client found while reading `App.tsx`); ops `task.create/update/toggle/delete`, `taskOption.create/update/delete`, `task.chooseOption`; `domain/taskRows.ts`; `repo/tasks.ts` `chooseTaskOption`; task/expense validators exported for reuse. PGlite: swap moves the task, stale/missing task → conflict, choose inserts event (end default +1h, next position) + linked expense and deletes task + options, backlog/free option creates nothing, deletes attributed. Tests: `taskRows.test.ts` (6), `taskOps.test.ts` (6), static 017 (2), swap test updated. libpg-query parse OK; tsc, lint (0 errors), 226 tests, `next build` green. |
+| 15 | 2026-09-29 | 3.7 | (this commit) | Done | Ops `trip.update`, `traveler.add`, `traveler.remove` (`src/server/ops/trip.ts`, `domain/tripRows.ts`); `getTripHeader` in `repo/trip.ts`. No SQL needed. `tripOps.test.ts` (7): header validation (merged dates, 60-day cap, destination clearing), traveler limit/attribution, registry = the plan's 28 ops, only `itinerary.reset` is owner-only. tsc, lint (0 errors), 233 tests, `next build` green. |
