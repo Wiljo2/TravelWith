@@ -72,3 +72,35 @@ describe("009_trip_tables_rls locks down every trip table", () => {
     expect(rls).not.toMatch(/create policy (?![^;]*as restrictive)/);
   });
 });
+
+describe("010_trip_triggers wires history and Broadcast", () => {
+  const triggers = readFileSync(join(process.cwd(), "supabase/migrations/010_trip_triggers.sql"), "utf8");
+  const tripTables = [...sql.matchAll(/create table if not exists public\.(\w+)/g)]
+    .map((m) => m[1])
+    .filter((t) => t !== "trip_changes");
+
+  it.each(tripTables)("%s has audit and broadcast triggers", (table) => {
+    for (const fn of ["record_trip_change", "broadcast_trip_change"]) {
+      expect(triggers).toMatch(
+        new RegExp(`after insert or update or delete on public\\.${table}\\s+for each row execute function private\\.${fn}\\(\\);`),
+      );
+    }
+  });
+
+  it("keeps functions out of public and realtime, with a pinned search_path", () => {
+    const fns = [...triggers.matchAll(/create or replace function ([\w.]+)\(\)[\s\S]*?as \$\$/g)];
+    expect(fns.map((m) => m[1])).toEqual([
+      "private.record_trip_change",
+      "private.broadcast_trip_change",
+      "private.prune_trip_changes",
+    ]);
+    for (const m of fns) expect(m[0]).toContain("set search_path = ''");
+    for (const m of fns) expect(triggers).toContain(`revoke all on function ${m[1]}() from public, anon, authenticated;`);
+  });
+
+  it("lets members receive but not send on trip channels", () => {
+    expect(triggers).toMatch(/on realtime\.messages\s+for select\s+to authenticated/);
+    expect(triggers).not.toMatch(/on realtime\.messages\s+for (insert|all)/);
+    expect(triggers).toContain("'trip:' || ur.room_code = (select realtime.topic())");
+  });
+});

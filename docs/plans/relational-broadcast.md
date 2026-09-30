@@ -167,6 +167,12 @@ supabase
 
 A generic `private.record_trip_change()` trigger on every trip table writes `before`/`after` JSON and `updated_by` into `trip_changes`. This enables an activity panel, per-change undo (apply the inverse op), and restore after mistakes. Retention: keep 90 days or last 5,000 changes per trip (scheduled cleanup).
 
+Implemented in `010_trip_triggers.sql`:
+- Acting user = `current_setting('app.user_id')` if set, else the row's `updated_by` (insert/update), else `auth.uid()`. Deletes carry no `updated_by`, so delete ops must run in a SQL function (or transaction) that does `set_config('app.user_id', <uid>, true)` first; the repository layer (step 3.1) owns this.
+- No-op updates (`new is not distinct from old`) are neither audited nor broadcast.
+- Rows deleted by the cascade from a deleted room are not audited (the room and its history go together; inserting would also violate the `trip_changes → rooms` FK).
+- Retention: `private.prune_trip_changes()` exists but is not scheduled; the `cron.schedule` call is in the migration comment.
+
 ## Migration: direct cut-over from JSON to tables
 
 The data moves from `rooms.payload` to the tables **once**, in a single maintenance window. There is no period where the app writes to both: the new code is built and tested against the tables on staging, then production switches in one step. `rooms.payload` is not modified by the migration, so it remains an untouched backup.

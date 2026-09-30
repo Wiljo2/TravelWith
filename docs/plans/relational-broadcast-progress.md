@@ -1,14 +1,14 @@
 # Relational + Broadcast progress
-- Iteration: 3
-- Last commit: (iteration 3 commit; the next iteration records its sha in the log)
-- Next step: 1.3
+- Iteration: 4
+- Last commit: (iteration 4 commit; the next iteration records its sha in the log)
+- Next step: 1.4
 - Human actions pending: 0.1 run the spike on staging (`docs/plans/spike/README.md`) and record the `broadcast_changes` payload shape and token-refresh behavior here; 3.10 waits for it.
 
 ## Steps
 - [H] 0.1 Spike kit (HUMAN: run on staging, record payload shape and token refresh)
 - [x] 1.1 Migration: `rooms` header columns and trip tables
 - [x] 1.2 Migration: RLS and grants on trip tables
-- [ ] 1.3 Migration: `private` schema, audit + broadcast triggers, `realtime.messages` policy
+- [x] 1.3 Migration: `private` schema, audit + broadcast triggers, `realtime.messages` policy
 - [ ] 1.4 `src/types/database.ts` by hand
 - [ ] 2.1 Migration: `private.migrate_room` / `private.migrate_all_rooms`
 - [ ] 2.2 Migration: `private.verify_room` / `private.rebuild_payload`
@@ -35,4 +35,5 @@
 |---|---|---|---|---|---|
 | 1 | 2026-09-29 | 0.1 | a0c486e | Prepared `[H]` | `docs/plans/spike/`: `spike.sql` (`spike_events`, RLS, `private.spike_broadcast_change()`, `realtime.messages` select policy), `writes.sql`, `listen.ts`, `teardown.sql`, README. Spike-specific names avoid clashing with 1.3. SQL parsed with libpg-query (incl. PL/pgSQL body); tsc, lint (0 errors), 87 tests green. No unit tests: throwaway staging tooling, no app logic. HUMAN: run on staging and paste results here. |
 | 2 | 2026-09-29 | 1.1 | bff48f5 | Done | `008_trip_tables.sql`: `rooms` header columns + checks; `trip_days/events/day_spans/spans/expenses/tasks/task_options/travelers/changes` with `(room_code, id)` PKs, version/updated_at/updated_by, FKs (`set null (col)` where planned), checks from `schemas.ts`/`LIMITS`, FK indexes. Plan updated: `position` on every list table; task day FK nulls `day_id` only (Postgres only allows FK columns in the set-null list); legacy-tolerant nullability and 0–48 hour checks. New test `src/lib/tripTablesLimits.test.ts` keeps SQL length checks in sync with `LIMITS`. libpg-query parse OK; tsc, lint (0 errors), 104 tests green. Vitest reports every file failing when the shell cwd is spelled `c:\` (lowercase); rerun from `C:\` passes. |
-| 3 | 2026-09-29 | 1.2 | (this commit) | Done | `009_trip_tables_rls.sql`: RLS on all 9 tables; restrictive member-only policy (`anon, authenticated`, `(select auth.uid())`) on the 8 trip tables, no permissive policy; all grants revoked from `anon`, writes revoked from `authenticated`; `trip_changes` server-only. Plan access-control section updated. Test renamed to `src/lib/tripTablesMigrations.test.ts` and extended (every 008 table locked down, no permissive policy). libpg-query parse OK; tsc, lint (0 errors), 115 tests green. |
+| 3 | 2026-09-29 | 1.2 | e3a5555 | Done | `009_trip_tables_rls.sql`: RLS on all 9 tables; restrictive member-only policy (`anon, authenticated`, `(select auth.uid())`) on the 8 trip tables, no permissive policy; all grants revoked from `anon`, writes revoked from `authenticated`; `trip_changes` server-only. Plan access-control section updated. Test renamed to `src/lib/tripTablesMigrations.test.ts` and extended (every 008 table locked down, no permissive policy). libpg-query parse OK; tsc, lint (0 errors), 115 tests green. |
+| 4 | 2026-09-29 | 1.3 | (this commit) | Done | `010_trip_triggers.sql`: schema `private` (no client access); `private.record_trip_change()` (audit into `trip_changes`, attribution via `app.user_id` → `updated_by` → `auth.uid()`, skips no-op updates and room-cascade deletes) and `private.broadcast_trip_change()` (`realtime.broadcast_changes` on `trip:<code>`), both security definer with empty search_path and execute revoked; audit + broadcast triggers on the 8 trip tables; members-only `select` policy on `realtime.messages`, no insert policy; `private.prune_trip_changes()` documented, not scheduled. Plan History section updated (delete attribution needs `app.user_id`, owned by 3.1). Tests extended; libpg-query parse OK; tsc, lint (0 errors), 125 tests green. |
