@@ -47,10 +47,16 @@ Decisions:
 | `trip_day_spans` | `day_id`, `label`, `start_event_id`, `end_event_id`, `start_hour`, `end_hour`, `bg`, `border`, `z_index` | FK day (cascade); event FKs `on delete set null (col)` | `days[].spans[]` |
 | `trip_spans` | `label`, `start_event_id`, `end_event_id`, `bg`, `border`, `z_index` | event FKs `on delete cascade` | `payload.tripSpans[]` |
 | `trip_expenses` | `position`, `label`, `amount`, `currency`, `split_mode`, `linked_event_id`, `start_day_id`, `end_day_id` | event FK `on delete set null (linked_event_id)`; day FKs `on delete set null (…)` | `payload.extras[]` |
-| `trip_tasks` | `position`, `title`, `done`, `note`, `day_id`, `start_hour`, `end_hour`, `cat`, `priority` | day FK `on delete set null (day_id, start_hour, end_hour)` | `payload.tasks[]` |
+| `trip_tasks` | `position`, `title`, `done`, `note`, `day_id`, `start_hour`, `end_hour`, `cat`, `priority` | day FK `on delete set null (day_id)` (hours are ignored while `day_id` is null) | `payload.tasks[]` |
 | `trip_task_options` | `task_id`, `position`, `label`, `note`, `amount`, `currency`, `split_mode` | FK task `on delete cascade` | `tasks[].options[]` |
 | `trip_travelers` | `name` | | `payload.mockPeople[]` |
 | `trip_changes` | `table_name`, `row_id`, `op`, `before jsonb`, `after jsonb`, `user_id`, `created_at` (bigint identity PK) | append-only, server-written | audit trigger |
+
+Implementation notes (step 1.1, `008_trip_tables.sql`):
+- Every list table (days, events, day spans, trip spans, expenses, tasks, options, travelers) has `position`, so `get_trip` and `rebuild_payload` return arrays in their original order.
+- `on delete set null (cols)` may only name columns of that foreign key, so the task day FK nulls `day_id` only, not the hours.
+- Columns are nullable wherever `src/lib/schemas.ts` accepts `null`/missing today, and hour checks use the schema's `0–48` range, so every legacy payload that passes validation can be migrated. The stricter `6 <= start < end <= 26` stays in the domain layer for new writes. `end_hour > start_hour` is enforced on events only (tasks and day spans may carry partial hours).
+- Every table also references `rooms (code) on delete cascade` directly, and `updated_by` references `auth.users on delete set null`; each foreign key has an index.
 
 Foreign keys replace today's dangling-id handling (deleting an event unlinks its expenses in the database, not in two copies of the logic). Check constraints mirror `src/lib/schemas.ts` limits (text lengths, `currency in ('USD','COP')`, hour range, `end_hour > start_hour`).
 
