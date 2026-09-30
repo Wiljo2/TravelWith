@@ -104,3 +104,36 @@ describe("010_trip_triggers wires history and Broadcast", () => {
     expect(triggers).toContain("'trip:' || ur.room_code = (select realtime.topic())");
   });
 });
+
+describe("011_migrate_rooms", () => {
+  const migrate = readFileSync(join(process.cwd(), "supabase/migrations/011_migrate_rooms.sql"), "utf8");
+  const fns = [...migrate.matchAll(/create or replace function ([\w.]+)\(([^)]*)\)[\s\S]*?as \$\$([\s\S]*?)\$\$;/g)];
+
+  it("defines only private functions with a pinned search_path and no client access", () => {
+    expect(fns.length).toBeGreaterThan(0);
+    for (const [whole, name, params] of fns) {
+      expect(name.startsWith("private.")).toBe(true);
+      expect(whole).toContain("set search_path = ''");
+      const types = params.split(",").map((p) => p.trim().split(/\s+/)[1]).filter(Boolean).join(", ");
+      expect(migrate).toContain(`revoke all on function ${name}(${types}) from public, anon, authenticated;`);
+    }
+  });
+
+  it("keeps bulk loads out of history and Broadcast", () => {
+    for (const name of ["private.record_trip_change", "private.broadcast_trip_change"]) {
+      const body = fns.find((m) => m[1] === name)?.[3] ?? "";
+      expect(body).toContain("if current_setting('app.bulk_load', true) = 'on' then");
+    }
+    const migrateRoom = fns.find((m) => m[1] === "private.migrate_room")?.[3] ?? "";
+    expect(migrateRoom).toContain("perform set_config('app.bulk_load', 'on', true);");
+    expect(migrateRoom).not.toMatch(/update public\.rooms\s+set payload/);
+  });
+
+  it("loads every trip table", () => {
+    const tripTables = [...sql.matchAll(/create table if not exists public\.(\w+)/g)].map((m) => m[1]);
+    for (const table of tripTables.filter((t) => t !== "trip_changes")) {
+      expect(migrate).toContain(`insert into public.${table} (`);
+      expect(migrate).toContain(`delete from public.${table} where room_code = p_code;`);
+    }
+  });
+});

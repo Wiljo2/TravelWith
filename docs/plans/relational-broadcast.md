@@ -189,6 +189,11 @@ The data moves from `rooms.payload` to the tables **once**, in a single maintena
 
 Rough total: 4–6 weeks for one developer. The maintenance window itself is minutes (trips are small; migration runs in the database).
 
+Implemented in `011_migrate_rooms.sql` (step 2.1):
+- `migrate_room` sets `app.bulk_load = 'on'` for its transaction; the audit and Broadcast trigger functions (replaced in 011 with this guard) skip those writes, so the migration adds nothing to `trip_changes` and sends no messages.
+- Each row is inserted in its own subtransaction. A row that cannot be stored (failed check such as `end <= start`, duplicate id within the trip, missing required value, trip span with a missing event) is skipped and listed under `skipped` with the database error; optional references to missing days/events are set to null and listed under `nulled`. Wrong JSON types become null (`private.json_num/json_text/json_bool/json_date`). An `endDate` before `startDate` keeps only the start date.
+- `migrate_all_rooms()` runs each room in its own subtransaction and returns `(room_code, ok, report)`; `ok` is false when anything was skipped or the room failed.
+
 **Rollback.** Before phase 5 cleanup, `private.rebuild_payload(code)` writes the tables back into `rooms.payload`. If the new version has to be rolled back after users made changes: turn maintenance on, run `rebuild_payload` for rooms with `trip_changes` after the cut-over, redeploy the previous version. With no changes after the cut-over, redeploying the previous version is enough because `payload` was never modified.
 
 Relation to the existing remediation plan: phase 3 here replaces the old Phase 14 (command-style writes); phases 5–6 replace the old snapshot-based Phases 7 and 16.
