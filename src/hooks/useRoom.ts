@@ -5,77 +5,33 @@ import type { RoomMember, RoomPayload } from "@/types";
 
 export type { MockPerson, RoomPayload } from "@/types";
 
-export type SaveState = "idle" | "saving" | "saved" | "error";
-
 interface UseRoomResult {
   connected: boolean;
   members: RoomMember[];
-  saveState: SaveState;
-  save: (payload: RoomPayload) => void;
+  reload: () => void;
 }
 
+// Loads the trip (assembled from the trip tables by GET /api/rooms/[code]).
+// Writes go through useTripOps; rooms.payload is a frozen backup, so the
+// realtime subscription only keeps the members roster current.
 export function useRoom(
   code: string | null,
   accessToken: string | undefined,
-  onRemoteUpdate: (payload: RoomPayload) => void,
+  onLoad: (payload: RoomPayload) => void,
 ): UseRoomResult {
   const [connected, setConnected] = useState(false);
   const [members, setMembers] = useState<RoomMember[]>([]);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const skipSave = useRef(false);
-  const lastUpdatedAt = useRef<string | null>(null);
-  // Tokens refresh about hourly; a ref keeps saves current without resubscribing.
+  // Tokens refresh about hourly; refs keep requests current without resubscribing.
   const token = useRef(accessToken);
+  const onLoadRef = useRef(onLoad);
   useEffect(() => {
     token.current = accessToken;
-  }, [accessToken]);
+    onLoadRef.current = onLoad;
+  });
   const hasToken = !!accessToken;
 
-  const save = useCallback(
-    async (payload: RoomPayload) => {
-      if (!code || code === "LOCAL") return;
-      if (skipSave.current) {
-        skipSave.current = false;
-        return;
-      }
-      setSaveState("saving");
-      try {
-        const res = await apiFetch(`/api/rooms/${code}`, token.current, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...payload, expectedUpdatedAt: lastUpdatedAt.current ?? undefined }),
-        });
-
-        if (res.status === 409) {
-          // Someone else saved first — adopt their version instead of overwriting it.
-          const data = await res.json();
-          if (data?.payload?.days) {
-            lastUpdatedAt.current = data.updated_at ?? null;
-            skipSave.current = true;
-            onRemoteUpdate(data.payload);
-          }
-          setSaveState("saved");
-          return;
-        }
-
-        if (!res.ok) {
-          setSaveState("error");
-          return;
-        }
-
-        const data = await res.json();
-        if (data?.updated_at) lastUpdatedAt.current = data.updated_at;
-        setSaveState("saved");
-      } catch {
-        setSaveState("error");
-      }
-    },
-    [code, onRemoteUpdate],
-  );
-
-  useEffect(() => {
-    if (!code || code === "LOCAL" || !hasToken) return;
-
+  const reload = useCallback(() => {
+    if (!code || code === "LOCAL") return;
     apiFetch(`/api/rooms/${code}`, token.current)
       .then((r) => {
         if (!r.ok) throw new Error(`GET room ${r.status}`);
@@ -83,18 +39,16 @@ export function useRoom(
       })
       .then((data) => {
         const p = data?.payload as RoomPayload | undefined;
-        if (data?.updated_at) lastUpdatedAt.current = data.updated_at;
-        if (p?.days && Array.isArray(p.days)) {
-          skipSave.current = true;
-          onRemoteUpdate(p);
-        }
-        if (Array.isArray(data?.members)) {
-          setMembers(data.members);
-        }
+        if (p?.days && Array.isArray(p.days)) onLoadRef.current(p);
+        if (Array.isArray(data?.members)) setMembers(data.members);
         setConnected(true);
       })
       .catch(() => setConnected(false));
+  }, [code]);
 
+  useEffect(() => {
+    if (!code || code === "LOCAL" || !hasToken) return;
+    reload();
     if (!supabase) return;
 
     const channel = supabase
@@ -103,18 +57,8 @@ export function useRoom(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${code}` },
         ({ new: row }) => {
-          const r = row as { payload: RoomPayload; members?: RoomMember[]; updated_at?: string };
-          // Roster-only changes (join/leave) keep updated_at: don't reload the
-          // payload, or pending local edits would be replaced by the stored copy.
-          const payloadChanged = !r.updated_at || r.updated_at !== lastUpdatedAt.current;
-          if (r.updated_at) lastUpdatedAt.current = r.updated_at;
-          if (payloadChanged && r.payload?.days && Array.isArray(r.payload.days)) {
-            skipSave.current = true;
-            onRemoteUpdate(r.payload);
-          }
-          if (Array.isArray(r.members)) {
-            setMembers(r.members);
-          }
+          const r = row as { members?: RoomMember[] };
+          if (Array.isArray(r.members)) setMembers(r.members);
         },
       )
       .subscribe();
@@ -123,8 +67,7 @@ export function useRoom(
       supabase!.removeChannel(channel);
       setConnected(false);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, hasToken]);
+  }, [code, hasToken, reload]);
 
-  return { connected, members, saveState, save };
+  return { connected, members, reload };
 }

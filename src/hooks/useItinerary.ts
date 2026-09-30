@@ -1,8 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { uid } from "@/utils/uid";
-import { HOUR_START, HOUR_END } from "@/constants/time";
-import type { Day, CalendarEvent } from "@/types";
+import type { Day, CalendarEvent, DaySpan, TripSpan } from "@/types";
 import { DEFAULT_EVENT_CAT } from "@/constants/categories";
+import { HOUR_END, HOUR_START } from "@/constants/time";
+import { applyToDays, applyToList, rowToTripSpan, type Row, type TripTable } from "@/utils/tripRows";
+import type { SendOp } from "@/hooks/useTripOps";
+import { sendable } from "@/lib/opQueue";
 
 // Repairs payloads saved before ids were globally unique: the legacy counter
 // restarted at 0 each session, so older rooms can hold repeated event ids.
@@ -25,22 +28,9 @@ function dedupeEventIds(incoming: Day[]): Day[] {
   return changed ? result : incoming;
 }
 
-export function useItinerary(): {
-  days: Day[];
-  selectedId: string | null;
-  selectedEvent: { ev: CalendarEvent; dayId: string } | null;
-  setSelectedId: (id: string | null) => void;
-  updateEvent: (patch: Partial<CalendarEvent>) => void;
-  deleteEvent: () => void;
-  addEvent: (dayId: string, title: string, start: number, end: number, note?: string, cat?: string) => string;
-  moveEvent: (fromDayId: string, toDayId: string, ev: CalendarEvent, newStart: number) => void;
-  swapDays: (aId: string, bId: string) => void;
-  loadDays: (days: Day[]) => void;
-  addDaySpan: (dayId: string, span: import("../types").DaySpan) => void;
-  removeDaySpan: (dayId: string, spanId: string) => void;
-  updateDaySpan: (dayId: string, spanId: string, patch: Partial<import("../types").DaySpan>) => void;
-} {
+export function useItinerary(send: SendOp) {
   const [days, setDays] = useState<Day[]>([]);
+  const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const selectedEvent = useMemo(() => {
@@ -53,37 +43,42 @@ export function useItinerary(): {
 
   function updateEvent(patch: Partial<CalendarEvent>) {
     if (!selectedEvent) return;
+    const id = selectedEvent.ev.id;
     setDays((prev) =>
       prev.map((d) =>
-        d.id === selectedEvent.dayId
-          ? { ...d, events: d.events.map((e) => (e.id === selectedEvent.ev.id ? { ...e, ...patch } : e)) }
-          : d
-      )
+        d.id === selectedEvent.dayId ? { ...d, events: d.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) } : d,
+      ),
     );
+    // Hours are edited one at a time; send them together once the range is valid.
+    const { start: _start, end: _end, ...rest } = patch;
+    const merged = { ...selectedEvent.ev, ...patch };
+    const hoursChanged = patch.start !== undefined || patch.end !== undefined;
+    const validHours = merged.start >= HOUR_START && merged.end <= HOUR_END && merged.end > merged.start;
+    const args = sendable({ id, ...rest, ...(hoursChanged && validHours ? { start: merged.start, end: merged.end } : {}) });
+    if (args) send("event.update", args);
   }
 
+  // The database also removes cross-day spans anchored to the event and
+  // unlinks its expenses; spans are dropped here right away.
   function deleteEvent() {
     if (!selectedEvent) return;
-    setDays((prev) =>
-      prev.map((d) =>
-        d.id === selectedEvent.dayId
-          ? { ...d, events: d.events.filter((e) => e.id !== selectedEvent.ev.id) }
-          : d
-      )
-    );
+    const id = selectedEvent.ev.id;
+    setDays((prev) => prev.map((d) => (d.id === selectedEvent.dayId ? { ...d, events: d.events.filter((e) => e.id !== id) } : d)));
+    setTripSpans((prev) => prev.filter((s) => s.startEventId !== id && s.endEventId !== id));
     setSelectedId(null);
+    send("event.delete", { id });
   }
 
-  function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = DEFAULT_EVENT_CAT) {
-    const nev: CalendarEvent = { id: uid(), start, end, title, cat, note };
+  function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = DEFAULT_EVENT_CAT, id = uid()) {
+    const nev: CalendarEvent = { id, start, end, title, cat, note };
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: [...d.events, nev] } : d)));
     setSelectedId(nev.id);
+    send("event.create", { id, dayId, title, start, end, note, cat });
     return nev.id;
   }
 
   // Swap the whole contents (events + day-level spans) between two days, keeping
-  // each day's own label/date. Event ids don't change, so trip-level spans still
-  // resolve. Callers also remap scheduled tasks' dayId (tasks live outside here).
+  // each day's own label/date. Callers also remap scheduled tasks' dayId.
   function swapDays(aId: string, bId: string) {
     if (aId === bId) return;
     setDays((prev) => {
@@ -96,48 +91,80 @@ export function useItinerary(): {
         return d;
       });
     });
+    send("day.swap", { a: aId, b: bId });
   }
 
   // newStart is already snapped and clamped by the caller
   function moveEvent(fromDayId: string, toDayId: string, ev: CalendarEvent, newStart: number) {
     if (!Number.isFinite(newStart)) return;
-    const dur = ev.end - ev.start;
-    const newEnd = newStart + dur;
-
+    const newEnd = newStart + (ev.end - ev.start);
     setDays((prev) =>
       prev.map((d) => {
         let result = d;
-        if (result.id === fromDayId) {
-          result = { ...result, events: result.events.filter((x) => x.id !== ev.id) };
-        }
-        if (result.id === toDayId) {
-          result = { ...result, events: [...result.events, { ...ev, start: newStart, end: newEnd }] };
-        }
+        if (result.id === fromDayId) result = { ...result, events: result.events.filter((x) => x.id !== ev.id) };
+        if (result.id === toDayId) result = { ...result, events: [...result.events, { ...ev, start: newStart, end: newEnd }] };
         return result;
-      })
+      }),
     );
     setSelectedId(ev.id);
+    send("event.move", { id: ev.id, dayId: toDayId, start: newStart, end: newEnd });
   }
 
-  function loadDays(incoming: Day[]) {
+  const loadItinerary = useCallback((incoming: Day[], spans: TripSpan[] | undefined) => {
     if (Array.isArray(incoming) && incoming.length > 0) setDays(dedupeEventIds(incoming));
+    if (Array.isArray(spans)) setTripSpans(spans);
+  }, []);
+
+  // Clears the calendar; the server regenerates the days (owner only) and
+  // the caller refetches the trip afterwards.
+  function resetItinerary(regenerated: Day[]) {
+    setDays(regenerated);
+    setTripSpans([]);
+    send("itinerary.reset", {});
   }
 
-  function addDaySpan(dayId: string, span: import("../types").DaySpan) {
-    setDays((prev) => prev.map((d) => d.id === dayId ? { ...d, spans: [...(d.spans ?? []), span] } : d));
+  function addDaySpan(dayId: string, span: DaySpan) {
+    setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, spans: [...(d.spans ?? []), span] } : d)));
+    send("daySpan.create", { ...span, dayId });
   }
 
   function removeDaySpan(dayId: string, spanId: string) {
-    setDays((prev) => prev.map((d) => d.id === dayId ? { ...d, spans: (d.spans ?? []).filter((s) => s.id !== spanId) } : d));
+    setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, spans: (d.spans ?? []).filter((s) => s.id !== spanId) } : d)));
+    send("daySpan.delete", { id: spanId });
   }
 
-  function updateDaySpan(dayId: string, spanId: string, patch: Partial<import("../types").DaySpan>) {
-    setDays((prev) => prev.map((d) =>
-      d.id === dayId
-        ? { ...d, spans: (d.spans ?? []).map((s) => s.id === spanId ? { ...s, ...patch } : s) }
-        : d
-    ));
+  function updateDaySpan(dayId: string, spanId: string, patch: Partial<DaySpan>) {
+    setDays((prev) =>
+      prev.map((d) => (d.id === dayId ? { ...d, spans: (d.spans ?? []).map((s) => (s.id === spanId ? { ...s, ...patch } : s)) } : d)),
+    );
+    const args = sendable({ id: spanId, ...patch });
+    if (args) send("daySpan.update", args);
   }
 
-  return { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, loadDays, addDaySpan, removeDaySpan, updateDaySpan };
+  function addTripSpan(span: TripSpan) {
+    setTripSpans((p) => [...p, span]);
+    send("tripSpan.create", { ...span });
+  }
+
+  function removeTripSpan(id: string) {
+    setTripSpans((p) => p.filter((s) => s.id !== id));
+    send("tripSpan.delete", { id });
+  }
+
+  function updateTripSpan(id: string, patch: Partial<TripSpan>) {
+    setTripSpans((p) => p.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+    const args = sendable({ id, ...patch });
+    if (args) send("tripSpan.update", args);
+  }
+
+  const applyRow = useCallback((table: TripTable, id: string, row: Row | null) => {
+    if (table === "trip_spans") setTripSpans((prev) => applyToList(prev, id, row, rowToTripSpan));
+    else setDays((prev) => applyToDays(prev, table, id, row));
+  }, []);
+
+  return {
+    days, tripSpans, selectedId, selectedEvent, setSelectedId,
+    updateEvent, deleteEvent, addEvent, moveEvent, swapDays, loadItinerary, resetItinerary,
+    addDaySpan, removeDaySpan, updateDaySpan, addTripSpan, removeTripSpan, updateTripSpan, applyRow,
+  };
 }

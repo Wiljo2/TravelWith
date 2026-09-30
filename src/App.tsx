@@ -3,6 +3,9 @@ import { useItinerary } from "@/hooks/useItinerary";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useBudget } from "@/hooks/useBudget";
 import { useRoom } from "@/hooks/useRoom";
+import { useTasks } from "@/hooks/useTasks";
+import { useTripInfo } from "@/hooks/useTripInfo";
+import { useTripOps } from "@/hooks/useTripOps";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRooms } from "@/hooks/useUserRooms";
 import { HOUR_START, HOUR_END } from "@/constants/time";
@@ -19,9 +22,11 @@ import TabBar from "@/components/TabBar";
 import type { Tab } from "@/components/TabBar";
 import AppHeader from "@/components/AppHeader";
 import Toast from "@/components/Toast";
+import SyncNotice from "@/components/SyncNotice";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
-import type { MockPerson, RoomPayload, Task, ToastAction, TripInfo, TripSpan } from "@/types";
+import type { RoomPayload, Task, ToastAction } from "@/types";
+import type { Row, TripTable } from "@/utils/tripRows";
 import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
 import { generateDays } from "@/utils/tripDays";
 
@@ -40,8 +45,9 @@ export default function App() {
   const [resumeAttempted, setResumeAttempted] = useState(false);
 
   const localMode = roomCode === LOCAL_ROOM_CODE;
-  // Beta: the assistant is owner-only (enforced server-side too).
-  const canUseAgent = localMode || userRooms.some((r) => r.room_code === roomCode && r.role === "owner");
+  // Beta: the assistant is owner-only, like resetting the itinerary (both enforced server-side too).
+  const isOwner = localMode || userRooms.some((r) => r.room_code === roomCode && r.role === "owner");
+  const canUseAgent = isOwner;
 
   useEffect(() => {
     if (resumeAttempted) return;
@@ -65,45 +71,37 @@ export default function App() {
   const [sidePanel, setSidePanel] = useState<"budget" | "agent">("budget");
   const [agentMessages, setAgentMessages] = useState<AgentChatMessage[]>([]);
 
-  const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, loadDays, removeDaySpan, updateDaySpan } = useItinerary();
-  const { extras, exchangeRate, setExchangeRate, updateExtra, addExtra, removeExtra, loadBudget } = useBudget();
-  const [mockPeople, setMockPeople] = useState<MockPerson[]>([]);
-  const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [trip, setTrip] = useState<TripInfo | null>(null);
+  const ops = useTripOps(roomCode, session?.access_token, {
+    adoptRow: (table, id, row) => adoptRow(table, id, row),
+    applyHeader: (header) => {
+      tripInfo.applyHeader(header);
+      if (header.exchange_rate != null) budget.setRate(Number(header.exchange_rate));
+    },
+    resync: () => reload(),
+  });
+  const itinerary = useItinerary(ops.send);
+  const budget = useBudget(ops.send);
+  const taskState = useTasks(ops.send, ops.isKnown);
+  const tripInfo = useTripInfo(ops.send);
+  const { days, tripSpans, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent } = itinerary;
+  const { extras, exchangeRate, setExchangeRate, updateExtra, addExtra, removeExtra } = budget;
+  const { tasks, addTask, toggleTask, updateTask, deleteTask } = taskState;
+  const { trip, mockPeople } = tripInfo;
 
-  function addTripSpan(span: TripSpan) { setTripSpans((p) => [...p, span]); }
-  function removeTripSpan(id: string)  { setTripSpans((p) => p.filter((s) => s.id !== id)); }
-  function updateTripSpan(id: string, patch: Partial<TripSpan>) { setTripSpans((p) => p.map((s) => s.id === id ? { ...s, ...patch } : s)); }
-
-  function addMockPerson(name: string) {
-    setMockPeople((prev) => [...prev, { id: crypto.randomUUID(), name }]);
-  }
-  function removeMockPerson(id: string) {
-    setMockPeople((prev) => prev.filter((p) => p.id !== id));
-  }
-
-  // Task helpers
-  function addTask(partial: Partial<Task> & { title: string }) {
-    setTasks((prev) => [...prev, { id: crypto.randomUUID(), done: false, ...partial }]);
-  }
-  function toggleTask(id: string) {
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, done: !t.done } : t));
-  }
-  function updateTask(id: string, patch: Partial<Task>) {
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, ...patch } : t));
-  }
-  function deleteTask(id: string) {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+  function adoptRow(table: TripTable, id: string, row: Row | null) {
+    if (table === "trip_expenses") budget.applyRow(id, row);
+    else if (table === "trip_tasks" || table === "trip_task_options") taskState.applyRow(table, id, row);
+    else if (table === "trip_travelers") tripInfo.applyRow(id, row);
+    else itinerary.applyRow(table, id, row);
   }
 
-  // Confirm a decision: choosing an option promotes the task to a real activity
-  // (a calendar event if it's scheduled) plus a budget line, then removes the task.
+  // Confirm a decision: the server turns the task into an event (if scheduled)
+  // and an expense (if the option has a cost). The LOCAL demo does it in memory.
   function chooseTaskOption(taskId: string, optionId: string) {
+    if (!localMode) return taskState.chooseOption(taskId, optionId);
     const task = tasks.find((t) => t.id === taskId);
     const option = task?.options?.find((o) => o.id === optionId);
     if (!task || !option) return;
-
     let linkedEventId: string | undefined;
     if (task.dayId && task.start != null) {
       const end = task.end ?? Math.min(task.start + 1, HOUR_END);
@@ -121,40 +119,39 @@ export default function App() {
     deleteTask(taskId);
   }
 
-  // Swap the whole contents of two days (events + spans in useItinerary) and
-  // remap scheduled tasks' dayId, which live in this component's state.
   function swapDaysWithTasks(aId: string, bId: string) {
     if (aId === bId) return;
-    swapDays(aId, bId);
-    setTasks((prev) => prev.map((t) =>
-      t.dayId === aId ? { ...t, dayId: bId } : t.dayId === bId ? { ...t, dayId: aId } : t,
-    ));
+    itinerary.swapDays(aId, bId);
+    taskState.swapTaskDays(aId, bId);
   }
 
   const [toastAction, setToastAction] = useState<ToastAction | null>(null);
   const dismissToast = useCallback(() => setToastAction(null), []);
 
-  const onRemoteUpdate = useCallback((payload: RoomPayload) => {
-    loadDays(payload.days);
+  const { seedVersions } = ops;
+  const { loadItinerary } = itinerary;
+  const { loadBudget } = budget;
+  const { loadTasks } = taskState;
+  const { loadTripInfo } = tripInfo;
+  const onLoad = useCallback((payload: RoomPayload) => {
+    seedVersions(payload);
+    loadItinerary(payload.days, payload.tripSpans);
     loadBudget(payload.extras, payload.exchangeRate);
-    if (payload.trip?.name)                setTrip(payload.trip);
-    if (Array.isArray(payload.mockPeople)) setMockPeople(payload.mockPeople);
-    if (Array.isArray(payload.tripSpans))  setTripSpans(payload.tripSpans);
-    if (Array.isArray(payload.tasks))      setTasks(payload.tasks);
-  }, [loadDays, loadBudget]);
+    loadTripInfo(payload.trip, payload.mockPeople);
+    loadTasks(payload.tasks);
+  }, [seedVersions, loadItinerary, loadBudget, loadTripInfo, loadTasks]);
 
-  const { connected, members, saveState, save } = useRoom(roomCode, session?.access_token, onRemoteUpdate);
+  const { connected, members, reload } = useRoom(roomCode, session?.access_token, onLoad);
 
-  // useRoom fetches nothing for LOCAL, so the mock payload is seeded here. The
-  // ref keeps edits from being wiped: onRemoteUpdate is a new function each render.
+  // useRoom fetches nothing for LOCAL, so the mock payload is seeded here.
   // The demo is imported lazily and never in production builds.
   const localSeeded = useRef(false);
   useEffect(() => {
     // Inline NODE_ENV check (not LOCAL_MODE_ENABLED) so the bundler can drop the import.
     if (process.env.NODE_ENV === "production" || !localMode || localSeeded.current) return;
     localSeeded.current = true;
-    import("@/data/mockRoom").then(({ mockRoomPayload }) => onRemoteUpdate(mockRoomPayload));
-  }, [localMode, onRemoteUpdate]);
+    import("@/data/mockRoom").then(({ mockRoomPayload }) => onLoad(mockRoomPayload));
+  }, [localMode, onLoad]);
 
   const people = Math.max(1, members.length + mockPeople.length);
   // grandTotal depends on people: "perPerson" expenses scale up with the traveler count.
@@ -167,20 +164,6 @@ export default function App() {
   const linkExtra = useCallback((extraId: string, eventId: string | undefined) => {
     updateExtra(extraId, { linkedEventId: eventId });
   }, [updateExtra]);
-
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!roomCode || roomCode === "LOCAL") return;
-    // Never autosave before the room's own payload has loaded: the local demo
-    // state would overwrite the real trip.
-    if (!connected) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      save({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks });
-    }, 600);
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, roomCode, connected]);
 
   function handleSelect(id: string | null) {
     setSelectedId(id);
@@ -242,17 +225,16 @@ export default function App() {
       <AppHeader
         roomCode={roomCode}
         connected={connected || localMode}
-        saveState={saveState}
+        saveState={ops.syncState}
         trip={trip}
         grandTotal={grandTotal}
         exchangeRate={exchangeRate}
-        onReset={() => {
+        onReset={isOwner ? () => {
           if (confirm("¿Restablecer el itinerario? Se perderán las actividades del calendario.")) {
             const regenerated = trip ? generateDays(trip.startDate, trip.endDate) : null;
-            loadDays(regenerated ?? days.map((d) => ({ ...d, events: [], spans: [] })));
-            setTripSpans([]);
+            itinerary.resetItinerary(regenerated ?? days.map((d) => ({ ...d, events: [], spans: [] })));
           }
-        }}
+        } : undefined}
         onLeaveRoom={() => { localSeeded.current = false; setRoomCode(null); }}
       />
 
@@ -317,11 +299,11 @@ export default function App() {
                 onAddExtra={addExtra}
                 onRemoveExtra={removeExtra}
                 tripSpans={tripSpans}
-                onAddTripSpan={addTripSpan}
-                onRemoveTripSpan={removeTripSpan}
-                onRemoveDaySpan={removeDaySpan}
-                onUpdateDaySpan={updateDaySpan}
-                onUpdateTripSpan={updateTripSpan}
+                onAddTripSpan={itinerary.addTripSpan}
+                onRemoveTripSpan={itinerary.removeTripSpan}
+                onRemoveDaySpan={itinerary.removeDaySpan}
+                onUpdateDaySpan={itinerary.updateDaySpan}
+                onUpdateTripSpan={itinerary.updateTripSpan}
                 tasks={tasks}
                 pendingNew={pendingNew}
                 onCommitNew={commitNewEvent}
@@ -347,8 +329,8 @@ export default function App() {
             onLinkExtra={linkExtra}
             onAddExtra={addExtra}
             onRemoveExtra={removeExtra}
-            onAddMockPerson={addMockPerson}
-            onRemoveMockPerson={removeMockPerson}
+            onAddMockPerson={tripInfo.addMockPerson}
+            onRemoveMockPerson={tripInfo.removeMockPerson}
           />
         </div>
       )}
@@ -368,6 +350,7 @@ export default function App() {
       )}
 
       <Toast action={toastAction} onUndo={toastAction?.undo} onDismiss={dismissToast} />
+      <SyncNotice message={ops.notice} onDismiss={ops.dismissNotice} />
 
       {slotDraft && (
         <SlotCreateModal

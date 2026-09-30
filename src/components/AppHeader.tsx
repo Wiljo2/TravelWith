@@ -4,17 +4,18 @@ import PriceChip from "@/components/budget/PriceChip";
 import { usdToCop, fmtUSD, fmtCOP } from "@/utils/currency";
 import { fmtTripDates } from "@/utils/tripDays";
 import { cn } from "@/lib/utils";
-import type { SaveState } from "@/hooks/useRoom";
+import type { SyncState } from "@/hooks/useTripOps";
 import type { TripInfo } from "@/types";
 
 interface AppHeaderProps {
   roomCode: string;
   connected: boolean;
-  saveState: SaveState;
+  saveState: SyncState;
   trip: TripInfo | null;
   grandTotal: number;
   exchangeRate: number;
-  onReset: () => void;
+  // Owner only; the button is hidden without it.
+  onReset?: () => void;
   onLeaveRoom: () => void;
 }
 
@@ -24,7 +25,7 @@ const FALLBACK = {
   title: "Tu viaje",
 };
 
-const SAVE_LABEL: Record<SaveState, string> = {
+const SAVE_LABEL: Record<SyncState, string> = {
   idle: "",
   saving: "guardando…",
   saved: "guardado ✓",
@@ -61,11 +62,13 @@ export default function AppHeader({
             <span className={cn("min-w-[52px] text-left text-[10px]", saveState === "error" ? "text-destructive" : "text-muted-foreground")}>
               {SAVE_LABEL[saveState]}
             </span>
-            <button
-              title="Restablecer itinerario al default"
-              onClick={onReset}
-              className="cursor-pointer pl-1 text-xs text-muted-foreground hover:text-foreground"
-            >↺</button>
+            {onReset && (
+              <button
+                title="Restablecer itinerario al default"
+                onClick={onReset}
+                className="cursor-pointer pl-1 text-xs text-muted-foreground hover:text-foreground"
+              >↺</button>
+            )}
             <button
               onClick={onLeaveRoom}
               className="cursor-pointer pl-1 text-[13px] text-muted-foreground hover:text-foreground"
