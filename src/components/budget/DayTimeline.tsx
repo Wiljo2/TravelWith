@@ -72,7 +72,7 @@ export default function DayTimeline({ dayExtras, linkedExtras, days, exchangeRat
                 {days.map((d) => {
                   const isHere = ld?.id === d.id;
                   const v = isHere ? extraGroupUSD(e, people, exchangeRate) : null;
-                  return <td key={d.id} className={cn(TD, !isHere && TD_EMPTY)}>{v !== null ? `$${fmtUSDNum(v)}` : "—"}</td>;
+                  return <td key={d.id} className={cn(TD, !isHere && TD_EMPTY)}>{v !== null ? fmtUSDNum(v) : "—"}</td>;
                 })}
               </tr>
             );

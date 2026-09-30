@@ -68,6 +68,15 @@ npm install
 npm run dev
 ```
 
+O con el script `scripts/dev.mjs` (Mac, Windows y Linux), que verifica Node,
+instala dependencias si hace falta, revisa `.env.local` y abre el navegador:
+
+```bash
+npm run local        # contra Supabase (necesita .env.local)
+npm run local:mock   # modo local con datos de prueba
+node scripts/dev.mjs --port 3001 --open
+```
+
 ### Modo local (sin cuenta, sin base de datos)
 
 Para trabajar en la UI sin login ni Supabase:

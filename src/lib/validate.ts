@@ -35,7 +35,7 @@ export function validateRoomPayload(body: unknown): RoomPayload | null {
   if (!Array.isArray(p.days) || !Array.isArray(p.extras)) return null;
   if (typeof p.exchangeRate !== "number" || !Number.isFinite(p.exchangeRate) || p.exchangeRate <= 0) return null;
 
-  for (const key of ["mockPeople", "tripSpans", "tasks"] as const) {
+  for (const key of ["mockPeople", "tripSpans", "tasks", "ideas", "ideaPlaces", "ideaLinks", "ideaLinksIds"] as const) {
     if (p[key] !== undefined && !Array.isArray(p[key])) return null;
   }
 

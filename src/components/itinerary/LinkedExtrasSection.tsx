@@ -95,9 +95,7 @@ export default function LinkedExtrasSection({
   const linkable = extras.filter((x) => x.linkedEventId !== selectedEvent.ev.id);
 
   return (
-    <div className="mt-3.5 border-t border-border pt-3">
-      <div className="mb-2 text-[11px] font-semibold tracking-[.06em] text-muted-foreground">GASTOS VINCULADOS</div>
-
+    <div>
       {linked.length === 0
         ? <p className="mb-2 text-xs text-muted-foreground">Sin gastos asignados</p>
         : (
@@ -116,10 +114,10 @@ export default function LinkedExtrasSection({
               }
               const displayAmt = x.currency === "COP"
                 ? `${Math.round(x.amount).toLocaleString("es-CO")} COP`
-                : `$${fmtUSDNum(x.amount)}`;
+                : fmtUSDNum(x.amount);
               return (
-                <div key={x.id} className="flex items-center justify-between text-xs">
-                  <span className="max-w-[130px] truncate text-foreground">{x.label}</span>
+                <div key={x.id} className="flex items-center justify-between gap-3 text-[13px]">
+                  <span className="min-w-0 truncate text-foreground">{x.label}</span>
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono text-[11px] text-secondary-foreground">{displayAmt}</span>
                     <button
@@ -152,7 +150,7 @@ export default function LinkedExtrasSection({
           onCancel={() => setShowAddForm(false)}
         />
       ) : (
-        <Button size="sm" onClick={() => setShowAddForm(true)} className="w-full text-xs font-semibold">
+        <Button size="sm" variant="outline" onClick={() => setShowAddForm(true)} className="w-full text-xs font-medium">
           + Nuevo gasto para esta actividad
         </Button>
       )}

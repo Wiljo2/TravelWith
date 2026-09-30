@@ -40,9 +40,9 @@ export default function TravelersCard({
   }
 
   return (
-    <div className="mb-7 rounded-xl border border-border bg-card px-[18px] py-3.5">
-      <div className={`flex items-center justify-between ${people > 0 || adding ? "mb-2.5" : ""}`}>
-        <span className="text-[11px] font-semibold tracking-[.06em] text-muted-foreground">VIAJEROS</span>
+    <div className="rounded-2xl bg-card p-4 shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-border/70 md:p-5">
+      <div className={`flex items-center justify-between ${people > 0 || adding ? "mb-3" : ""}`}>
+        <h2 className="text-[15px] font-semibold">Viajeros</h2>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="rounded-full border-primary bg-primary/15 px-2.5 text-xs font-semibold text-emerald-700">
             {people} {people === 1 ? "persona" : "personas"}
