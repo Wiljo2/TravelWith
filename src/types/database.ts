@@ -1,5 +1,5 @@
 // Database types for the public schema, written by hand to match migrations
-// 001-010 (docs/plans/relational-broadcast.md, step 1.4). Once a Supabase
+// 001-013 (docs/plans/relational-broadcast.md, step 1.4). Once a Supabase
 // project with these migrations is available, replace this file with:
 //
 //   npx supabase gen types typescript --project-id <id> --schema public > src/types/database.ts
@@ -224,6 +224,10 @@ export type Database = {
       };
       leave_room: { Args: { p_code: string; p_user: string }; Returns: Json };
       delete_room: { Args: { p_code: string }; Returns: undefined };
+      delete_trip_row: {
+        Args: { p_table: TripTable; p_code: string; p_id: string; p_expected_version: number | null; p_user: string | null };
+        Returns: Json;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

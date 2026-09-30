@@ -80,6 +80,11 @@ Foreign keys replace today's dangling-id handling (deleting an event unlinks its
    - Multi-row ops run as SQL functions (same pattern as `join_room`), so they are atomic: `choose_task_option` (insert event + insert expense + delete task), `swap_days`, `reset_itinerary`, `reorder`.
 4. Return the new row(s) and versions. The client applies them optimistically and reconciles with the response.
 
+Implemented in step 3.1 (`src/server/repo/*`, `013_trip_row_writes.sql`):
+- `tableRepo(table)` gives each table `list/get/insert/update/remove/nextPosition`; per-table modules (`eventsRepo`, `expensesRepo`, …) bind it. Updates set `version = expected + 1` guarded by `version = expected`; without an expected version the repo reads the current one and retries once. 0 rows → `RowConflictError` (409, carries the current row) or `RowNotFoundError` (404). Constraint errors map to 400/409 with Spanish messages; anything else stays a generic 500.
+- Deletes go through `public.delete_trip_row(table, code, id, expected_version, user)` (service role only, table whitelist), which sets `app.user_id` for the audit trigger and returns the deleted row, or the current row on a version mismatch. Deleting a row that is already gone succeeds with `null`.
+- A `before update` trigger (`private.bump_trip_row_version`) bumps `version` and `updated_at` on every effective update the writer didn't bump itself. Without it, foreign-key `on delete set null` cascades (delete an event → its expenses are unlinked) changed rows without changing their version, and clients that ignore known versions would have missed them.
+
 Ops (first set, mapping today's hooks and agent tools):
 
 | Area | Ops |

@@ -1,7 +1,7 @@
 # Relational + Broadcast progress
-- Iteration: 8
-- Last commit: (iteration 8 commit; the next iteration records its sha in the log)
-- Next step: 3.1
+- Iteration: 9
+- Last commit: (iteration 9 commit; the next iteration records its sha in the log)
+- Next step: 3.2
 - Human actions pending: 0.1 run the spike on staging (`docs/plans/spike/README.md`) and record the `broadcast_changes` payload shape and token-refresh behavior here; 3.10 waits for it. 2.3 run the migration rehearsal (`docs/plans/migration-rehearsal.md`) on a staging copy of production and record the results here; 4.1 needs it done with 0 differences.
 
 ## Steps
@@ -13,7 +13,7 @@
 - [x] 2.1 Migration: `private.migrate_room` / `private.migrate_all_rooms`
 - [x] 2.2 Migration: `private.verify_room` / `private.rebuild_payload`
 - [H] 2.3 HUMAN runbook `docs/plans/migration-rehearsal.md`
-- [ ] 3.1 Repository layer `src/server/repo/*`
+- [x] 3.1 Repository layer `src/server/repo/*`
 - [ ] 3.2 `get_trip(code)` + `GET /api/rooms/[code]` on it
 - [ ] 3.3 Op registry + `POST /api/rooms/[code]/ops` + event ops
 - [ ] 3.4 Day, itinerary and span ops
@@ -40,4 +40,5 @@
 | 5 | 2026-09-29 | 1.4 | 12ecc62 | Done | `src/types/database.ts`: `Database` in supabase-js generic shape (public tables incl. existing `rooms`/`user_rooms`/`agent_usage`, FK relationships, `join_room`/`leave_room`/`delete_room`), `Tables`/`TablesInsert`/`TablesUpdate`, flat row aliases, `TripTable`; header says how to regenerate. `src/types/database.test.ts` checks every trip table's row keys against the 008 SQL columns (both directions via `satisfies`) and that `createClient<Database>` infers rows / rejects bad inserts. tsc, lint (0 errors), 135 tests green. No app code imports it yet, so no `next build`. |
 | 6 | 2026-09-29 | 2.1 | 2579029 | Done | `011_migrate_rooms.sql`: `private.migrate_room(code)` (idempotent delete + insert, per-row subtransactions, `skipped`/`nulled` report, header columns from `payload.trip`/`exchangeRate`), `private.migrate_all_rooms()` (per-room subtransaction), lenient JSON readers, and `app.bulk_load` guard added to both trigger functions. **Executed on real Postgres 18 (PGlite, scratch only, Supabase `auth`/`realtime` stubbed):** migrations 001–011 apply; a legacy payload (nulls, missing fields, legacy category, string amount, duplicate event id, `end < start`, dangling event/day refs, trip span to a missing event, bad dates, negative rate) migrates with the expected report; re-run is identical; `rooms.payload` unchanged; 0 `trip_changes`/messages from the migration; later edits are audited (delete attributed via `app.user_id`) and broadcast; deleting a room still cascades. Static tests extended; libpg-query parse OK; tsc, lint (0 errors), 138 tests green. |
 | 7 | 2026-09-29 | 2.2 | dd316fa | Done | `012_verify_rebuild.sql`: `private.trip_payload`, `private.verify_room`, `private.verify_all_rooms`, `private.rebuild_payload`. On PGlite (Postgres 18, scratch): a clean payload migrates with 0 differences and `trip_payload` equals the original exactly; a legacy payload reports exactly the skipped rows (events, expenses, events per day); rebuild after an edit writes the edit, renamed trip, keeps unknown keys, bumps `updated_at`, and verifies clean. Static tests extended; libpg-query parse OK; tsc, lint (0 errors), 141 tests green. |
-| 8 | 2026-09-29 | 2.3 | (this commit) | Prepared `[H]` | `docs/plans/migration-rehearsal.md`: read-only `check-payloads` on production, `pg_dump` of `public.rooms` only into staging with 001–007, apply 008–012, timed `migrate_all_rooms` (run twice for idempotence), `verify_all_rooms` to CSV, rollback spot check, what to record (counts and codes only), fix paths, cleanup of the dump. tsc, lint (0 errors), 141 tests green. HUMAN: run it and record results. |
+| 8 | 2026-09-29 | 2.3 | d384a2b | Prepared `[H]` | `docs/plans/migration-rehearsal.md`: read-only `check-payloads` on production, `pg_dump` of `public.rooms` only into staging with 001–007, apply 008–012, timed `migrate_all_rooms` (run twice for idempotence), `verify_all_rooms` to CSV, rollback spot check, what to record (counts and codes only), fix paths, cleanup of the dump. tsc, lint (0 errors), 141 tests green. HUMAN: run it and record results. |
+| 9 | 2026-09-29 | 3.1 | (this commit) | Done | `src/server/repo/` (`core.ts` generic typed `tableRepo`, `errors.ts`, one module per table) + `013_trip_row_writes.sql` (`public.delete_trip_row` for attributed, version-guarded deletes; `private.bump_trip_row_version` before-update trigger on all trip tables). Found on PGlite: FK `set null` cascades updated rows without bumping `version`, so the trigger was added and the plan updated. PGlite: stale/ok/gone/unguarded deletes, delete attribution, cascade version bump, guarded writers keep their version, no-op updates unchanged. `repo.test.ts` (13 tests) + static 013 tests; mock gained `limit()`; `delete_trip_row` added to `database.ts`. libpg-query parse OK; tsc, lint (0 errors), 163 tests green. Not imported by app code yet, so no `next build`. |

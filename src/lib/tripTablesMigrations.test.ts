@@ -105,6 +105,26 @@ describe("010_trip_triggers wires history and Broadcast", () => {
   });
 });
 
+describe("013_trip_row_writes", () => {
+  const writes = readFileSync(join(process.cwd(), "supabase/migrations/013_trip_row_writes.sql"), "utf8");
+  const tripTables = [...sql.matchAll(/create table if not exists public\.(\w+)/g)]
+    .map((m) => m[1])
+    .filter((t) => t !== "trip_changes");
+
+  it.each(tripTables)("%s bumps version on every effective update", (table) => {
+    expect(writes).toMatch(
+      new RegExp(`before update on public\\.${table}\\s+for each row execute function private\\.bump_trip_row_version\\(\\);`),
+    );
+  });
+
+  it("delete_trip_row only touches trip tables and is server-only", () => {
+    for (const table of tripTables) expect(writes).toContain(`'${table}'`);
+    expect(writes).not.toContain("security definer");
+    expect(writes).toContain("revoke all on function public.delete_trip_row(text, text, text, int, uuid) from public, anon, authenticated;");
+    expect(writes).toContain("grant execute on function public.delete_trip_row(text, text, text, int, uuid) to service_role;");
+  });
+});
+
 describe("012_verify_rebuild", () => {
   const verify = readFileSync(join(process.cwd(), "supabase/migrations/012_verify_rebuild.sql"), "utf8");
   const fns = [...verify.matchAll(/create or replace function ([\w.]+)\(([^)]*)\)[\s\S]*?as \$\$/g)];
