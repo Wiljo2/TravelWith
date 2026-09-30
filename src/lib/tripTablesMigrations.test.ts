@@ -142,6 +142,23 @@ describe("014_get_trip", () => {
   });
 });
 
+describe("015_day_ops", () => {
+  const dayOps = readFileSync(join(process.cwd(), "supabase/migrations/015_day_ops.sql"), "utf8");
+
+  it("defines server-only invoker functions with a pinned search_path", () => {
+    expect(dayOps).not.toContain("security definer");
+    expect(dayOps.match(/set search_path = ''/g)).toHaveLength(2);
+    for (const sig of ["swap_days(text, text, text, uuid)", "reset_itinerary(text, jsonb, uuid)"]) {
+      expect(dayOps).toContain(`revoke all on function public.${sig} from public, anon, authenticated;`);
+      expect(dayOps).toContain(`grant execute on function public.${sig} to service_role;`);
+    }
+  });
+
+  it("attributes reset deletes to the acting user", () => {
+    expect(dayOps).toContain("perform set_config('app.user_id', coalesce(p_user::text, ''), true);");
+  });
+});
+
 describe("012_verify_rebuild", () => {
   const verify = readFileSync(join(process.cwd(), "supabase/migrations/012_verify_rebuild.sql"), "utf8");
   const fns = [...verify.matchAll(/create or replace function ([\w.]+)\(([^)]*)\)[\s\S]*?as \$\$/g)];

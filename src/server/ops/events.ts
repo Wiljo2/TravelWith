@@ -1,17 +1,11 @@
 import { LIMITS } from "@/constants/limits";
 import { DomainError, argId } from "@/server/domain/core";
 import { eventMovePatch, eventUpdatePatch, newEventRow } from "@/server/domain/eventRows";
-import { daysRepo } from "@/server/repo/days";
 import { eventsRepo } from "@/server/repo/events";
 import { RowNotFoundError } from "@/server/repo/errors";
+import { requireDayRow } from "@/server/ops/shared";
 import type { OpContext, OpDefinition } from "@/server/ops/types";
 import type { TripEventRow } from "@/types/database";
-
-async function requireDayRow(code: string, dayId: string): Promise<void> {
-  if (!(await daysRepo.get(code, dayId))) {
-    throw new DomainError(`Day "${dayId}" not found`);
-  }
-}
 
 async function requireEventRow(code: string, id: string): Promise<TripEventRow> {
   const row = await eventsRepo.get(code, id);

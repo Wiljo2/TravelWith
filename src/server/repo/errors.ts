@@ -28,6 +28,9 @@ export function repoError(error: PostgrestLikeError): Error {
       return new HttpError(409, "Ya existe un elemento con ese id");
     case "23503":
       return new HttpError(409, "Un elemento relacionado ya no existe");
+    case "P0002":
+      return new HttpError(404, "El elemento ya no existe");
+    case "22023":
     case "23502":
     case "23514":
     case "22P02":

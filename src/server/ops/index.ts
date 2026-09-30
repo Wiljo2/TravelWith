@@ -1,10 +1,14 @@
 import { HttpError } from "@/server/http";
+import { DAY_OPS } from "@/server/ops/days";
 import { EVENT_OPS } from "@/server/ops/events";
+import { SPAN_OPS } from "@/server/ops/spans";
 import type { OpContext, OpDefinition, OpInput, OpResult } from "@/server/ops/types";
 
 // Every trip write goes through here: the ops route today, the agent tools next.
 export const OPS: Record<string, OpDefinition> = {
   ...EVENT_OPS,
+  ...DAY_OPS,
+  ...SPAN_OPS,
 };
 
 export function isKnownOp(name: string): boolean {
