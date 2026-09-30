@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase-server";
 import { validateRoomPayload } from "@/lib/validate";
 import { payloadIssues } from "@/lib/schemas";
 import { LIMITS } from "@/constants/limits";
 import { TripConflictError, persistRoom } from "@/server/trip-store";
 import { requireMember } from "@/server/auth";
 import { deleteRoom } from "@/server/members";
+import { getTrip } from "@/server/repo/trip";
 import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
 
 type Params = Promise<{ code: string }>;
@@ -15,15 +15,9 @@ export async function GET(req: Request, { params }: { params: Params }) {
     const code = roomCodeParam((await params).code);
     await requireMember(req, code);
 
-    const { data, error } = await createServerClient()
-      .from("rooms")
-      .select("code, payload, members, updated_at")
-      .eq("code", code)
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!data) throw new HttpError(404, "Sala no encontrada");
-    return NextResponse.json(data);
+    const trip = await getTrip(code);
+    if (!trip) throw new HttpError(404, "Sala no encontrada");
+    return NextResponse.json(trip);
   } catch (e) {
     return errorResponse(e, "GET /api/rooms/[code]");
   }

@@ -39,6 +39,24 @@ describe("GET /api/rooms/[code]", () => {
     expect((await res.json()).code).toBe("ABC123");
   });
 
+  it("reads the trip from the tables through get_trip", async () => {
+    const trip = { ...ROOM, payload: { days: [{ id: "d0", label: "L", events: [], version: 3 }], extras: [] } };
+    const db = resetDb((q) => membership("member")(q) ?? (q.op === "rpc" ? { data: trip } : undefined));
+    const res = await GET(request("GET", "tok-member"), params("abc123"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.payload.days[0].version).toBe(3);
+    expect(body.payload.exchangeRate).toBe(4000);
+    expect(db.log.find((q) => q.op === "rpc")).toMatchObject({ table: "get_trip", args: { p_code: "ABC123" } });
+    expect(db.log.some((q) => q.table === "rooms")).toBe(false);
+  });
+
+  it("answers 404 when the room does not exist", async () => {
+    resetDb((q) => membership("member")(q) ?? (q.op === "rpc" ? { data: null } : undefined));
+    const res = await GET(request("GET", "tok-member"), params("ABC123"));
+    expect(res.status).toBe(404);
+  });
+
   it("rejects malformed codes before touching the database", async () => {
     resetDb(() => ({ data: ROOM }));
     const res = await GET(request("GET", "tok-member"), params("no!"));

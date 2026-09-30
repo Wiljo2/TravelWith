@@ -125,6 +125,23 @@ describe("013_trip_row_writes", () => {
   });
 });
 
+describe("014_get_trip", () => {
+  const getTrip = readFileSync(join(process.cwd(), "supabase/migrations/014_get_trip.sql"), "utf8");
+
+  it("is a server-only, invoker-rights read", () => {
+    expect(getTrip).toContain("stable");
+    expect(getTrip).toContain("set search_path = ''");
+    expect(getTrip).not.toContain("security definer");
+    expect(getTrip).toContain("revoke all on function public.get_trip(text) from public, anon, authenticated;");
+    expect(getTrip).toContain("grant execute on function public.get_trip(text) to service_role;");
+  });
+
+  it("reads the tables, never the frozen payload, and returns versions", () => {
+    expect(getTrip).not.toMatch(/r\.payload/);
+    for (const alias of ["d", "e", "s", "x", "t", "o", "m"]) expect(getTrip).toContain(`'version', ${alias}.version`);
+  });
+});
+
 describe("012_verify_rebuild", () => {
   const verify = readFileSync(join(process.cwd(), "supabase/migrations/012_verify_rebuild.sql"), "utf8");
   const fns = [...verify.matchAll(/create or replace function ([\w.]+)\(([^)]*)\)[\s\S]*?as \$\$/g)];

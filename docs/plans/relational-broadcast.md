@@ -27,6 +27,7 @@ browser ◄── private channel trip:<code> (RLS on realtime.messages: members
 ```
 
 - **Reads:** `GET /api/rooms/[code]` returns the trip assembled from rows, in the same `RoomPayload` shape the client uses today, so components don't change.
+  Implemented in step 3.2: `public.get_trip(code)` (`014_get_trip.sql`, service role only) returns `{code, payload, members, updated_at}`; every item in `payload` carries `version` (optional `version?: number` on the item types). `trip` comes from the `rooms` header columns and is omitted when the dates are missing; `exchangeRate` is omitted when null and `getTrip` (`src/server/repo/trip.ts`) applies `DEFAULT_RATE`. The frozen `rooms.payload` is never read.
 - **Writes:** small commands (`event.move`, `expense.update`, …) instead of full-payload `PATCH`. The agent tools call the same commands.
 - **Realtime:** one subscription per open trip; every table's trigger publishes to `trip:<code>`; the client applies the changed row by id.
 
