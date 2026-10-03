@@ -35,6 +35,7 @@ export function useItinerary(): {
   addEvent: (dayId: string, title: string, start: number, end: number, note?: string, cat?: string) => string;
   moveEvent: (fromDayId: string, toDayId: string, ev: CalendarEvent, newStart: number) => void;
   swapDays: (aId: string, bId: string) => void;
+  setDaySub: (dayId: string, sub: string) => void;
   loadDays: (days: Day[]) => void;
   addDaySpan: (dayId: string, span: import("../types").DaySpan) => void;
   removeDaySpan: (dayId: string, spanId: string) => void;
@@ -81,8 +82,8 @@ export function useItinerary(): {
     return nev.id;
   }
 
-  // Swap the whole contents (events + day-level spans) between two days, keeping
-  // each day's own label/date. Event ids don't change, so trip-level spans still
+  // Swap the whole contents (events + day-level spans + the subtitle describing
+  // them) between two days, keeping each day's own label/date. Event ids don't change, so trip-level spans still
   // resolve. Callers also remap scheduled tasks' dayId (tasks live outside here).
   function swapDays(aId: string, bId: string) {
     if (aId === bId) return;
@@ -91,8 +92,8 @@ export function useItinerary(): {
       const b = prev.find((d) => d.id === bId);
       if (!a || !b) return prev;
       return prev.map((d) => {
-        if (d.id === aId) return { ...d, events: b.events, spans: b.spans };
-        if (d.id === bId) return { ...d, events: a.events, spans: a.spans };
+        if (d.id === aId) return { ...d, sub: b.sub, events: b.events, spans: b.spans };
+        if (d.id === bId) return { ...d, sub: a.sub, events: a.events, spans: a.spans };
         return d;
       });
     });
@@ -119,6 +120,10 @@ export function useItinerary(): {
     setSelectedId(ev.id);
   }
 
+  function setDaySub(dayId: string, sub: string) {
+    setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, sub } : d)));
+  }
+
   function loadDays(incoming: Day[]) {
     if (Array.isArray(incoming) && incoming.length > 0) setDays(dedupeEventIds(incoming));
   }
@@ -139,5 +144,5 @@ export function useItinerary(): {
     ));
   }
 
-  return { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, loadDays, addDaySpan, removeDaySpan, updateDaySpan };
+  return { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, setDaySub, loadDays, addDaySpan, removeDaySpan, updateDaySpan };
 }

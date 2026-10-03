@@ -80,7 +80,7 @@ const key = (s: string) => normalizeText(s).replace(/[^a-z0-9ñ]+/g, " ").trim()
 // Cruise embarkation/disembarkation: logistics, but a place people make videos about.
 const PORT_PLACES = [
   { sub: /^\s*embarque/i, event: /puerto|check-in|embarque|terminal/i, name: "Embarque del crucero",
-    aliases: ["embarque", "embarcar", "terminal del crucero", "puerto de Miami", "Port of Miami", "PortMiami", "check-in del crucero", "embarkation", "boarding"] },
+    aliases: ["embarque", "embarcar", "terminal del crucero", "check-in del crucero", "embarkation", "boarding"] },
   { sub: /desembarque/i, event: /desembarque/i, name: "Desembarque del crucero",
     aliases: ["desembarque", "desembarcar", "disembarkation", "self-assist"] },
 ];

@@ -108,7 +108,7 @@ export default function IdeaRow({
       {s && !discarded && (
         <div className="ml-14 mt-2 flex items-center gap-2 rounded-lg bg-accent px-2.5 py-1.5 text-xs text-accent-foreground">
           <span className="line-clamp-2 min-w-0 flex-1">
-            {s.source === "ai" ? "✨" : "🔎"} ¿{[s.place && `📍 ${s.place}`, typeLabel(s.cat)].filter(Boolean).join(" · ")}?
+            {s.source === "rules" ? "🔎" : "✨"} ¿{[s.place && `📍 ${s.place}`, typeLabel(s.cat)].filter(Boolean).join(" · ")}?
           </span>
           <button
             onClick={() => onUpdate({ place: s.place ?? idea.place, cat: s.cat ?? idea.cat, suggestion: undefined })}

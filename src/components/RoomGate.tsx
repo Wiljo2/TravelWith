@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { loadSnapshot } from "@/lib/offline";
 
 interface RoomGateProps {
   onEnter: (code: string) => void;
@@ -51,8 +52,14 @@ export default function RoomGate({
     if (!c) return;
     setLoading(true);
     setError("");
-    const res = await fetch(`/api/rooms/${c}`);
-    if (!res.ok) {
+    const res = await fetch(`/api/rooms/${c}`).catch(() => null);
+    // Offline: open this device's last copy of the trip, if it has one.
+    if (!res && loadSnapshot(c)) {
+      setLoading(false);
+      onEnter(c);
+      return;
+    }
+    if (!res?.ok) {
       setError("Sala no encontrada.");
       setLoading(false);
       return;

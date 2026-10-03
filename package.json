@@ -10,18 +10,20 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "postinstall": "node scripts/copy-maplibre-worker.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
     "@base-ui/react": "^1.6.0",
-    "@huggingface/transformers": "^4.3.0",
     "@supabase/supabase-js": "^2.108.2",
     "@tailwindcss/postcss": "^4.3.2",
     "@types/node": "^26.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.23.0",
+    "maplibre-gl": "^6.11.2",
     "next": "^16.2.9",
     "postcss": "^8.5.16",
     "react": "^19.2.7",

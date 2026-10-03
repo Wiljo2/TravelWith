@@ -40,6 +40,7 @@ interface CalendarGridProps {
   onToggleTask: (id: string) => void;
   onEditTask: (task: Task, x: number, y: number) => void;
   onSwapDays: (aId: string, bId: string) => void;
+  onSetDaySub: (dayId: string, sub: string) => void;
   pendingNew?: { dayId: string; hour: number } | null;
   // Day to open on first render, e.g. today while the trip is underway.
   initialDayIdx?: number;
@@ -47,7 +48,7 @@ interface CalendarGridProps {
 
 export default function CalendarGrid({
   days, tripSpans, tasks, onDragStart, onTouchDragStart, onTouchDragCancel, onDragEnter, onDragMove, onDrop, onDragEnd,
-  onSelect, selectedId, dragTarget, dragPreview, onAddEvent, onToggleTask, onEditTask, onSwapDays, pendingNew,
+  onSelect, selectedId, dragTarget, dragPreview, onAddEvent, onToggleTask, onEditTask, onSwapDays, onSetDaySub, pendingNew,
   initialDayIdx,
 }: CalendarGridProps) {
   const mobile = useIsMobile();
@@ -145,6 +146,7 @@ export default function CalendarGrid({
         onToggleTask={onToggleTask}
         onEditTask={onEditTask}
         onSwapDays={onSwapDays}
+        onSetDaySub={onSetDaySub}
         selectedId={selectedId}
         isDragTarget={dragTarget === day.id}
         dragPreview={dragPreview}

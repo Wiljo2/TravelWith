@@ -7,6 +7,7 @@ import { fmtHour } from "@/utils/time";
 import { nextFreeHour } from "@/utils/tripDays";
 import { daySpanLabels } from "@/utils/spans";
 import { PANEL } from "@/components/home/shared";
+import DaySubtitle from "@/components/itinerary/DaySubtitle";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Day, Task, TripSpan } from "@/types";
 
@@ -20,13 +21,14 @@ interface ItineraryAgendaProps {
   onAdd: (dayId: string, hour: number, x: number, y: number) => void;
   onEditTask: (task: Task, x: number, y: number) => void;
   onToggleTask: (id: string) => void;
+  onSetDaySub: (dayId: string, sub: string) => void;
 }
 
 type Row = { kind: "event"; ev: CalendarEvent; start: number } | { kind: "task"; task: Task; start: number };
 
 // The whole trip as a list of day cards — the default, low-noise itinerary view.
 export default function ItineraryAgenda({
-  days, tripSpans, tasks, selectedId, todayIdx, onSelect, onAdd, onEditTask, onToggleTask,
+  days, tripSpans, tasks, selectedId, todayIdx, onSelect, onAdd, onEditTask, onToggleTask, onSetDaySub,
 }: ItineraryAgendaProps) {
   const todayRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -58,7 +60,7 @@ export default function ItineraryAgenda({
                   {weekday} {date}
                   {isToday && <span className="rounded-full bg-primary px-2 py-px text-[11px] font-semibold text-primary-foreground">Hoy</span>}
                 </h3>
-                {day.sub && <p className="truncate text-[13px] text-muted-foreground">{day.sub}</p>}
+                <DaySubtitle value={day.sub ?? ""} onCommit={(sub) => onSetDaySub(day.id, sub)} className="text-[13px] text-muted-foreground" />
                 {chips.length > 0 && (
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {chips.map((c) => (
