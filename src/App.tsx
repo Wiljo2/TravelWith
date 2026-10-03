@@ -19,6 +19,8 @@ import HomeView from "@/components/home/HomeView";
 import TabBar from "@/components/TabBar";
 import type { Tab } from "@/components/TabBar";
 import AppHeader from "@/components/AppHeader";
+import OfflineBanner from "@/components/OfflineBanner";
+import { downloadTripPdf } from "@/lib/tripPdf";
 import Toast from "@/components/Toast";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
@@ -109,7 +111,7 @@ export default function App() {
     loadIdeasPayload(payload);
   }, [loadDays, loadBudget, loadIdeasPayload]);
 
-  const { connected, members, saveState, save } = useRoom(roomCode, onRemoteUpdate);
+  const { connected, offlineSince, members, saveState, save } = useRoom(roomCode, onRemoteUpdate);
 
   // useRoom fetches nothing for LOCAL, so the mock payload is seeded here. The
   // ref keeps edits from being wiped: onRemoteUpdate is a new function each render.
@@ -245,7 +247,9 @@ export default function App() {
           }
         }}
         onLeaveRoom={() => { localSeeded.current = false; setRoomCode(null); }}
+        onDownloadPdf={(kind) => downloadTripPdf(kind, { trip, days, travelers: [...members, ...mockPeople].map((p) => p.name) })}
       />
+      {offlineSince && <OfflineBanner since={offlineSince} />}
 
       <TabBar active={activeTab} onChange={setActiveTab} pendingTaskCount={pendingTaskCount} />
 

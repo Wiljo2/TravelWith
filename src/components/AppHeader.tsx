@@ -1,12 +1,13 @@
 "use client";
 import { useState } from "react";
 import { Menu } from "@base-ui/react/menu";
-import { Copy, Ellipsis, LogOut, RotateCcw } from "lucide-react";
+import { Copy, Ellipsis, FileDown, LogOut, RotateCcw } from "lucide-react";
 import AuthButton from "@/components/auth/AuthButton";
 import { fmtTripDates } from "@/utils/tripDays";
 import { cn } from "@/lib/utils";
 import type { SaveState } from "@/hooks/useRoom";
 import type { TripInfo } from "@/types";
+import type { ReportKind } from "@/utils/tripReport";
 
 interface AppHeaderProps {
   roomCode: string;
@@ -15,6 +16,7 @@ interface AppHeaderProps {
   trip: TripInfo | null;
   onReset: () => void;
   onLeaveRoom: () => void;
+  onDownloadPdf: (kind: ReportKind) => Promise<void>;
 }
 
 // Shown for the LOCAL demo room, which has no trip metadata
@@ -34,11 +36,15 @@ const SYNC: Record<SaveState, { label: string; dot: string }> = {
 
 const ITEM = "flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-foreground outline-none data-highlighted:bg-secondary";
 
-export default function AppHeader({ roomCode, connected, saveState, trip, onReset, onLeaveRoom }: AppHeaderProps) {
+export default function AppHeader({ roomCode, connected, saveState, trip, onReset, onLeaveRoom, onDownloadPdf }: AppHeaderProps) {
   const t = trip ?? DEMO;
   const local = roomCode === "LOCAL";
   const sync = connected ? SYNC[saveState] : { label: "Conectando…", dot: "bg-muted-foreground animate-pulse" };
   const [copied, setCopied] = useState(false);
+
+  function download(kind: ReportKind) {
+    onDownloadPdf(kind).catch(() => alert("No se pudo generar el PDF. Intenta de nuevo con internet."));
+  }
 
   function copyCode() {
     navigator.clipboard?.writeText(roomCode).then(() => {
@@ -82,6 +88,15 @@ export default function AppHeader({ roomCode, connected, saveState, trip, onRese
                     <span className="font-mono text-xs font-semibold tracking-wider text-muted-foreground">{roomCode}</span>
                   </Menu.Item>
                 )}
+                <Menu.Item className={ITEM} onClick={() => download("migration")}>
+                  <FileDown className="size-4 text-muted-foreground" />
+                  PDF para migración
+                </Menu.Item>
+                <Menu.Item className={ITEM} onClick={() => download("full")}>
+                  <FileDown className="size-4 text-muted-foreground" />
+                  PDF del itinerario completo
+                </Menu.Item>
+                <Menu.Separator className="mx-1 my-1 h-px bg-border" />
                 <Menu.Item className={ITEM} onClick={onReset}>
                   <RotateCcw className="size-4 text-muted-foreground" />
                   Restablecer itinerario
