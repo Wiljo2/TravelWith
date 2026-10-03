@@ -27,3 +27,7 @@ dist-ssr
 .vercel
 /claude
 /public/vendor
+
+# Build artifacts and personal tool settings
+*.tsbuildinfo
+.claude/settings.local.json

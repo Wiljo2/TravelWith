@@ -1,23 +1,33 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { RoomPayload } from "@/hooks/useRoom";
-import { loadRoom, mutateRoom } from "@/server/trip-store";
+import type { RoomPayload } from "@/types";
+import { TripStoreError, loadRoom, mutateRoom } from "@/server/trip-store";
 import { DomainError } from "@/server/domain/core";
 import { addEvent, updateEvent, deleteEvent } from "@/server/domain/events";
 import { addTask, updateTask, deleteTask } from "@/server/domain/tasks";
 import { addExtra, updateExtra, removeExtra, setExchangeRate } from "@/server/domain/extras";
 import { tripOverview, dayDetail, budgetDetail } from "@/server/domain/read";
-import { CATEGORIES } from "@/constants/categories";
+import { DEFAULT_EVENT_CAT, EVENT_CATEGORY_KEYS } from "@/constants/categories";
 import { TASK_CATEGORIES } from "@/constants/taskCategories";
 
 const HOURS_DESC = "Decimal hour between 6 and 26 (e.g. 19.5 = 7:30pm, 25 = 1:00am next day)";
-const EVENT_CATS = Object.keys(CATEGORIES).join(" | ");
+const EVENT_CATS = EVENT_CATEGORY_KEYS.join(" | ");
 const TASK_CATS = Object.keys(TASK_CATEGORIES).join(" | ");
 
 function schema(properties: Record<string, unknown>, required: string[] = []) {
   return { type: "object" as const, properties, required, additionalProperties: false };
 }
 
-export const AGENT_TOOLS: Anthropic.Tool[] = [
+// Tools that delete data or change every number in the trip. Disabled during
+// the beta (no confirmation flow yet) unless AGENT_DESTRUCTIVE_TOOLS=on. Read
+// once at module load, so the tool list stays stable per deploy (prompt cache).
+const DESTRUCTIVE_TOOLS = new Set(["delete_event", "delete_task", "remove_expense", "set_exchange_rate"]);
+const DESTRUCTIVE_ENABLED = process.env.AGENT_DESTRUCTIVE_TOOLS === "on";
+
+export function isToolEnabled(name: string): boolean {
+  return DESTRUCTIVE_ENABLED || !DESTRUCTIVE_TOOLS.has(name);
+}
+
+const ALL_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_trip_overview",
     description:
@@ -48,7 +58,7 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
         title: { type: "string" },
         start: { type: "number", description: HOURS_DESC },
         end: { type: "number", description: `${HOURS_DESC}; must be greater than start` },
-        cat: { type: "string", description: `Category: ${EVENT_CATS}. Default miami.` },
+        cat: { type: "string", description: `Category: ${EVENT_CATS}. Default ${DEFAULT_EVENT_CAT}.` },
         note: { type: "string", description: "Optional note shown on the event" },
       },
       ["dayId", "title", "start", "end"],
@@ -168,6 +178,8 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+export const AGENT_TOOLS: Anthropic.Tool[] = ALL_TOOLS.filter((t) => isToolEnabled(t.name));
+
 // Spanish activity labels shown as chips in the chat UI while a tool runs.
 export const TOOL_LABELS: Record<string, string> = {
   get_trip_overview: "Leyendo el plan",
@@ -214,12 +226,22 @@ export async function executeTool(
   name: string,
   input: Record<string, unknown>,
 ): Promise<ToolOutcome> {
+  if (!isToolEnabled(name)) {
+    return {
+      content: `Tool "${name}" is disabled. Tell the user to make this change themselves in the app.`,
+      isError: true,
+    };
+  }
   try {
     const result = await runTool(code, name, input);
     return { content: JSON.stringify(result), isError: false };
   } catch (e) {
     if (e instanceof DomainError) {
       return { content: e.message, isError: true };
+    }
+    // Lost the concurrency race twice: let the model re-read and retry.
+    if (e instanceof TripStoreError && e.status === 409) {
+      return { content: "The trip was changed by someone else at the same time. Re-read it and try again.", isError: true };
     }
     throw e;
   }

@@ -1,5 +1,8 @@
+// Test fixture only: a full multi-day itinerary (the app's original demo trip)
+// used by the idea-matching tests. Never import this from app code; it must not
+// ship in production bundles.
 import { uid } from "@/utils/uid";
-import type { Day, CalendarEvent, DaySpan } from '../types';
+import type { Day, CalendarEvent, DaySpan } from "@/types";
 
 const mk = (start: number, end: number, title: string, cat: string, note = ""): CalendarEvent => ({
   id: uid(), start, end, title, cat, note,

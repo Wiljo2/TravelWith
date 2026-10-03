@@ -1,6 +1,27 @@
-import type { RoomPayload } from "@/hooks/useRoom";
-import type { Extra } from "@/types";
-import { DomainError, requireDay, findEvent } from "./core";
+import type { RoomPayload, Extra } from "@/types";
+import { LIMITS } from "@/constants/limits";
+import { DomainError, checkArgs, requireDay, findEvent } from "./core";
+
+const EXTRA_FIELDS = {
+  label: { type: "string", max: LIMITS.label },
+  amount: { type: "number" },
+  currency: { type: "string", max: LIMITS.id },
+  splitMode: { type: "string", max: LIMITS.id },
+  linkedEventId: { type: "string", max: LIMITS.id },
+  startDayId: { type: "string", max: LIMITS.id },
+  endDayId: { type: "string", max: LIMITS.id },
+  unlinkEvent: { type: "boolean" },
+  clearDayRange: { type: "boolean" },
+} as const;
+
+// An expense spread over days must end on or after the day it starts, or it
+// counts in the grand total but in no day of the per-day timeline.
+function validateDayRange(payload: RoomPayload, startDayId?: string, endDayId?: string) {
+  if (!startDayId || !endDayId) return;
+  const start = payload.days.findIndex((d) => d.id === startDayId);
+  const end = payload.days.findIndex((d) => d.id === endDayId);
+  if (end < start) throw new DomainError("endDayId must be the same day as startDayId or a later day");
+}
 
 function validateCurrency(currency: string): asserts currency is "USD" | "COP" {
   if (currency !== "USD" && currency !== "COP") {
@@ -43,7 +64,13 @@ export interface AddExtraArgs {
 }
 
 export function addExtra(payload: RoomPayload, args: AddExtraArgs): { payload: RoomPayload; extra: Extra } {
+  checkArgs(args, {
+    ...EXTRA_FIELDS,
+    label: { ...EXTRA_FIELDS.label, required: true },
+    amount: { type: "number", required: true },
+  });
   if (!args.label.trim()) throw new DomainError("label is required");
+  if (payload.extras.length >= LIMITS.extras) throw new DomainError(`The trip already has ${LIMITS.extras} expenses`);
   validateAmount(args.amount);
   const currency = args.currency ?? "USD";
   validateCurrency(currency);
@@ -53,6 +80,7 @@ export function addExtra(payload: RoomPayload, args: AddExtraArgs): { payload: R
   if (args.startDayId) requireDay(payload, args.startDayId);
   if (args.endDayId) requireDay(payload, args.endDayId);
   if (args.endDayId && !args.startDayId) throw new DomainError("endDayId requires startDayId");
+  validateDayRange(payload, args.startDayId, args.endDayId);
 
   const extra: Extra = {
     id: crypto.randomUUID(),
@@ -85,6 +113,7 @@ export function updateExtra(
   extraId: string,
   patch: UpdateExtraArgs,
 ): { payload: RoomPayload; extra: Extra } {
+  checkArgs(patch, EXTRA_FIELDS);
   const current = requireExtra(payload, extraId);
 
   if (patch.amount !== undefined) validateAmount(patch.amount);
@@ -110,6 +139,7 @@ export function updateExtra(
     next.endDayId = undefined;
   }
   if (!next.label) throw new DomainError("label cannot be empty");
+  validateDayRange(payload, next.startDayId, next.endDayId);
 
   const extras = payload.extras.map((x) => (x.id === extraId ? next : x));
   return { payload: { ...payload, extras }, extra: next };

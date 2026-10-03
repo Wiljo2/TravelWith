@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import type { UserRoom } from "@/hooks/useUserRooms";
+import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,21 +39,14 @@ export default function RoomGate({
   const [deleteTarget, setDeleteTarget] = useState<{ code: string; name: string | null } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  async function registerMember(code: string, role?: "owner" | "member") {
-    if (!session?.access_token) return;
-    await fetch(`/api/rooms/${code}/members`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(role ? { role } : {}),
-    });
-  }
-
+  // Reading a room requires membership, so joining registers first; the
+  // members endpoint answers 404 for unknown codes.
   async function join(code?: string) {
     const c = (code ?? input).trim().toUpperCase();
     if (!c) return;
     setLoading(true);
     setError("");
-    const res = await fetch(`/api/rooms/${c}`).catch(() => null);
+    const res = await apiFetch(`/api/rooms/${c}/members`, session?.access_token, { method: "POST" }).catch(() => null);
     // Offline: open this device's last copy of the trip, if it has one.
     if (!res && loadSnapshot(c)) {
       setLoading(false);
@@ -60,11 +54,10 @@ export default function RoomGate({
       return;
     }
     if (!res?.ok) {
-      setError("Sala no encontrada.");
+      setError(res?.status === 404 ? "Sala no encontrada." : "No se pudo entrar al viaje.");
       setLoading(false);
       return;
     }
-    await registerMember(c, "member");
     addRoom(c, "member");
     onEnter(c);
   }
@@ -75,7 +68,7 @@ export default function RoomGate({
     if (!canCreate) return;
     setLoading(true);
     setError("");
-    const res = await fetch("/api/rooms", {
+    const res = await apiFetch("/api/rooms", session?.access_token, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -92,7 +85,6 @@ export default function RoomGate({
       return;
     }
     const { code } = await res.json();
-    await registerMember(code, "owner");
     addRoom(code, "owner", tripName.trim());
     onEnter(code);
   }
@@ -210,7 +202,7 @@ export default function RoomGate({
                     autoFocus
                     value={tripName}
                     onChange={(e) => setTripName(e.target.value)}
-                    placeholder="Nombre del viaje (ej. Bahamas 2026)"
+                    placeholder="Nombre del viaje (ej. Vacaciones 2027)"
                     maxLength={80}
                     className="bg-secondary text-sm"
                   />
@@ -252,7 +244,7 @@ export default function RoomGate({
                       onChange={(e) => setInput(e.target.value.toUpperCase())}
                       onKeyDown={(e) => e.key === "Enter" && join()}
                       placeholder="Código de sala"
-                      maxLength={8}
+                      maxLength={12}
                       className="flex-1 bg-secondary font-mono text-[15px] tracking-[.1em]"
                     />
                     <Button onClick={() => join()} disabled={loading || !input.trim()} className="font-semibold">

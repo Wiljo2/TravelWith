@@ -1,9 +1,18 @@
-import type { RoomPayload } from "@/hooks/useRoom";
-import type { CalendarEvent } from "@/types";
-import { CATEGORIES } from "@/constants/categories";
+import type { RoomPayload, CalendarEvent } from "@/types";
+import { CATEGORIES, DEFAULT_EVENT_CAT } from "@/constants/categories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { uid } from "@/utils/uid";
-import { DomainError, requireDay, requireEvent } from "./core";
+import { LIMITS } from "@/constants/limits";
+import { DomainError, checkArgs, requireDay, requireEvent } from "./core";
+
+const EVENT_FIELDS = {
+  title: { type: "string", max: LIMITS.title },
+  start: { type: "number" },
+  end: { type: "number" },
+  cat: { type: "string", max: LIMITS.id },
+  note: { type: "string", max: LIMITS.note },
+  dayId: { type: "string", max: LIMITS.id },
+} as const;
 
 function validateHours(start: number, end: number) {
   if (!Number.isFinite(start) || !Number.isFinite(end)) {
@@ -32,10 +41,20 @@ export interface AddEventArgs {
 }
 
 export function addEvent(payload: RoomPayload, args: AddEventArgs): { payload: RoomPayload; event: CalendarEvent } {
-  requireDay(payload, args.dayId);
+  checkArgs(args, {
+    ...EVENT_FIELDS,
+    dayId: { ...EVENT_FIELDS.dayId, required: true },
+    title: { ...EVENT_FIELDS.title, required: true },
+    start: { type: "number", required: true },
+    end: { type: "number", required: true },
+  });
+  const target = requireDay(payload, args.dayId);
+  if (target.events.length >= LIMITS.eventsPerDay) {
+    throw new DomainError(`Day ${args.dayId} already has ${LIMITS.eventsPerDay} events`);
+  }
   if (!args.title.trim()) throw new DomainError("title is required");
   validateHours(args.start, args.end);
-  const cat = args.cat ?? "miami";
+  const cat = args.cat ?? DEFAULT_EVENT_CAT;
   validateCat(cat);
 
   const event: CalendarEvent = {
@@ -67,6 +86,7 @@ export function updateEvent(
   eventId: string,
   patch: UpdateEventArgs,
 ): { payload: RoomPayload; event: CalendarEvent } {
+  checkArgs(patch, EVENT_FIELDS);
   const { day, event } = requireEvent(payload, eventId);
 
   const next: CalendarEvent = {

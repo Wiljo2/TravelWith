@@ -19,12 +19,10 @@ interface AppHeaderProps {
   onDownloadPdf: (kind: ReportKind) => Promise<void>;
 }
 
-// Shown for the LOCAL demo room, which has no trip metadata
-const DEMO: TripInfo = {
-  name: "Bahamas & Perfect Day",
-  destination: "Orlando · Miami · Bahamas",
-  startDate: "2026-11-26",
-  endDate: "2026-12-04",
+// Shown while the trip loads and for legacy rooms saved without trip metadata
+const FALLBACK = {
+  name: "Tu viaje",
+  subtitle: "Viaje en grupo",
 };
 
 const SYNC: Record<SaveState, { label: string; dot: string }> = {
@@ -37,7 +35,6 @@ const SYNC: Record<SaveState, { label: string; dot: string }> = {
 const ITEM = "flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-foreground outline-none data-highlighted:bg-secondary";
 
 export default function AppHeader({ roomCode, connected, saveState, trip, onReset, onLeaveRoom, onDownloadPdf }: AppHeaderProps) {
-  const t = trip ?? DEMO;
   const local = roomCode === "LOCAL";
   const sync = connected ? SYNC[saveState] : { label: "Conectando…", dot: "bg-muted-foreground animate-pulse" };
   const [copied, setCopied] = useState(false);
@@ -56,10 +53,14 @@ export default function AppHeader({ roomCode, connected, saveState, trip, onRese
   return (
     <header className="mb-4 flex items-center justify-between gap-3 md:mb-5">
       <div className="min-w-0">
-        <h1 className="truncate text-xl font-semibold tracking-tight text-foreground md:text-2xl">{t.name}</h1>
+        <h1 className="truncate text-xl font-semibold tracking-tight text-foreground md:text-2xl">{trip?.name ?? FALLBACK.name}</h1>
         <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
-          {fmtTripDates(t.startDate, t.endDate)}
-          {t.destination && <> · {t.destination}</>}
+          {trip ? (
+            <>
+              {fmtTripDates(trip.startDate, trip.endDate)}
+              {trip.destination && <> · {trip.destination}</>}
+            </>
+          ) : FALLBACK.subtitle}
         </p>
       </div>
 

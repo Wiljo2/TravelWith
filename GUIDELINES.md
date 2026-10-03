@@ -55,10 +55,11 @@ rooms (code PK, name, payload JSONB, members JSONB, updated_at)
 ```
 
 Notes and known trade-offs:
-- **Membership is stored twice**: `rooms.members` (JSONB — display cache with name/avatar, written by POST members) and `user_rooms` (relational — source of truth for "my trips", enforced by RLS). Keep both in sync through the API routes; do not add a third representation.
+- **Membership is stored twice**: `rooms.members` (JSONB — display cache with name/avatar) and `user_rooms` (relational — source of truth for access and "my trips"). Both change only through the SQL functions `join_room` / `leave_room` / `delete_room` (`006_membership_functions.sql`, called via `src/server/members.ts`), which update them in one transaction; do not write either directly, and do not add a third representation. Roles are assigned by the server: the creator is `owner` (in `POST /api/rooms`), everyone who joins is `member`.
 - `rooms.name` is **denormalized** from `payload.trip.name` so trip listings don't fetch full payloads. The PATCH route keeps it in sync — never write it from anywhere else.
 - References inside the payload are **by id across arrays** (e.g. `extra.linkedEventId` → an event inside some day). Deleting an event does NOT cascade; consumers must handle dangling ids gracefully (`find(...) ?? null`).
-- New rooms get their initial payload **built server-side** in `POST /api/rooms` (empty days generated from the trip dates). The client demo state (`initialDays`, `DEFAULT_EXTRAS`) is only for the `LOCAL` room and must never leak into real rooms — that's also why autosave is gated on `connected`.
+- New rooms get their initial payload **built server-side** in `POST /api/rooms` (empty days generated from the trip dates). Client hooks start empty; the fictional demo trip (`src/data/mockRoom.ts`) is loaded with a dynamic import only in the `LOCAL` room in development builds, so it never ships to production. Never put real trip data in app code or anything the client bundle imports (the idea-matching tests use the fixture `src/test/fixtures/initialDays.ts`, test-only), and keep autosave gated on `connected` so an empty or demo state can't overwrite a real trip.
+- Event categories: new events use `DEFAULT_EVENT_CAT`; pickers, the legend and the agent list `EVENT_CATEGORY_KEYS`. Legacy keys (`barco`, `puerto`, `miami`) stay in `CATEGORIES` so stored events render — never remove a category key.
 
 ### Server domain layer (`src/server/`)
 
@@ -71,6 +72,7 @@ Server-side mutations do NOT talk to Supabase directly. The layering is:
 ### AI assistant (Claude agent)
 
 - Endpoint: `POST /api/rooms/[code]/agent` — SSE stream (`text` deltas, `tool` activity, `done` usage, `error`). Manual tool-use loop (max 15 iterations), model from `AGENT_MODEL` env (default `claude-sonnet-5`), adaptive thinking, no sampling params.
+- Beta access rules: owner only (`requireMember(..., "owner")`, and the UI hides the tab for others); per-user daily token quota from `AGENT_DAILY_TOKEN_LIMIT`, recorded in `agent_usage` (`src/server/agent/usage.ts`); destructive tools (`delete_event`, `delete_task`, `remove_expense`, `set_exchange_rate`) are excluded from `AGENT_TOOLS` and refused by `executeTool` unless `AGENT_DESTRUCTIVE_TOOLS=on`. The model call receives `req.signal`, so a closed panel stops generation.
 - `ANTHROPIC_API_KEY` lives **only** on the server (env). Never send it to, or accept it from, the browser.
 - Agent rules: read tools (`get_trip_overview`, `get_day_detail`, `get_budget`) ground the model before writes; write tools persist per-mutation via `mutateRoom` so Realtime shows live progress to all members; validation failures return `is_error` tool results (the model self-corrects) instead of throwing.
 - Tool schemas do **not** use `strict: true`: Anthropic caps total optional parameters across all `strict` tools in one request at 24, and our edit-style tools (`update_task`, `update_expense`, `update_event`, …) intentionally have many optional fields by design. Domain-layer validation (`DomainError` → `is_error`) is the real validation boundary; don't re-add `strict: true` without first checking the combined optional-param count across `AGENT_TOOLS`.
@@ -81,10 +83,10 @@ Server-side mutations do NOT talk to Supabase directly. The layering is:
 
 | Method | Route | Purpose |
 |--------|-------|---------|
-| POST | `/api/rooms` | Create trip: validates `{name, destination?, startDate, endDate}`, generates days, inserts room |
+| POST | `/api/rooms` | Create trip (authenticated): validates `{name, destination?, startDate, endDate}`, generates days, inserts room with a random 10-char code, makes the caller owner |
 | GET | `/api/rooms/list` | Authenticated: trips of the current user (joins `user_rooms` + `rooms`, returns names) |
 | GET | `/api/rooms/[code]` | Room payload + members + `updated_at` |
-| PATCH | `/api/rooms/[code]` | Save full payload; optional optimistic concurrency via `expectedUpdatedAt` (409 on conflict); syncs `name` |
+| PATCH | `/api/rooms/[code]` | Save full payload built on `expectedUpdatedAt` (required). Atomic compare-and-swap in SQL; 409 + current state on conflict. Body ≤ 512 KB, validated by `lib/schemas.ts`; syncs `name` |
 | DELETE | `/api/rooms/[code]` | Hard-delete for everyone. Authenticated + **owner only** (403 otherwise). Not wired in the UI |
 | GET/POST/DELETE | `/api/rooms/[code]/members` | List / join (idempotent, authenticated) / **leave** |
 
@@ -150,12 +152,15 @@ All trip state is stored as **a single JSONB `payload`** in the `rooms` table. O
   2. Validates the minimal body shape before writing, returning 400 with a message.
   3. Returns `{ error }` with the right status (400/401/404/409/500) — never throws uncaught.
 - Mutation endpoints should be **idempotent** where possible (see POST members: already a member → `{ ok: true }`).
-- Authenticated routes: token via `Authorization: Bearer` header, verified with `getUserFromToken`. Never trust a `userId` coming in the body.
+- Authenticated routes: token via `Authorization: Bearer` header. Use `requireUser` / `requireMember(req, code, minRole?)` from `src/server/auth.ts`, never hand-parse the header. Every room-scoped route calls `requireMember` (the service role bypasses RLS, so this is the only access check). Never trust a `userId` or role coming in the body.
+- Errors: wrap handlers in `try/catch` and return `errorResponse(e, context)` from `src/server/http.ts`. Throw `HttpError(status, message)` for user-facing errors; database and provider errors are logged and answered with a generic 500, never echoed.
+- Client calls to room routes go through `apiFetch(path, accessToken, init)` (`src/lib/api.ts`).
 - Schema changes = **new file** in `supabase/migrations/` with a sequential numeric prefix (`002_...`). Never edit an applied migration.
 
 ### Known backend debt (do not make it worse)
 - Saving is **last-write-wins of the full payload**: two people editing simultaneously can overwrite each other. Mitigated by the debounce, realtime, and the `updated_at` conflict check (409). Any new collaborative feature must keep this in mind.
-- The `rooms` RLS policies are open (`using (true)`): anyone with the code can write. Acceptable for the share-by-code model, but never store sensitive data in the payload.
+- `rooms.updated_at` is the payload's version: since `006_membership_functions.sql` the trigger only bumps it when `payload` changes (roster updates keep it), and clients skip reloading the payload when a Realtime row carries an unchanged `updated_at`. Don't bump it for non-payload columns.
+- The permissive `rooms` policies from `001_init.sql` are still `using (true)`, but `005_rls_lockdown.sql` adds restrictive policies on top: browser clients (anon key, signed in or not) can only read/write rooms they are members of, and cannot insert or delete `user_rooms` rows. Route handlers use the service role and bypass RLS, so **every route must enforce membership itself**. Never add a permissive policy that widens this, and never grant clients direct writes to `user_rooms`.
 
 ---
 
@@ -177,7 +182,7 @@ All trip state is stored as **a single JSONB `payload`** in the `rooms` table. O
 
 1. ~~Unit tests for `utils/currency.ts` and `utils/time.ts`~~ (done — see `src/utils/__tests__/`).
 2. ~~Migrate deep relative imports to the `@/` alias~~ (done).
-3. Schema validation (zod) for `PATCH /api/rooms/[code]` beyond the current shape checks.
+3. ~~Schema validation (zod) for `PATCH /api/rooms/[code]` beyond the current shape checks~~ (done — `src/lib/schemas.ts`, limits in `src/constants/limits.ts`; when adding a persisted field, add it to the schema as optional/`nullish`, and to `LIMITS` if it's a string or list).
 4. ~~Concurrent-save protection (compare `updated_at`)~~ (done — 409 + refetch).
 5. `BudgetPanel` takes ~25 props: consider splitting into connected subcomponents or a room context.
 6. Translate remaining Spanish UI copy if the product ever targets English-speaking users.

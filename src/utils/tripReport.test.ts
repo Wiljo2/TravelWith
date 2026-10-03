@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { initialDays } from "@/data/initialDays";
+import { initialDays } from "@/test/fixtures/initialDays";
 import { buildTripReport, pdfText } from "./tripReport";
 
 const trip = { name: "Orlando · Miami · Wonder of the Seas", startDate: "2026-11-26", endDate: "2026-12-04" };

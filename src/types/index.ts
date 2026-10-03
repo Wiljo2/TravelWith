@@ -183,6 +183,30 @@ export interface IdeaPlanResult {
   ideaIds: string[];
 }
 
+// A traveler without an account, counted in per-person math.
+export interface MockPerson {
+  id: string;
+  name: string;
+}
+
+// The persisted trip document (rooms.payload). Every field added after the
+// first release is optional; consumers apply defaults at read time.
+export interface RoomPayload {
+  days: Day[];
+  extras: Extra[];
+  exchangeRate: number;
+  trip?: TripInfo;
+  mockPeople?: MockPerson[];
+  tripSpans?: TripSpan[];
+  tasks?: Task[];
+  ideas?: Idea[];
+  ideaPlaces?: string[];   // places for organizing ideas; unset = derived from the trip
+  ideaLinks?: IdeaLink[];  // last "Analizar con Claude" result (free matches are computed live)
+  ideaLinksAt?: string;    // ISO time of that analysis
+  ideaLinksIds?: string[]; // ideas that analysis read (the others are "new")
+  eventPlaces?: Record<string, EventPlace>; // trip map: where each activity happens, by event id
+}
+
 export interface RoomMember {
   userId: string;
   name: string;

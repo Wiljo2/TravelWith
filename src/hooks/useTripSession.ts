@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRooms } from "@/hooks/useUserRooms";
-import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/mockRoom";
+import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
 import { isOffline, lastSnapshotCode } from "@/lib/offline";
 
 // Which trip (room) is open, plus the signed-in user and their trips.

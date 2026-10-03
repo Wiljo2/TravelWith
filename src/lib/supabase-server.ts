@@ -12,12 +12,15 @@ export function serviceRoleKey(): string | null {
 let warned = false;
 
 // Server-only client — uses service role key, never sent to the browser.
-// Falling back to the anon key keeps the public `rooms` table working, but every
-// `user_rooms` query silently returns nothing: its RLS policies match on
-// auth.uid(), which is null for an anon client. That looks like "my trips
-// disappeared" rather than an error, so say it out loud once.
+// Production fails closed: authorization lives in the route handlers, which
+// assume the service role. In development the anon-key fallback keeps rooms
+// loading, but every `user_rooms` query silently returns nothing (its RLS
+// matches on auth.uid(), null for an anon client), so say it out loud once.
 export function createServerClient() {
   const key = serviceRoleKey();
+  if (!key && process.env.NODE_ENV === "production") {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required in production");
+  }
   if (!key && !warned) {
     warned = true;
     console.warn(

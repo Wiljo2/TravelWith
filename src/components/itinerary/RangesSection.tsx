@@ -5,6 +5,7 @@ import { SPAN_COLORS } from "@/constants/spanColors";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { LIMITS } from "@/constants/limits";
 
 interface RangesSectionProps {
   selectedEvent: { ev: CalendarEvent; dayId: string };
@@ -73,7 +74,7 @@ export default function RangesSection({
 
       {showForm ? (
         <div className="rounded-lg border border-border bg-secondary p-2.5">
-          <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Etiqueta del rango"
+          <Input value={label} maxLength={LIMITS.label} onChange={(e) => setLabel(e.target.value)} placeholder="Etiqueta del rango"
             className="mb-[7px] bg-card text-xs" />
 
           <div className="mb-[7px] flex gap-1.5">

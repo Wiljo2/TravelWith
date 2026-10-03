@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { CATEGORIES } from "@/constants/categories";
+import { CATEGORIES, EVENT_CATEGORY_KEYS } from "@/constants/categories";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import NoteLinks from "@/components/NoteLinks";
 import type { CalendarEvent, Day } from "@/types";
-
-const CAT_KEYS = Object.keys(CATEGORIES) as (keyof typeof CATEGORIES)[];
+import { LIMITS } from "@/constants/limits";
 
 // Decimal hours ↔ "HH:MM"
 function toTimeStr(h: number): string {
@@ -40,6 +39,7 @@ export default function EventEditor({
     <div className="flex flex-col gap-2.5">
       <Input
         value={ev.title}
+        maxLength={LIMITS.title}
         onChange={(e) => onChange({ title: e.target.value })}
         aria-label="Título"
         className="h-10 bg-secondary text-[15px] font-medium"
@@ -69,6 +69,7 @@ export default function EventEditor({
 
       <Textarea
         value={ev.note}
+        maxLength={LIMITS.note}
         onChange={(e) => onChange({ note: e.target.value })}
         placeholder="Nota, precios, links…"
         rows={2}
@@ -79,7 +80,7 @@ export default function EventEditor({
       <div>
         <div className="mb-1.5 text-xs text-secondary-foreground">Categoría</div>
         <div className="flex flex-wrap gap-[5px]">
-          {CAT_KEYS.map((key) => {
+          {(EVENT_CATEGORY_KEYS.includes(ev.cat) || !CATEGORIES[ev.cat] ? EVENT_CATEGORY_KEYS : [...EVENT_CATEGORY_KEYS, ev.cat]).map((key) => {
             const c = CATEGORIES[key];
             const active = ev.cat === key;
             return (

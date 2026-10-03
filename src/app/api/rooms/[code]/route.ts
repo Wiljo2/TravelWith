@@ -1,117 +1,93 @@
 import { NextResponse } from "next/server";
-import { createServerClient, getUserFromToken } from "@/lib/supabase-server";
-import { normalizeRoomCode, validateRoomPayload } from "@/lib/validate";
-import { persistRoom, TripStoreError } from "@/server/trip-store";
+import { createServerClient } from "@/lib/supabase-server";
+import { validateRoomPayload } from "@/lib/validate";
+import { payloadIssues } from "@/lib/schemas";
+import { LIMITS } from "@/constants/limits";
+import { TripConflictError, persistRoom } from "@/server/trip-store";
+import { requireMember } from "@/server/auth";
+import { deleteRoom } from "@/server/members";
+import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
 
 type Params = Promise<{ code: string }>;
 
-export async function GET(_req: Request, { params }: { params: Params }) {
-  const code = normalizeRoomCode((await params).code);
-  if (!code) return NextResponse.json({ error: "Código inválido" }, { status: 400 });
-  const supabase = createServerClient();
+export async function GET(req: Request, { params }: { params: Params }) {
+  try {
+    const code = roomCodeParam((await params).code);
+    await requireMember(req, code);
 
-  const { data, error } = await supabase
-    .from("rooms")
-    .select("code, payload, members, updated_at")
-    .eq("code", code)
-    .maybeSingle();
+    const { data, error } = await createServerClient()
+      .from("rooms")
+      .select("code, payload, members, updated_at")
+      .eq("code", code)
+      .maybeSingle();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) throw error;
+    if (!data) throw new HttpError(404, "Sala no encontrada");
+    return NextResponse.json(data);
+  } catch (e) {
+    return errorResponse(e, "GET /api/rooms/[code]");
   }
-  if (!data) {
-    return NextResponse.json({ error: "Sala no encontrada" }, { status: 404 });
-  }
-
-  return NextResponse.json(data);
 }
 
 // DELETE /api/rooms/[code] — hard-delete the trip for EVERYONE. Owner only.
 // The normal flow is leaving via DELETE /members (last one out deletes the room).
 export async function DELETE(req: Request, { params }: { params: Params }) {
-  const code = normalizeRoomCode((await params).code);
-  if (!code) return NextResponse.json({ error: "Código inválido" }, { status: 400 });
-
-  const token = req.headers.get("Authorization")?.replace("Bearer ", "");
-  if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
-  const user = await getUserFromToken(token);
-  if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-
-  const supabase = createServerClient();
-
-  const { data: membership } = await supabase
-    .from("user_rooms")
-    .select("role")
-    .eq("room_code", code)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (membership?.role !== "owner") {
-    return NextResponse.json({ error: "Solo el creador puede eliminar el viaje para todos" }, { status: 403 });
+  try {
+    const code = roomCodeParam((await params).code);
+    await requireMember(req, code, "owner");
+    await deleteRoom(code);
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return errorResponse(e, "DELETE /api/rooms/[code]");
   }
-
-  await supabase.from("user_rooms").delete().eq("room_code", code);
-
-  const { error } = await supabase
-    .from("rooms")
-    .delete()
-    .eq("code", code);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ ok: true });
 }
 
-// PATCH /api/rooms/[code] — save the full payload.
-// Optional optimistic concurrency: when the client sends `expectedUpdatedAt`
-// and it doesn't match the stored row, respond 409 with the current server
-// state instead of overwriting a newer save from another member.
+// "report" logs schema violations without rejecting (rollout mode, until live
+// payloads are known to be clean); anything else enforces the full schema.
+// Structural checks and the size cap are always enforced.
+const SCHEMA_MODE = process.env.PAYLOAD_VALIDATION === "report" ? "report" : "enforce";
+
+// PATCH /api/rooms/[code] — save the full payload built on `expectedUpdatedAt`.
+// The write is a compare-and-swap: if another member saved in between, nothing
+// is written and the response is 409 with the current state to adopt.
 export async function PATCH(req: Request, { params }: { params: Params }) {
-  const code = normalizeRoomCode((await params).code);
-  if (!code) return NextResponse.json({ error: "Código inválido" }, { status: 400 });
-  const supabase = createServerClient();
-
-  let body: unknown;
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Payload inválido" }, { status: 400 });
-  }
+    const code = roomCodeParam((await params).code);
+    await requireMember(req, code);
 
-  const { expectedUpdatedAt, ...rest } = (body ?? {}) as Record<string, unknown>;
-  const payload = validateRoomPayload(rest);
-  if (!payload) {
-    return NextResponse.json({ error: "Payload inválido" }, { status: 400 });
-  }
+    const raw = await req.text();
+    if (Buffer.byteLength(raw) > LIMITS.bodyBytes) throw new HttpError(413, "El viaje es demasiado grande para guardarlo");
 
-  if (typeof expectedUpdatedAt === "string") {
-    const { data: current, error: fetchError } = await supabase
-      .from("rooms")
-      .select("payload, updated_at")
-      .eq("code", code)
-      .maybeSingle();
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      throw new HttpError(400, "Payload inválido");
+    }
 
-    if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
-    if (!current) return NextResponse.json({ error: "Sala no encontrada" }, { status: 404 });
+    const { expectedUpdatedAt, ...rest } = (body ?? {}) as Record<string, unknown>;
+    if (typeof expectedUpdatedAt !== "string" || !expectedUpdatedAt) {
+      throw new HttpError(400, "Falta la versión del viaje (expectedUpdatedAt)");
+    }
 
-    if (current.updated_at !== expectedUpdatedAt) {
+    const payload = validateRoomPayload(rest);
+    if (!payload) throw new HttpError(400, "Payload inválido");
+
+    const issues = payloadIssues(payload);
+    if (issues.length > 0) {
+      if (SCHEMA_MODE === "enforce") throw new HttpError(400, `Payload inválido: ${issues[0]}`);
+      console.warn(`[api] PATCH /api/rooms/${code} schema issues (report mode)`, issues);
+    }
+
+    const updatedAt = await persistRoom(code, payload, expectedUpdatedAt);
+    return NextResponse.json({ ok: true, updated_at: updatedAt });
+  } catch (e) {
+    if (e instanceof TripConflictError) {
       return NextResponse.json(
-        { error: "Conflicto de versión", payload: current.payload, updated_at: current.updated_at },
+        { error: e.message, payload: e.current.payload, updated_at: e.current.updatedAt },
         { status: 409 },
       );
     }
-  }
-
-  try {
-    const updatedAt = await persistRoom(code, payload);
-    return NextResponse.json({ ok: true, updated_at: updatedAt });
-  } catch (e) {
-    if (e instanceof TripStoreError) {
-      return NextResponse.json({ error: e.message }, { status: e.status });
-    }
-    throw e;
+    return errorResponse(e, "PATCH /api/rooms/[code]");
   }
 }

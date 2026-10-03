@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { initialDays } from "@/data/initialDays";
+import { initialDays } from "@/test/fixtures/initialDays";
 import { distanceKm, eventKey, inTripRegion, mapStops, offlineTiles, staleEvents, stopOrder, tilesInBBox } from "./tripGeo";
 import type { Day, EventPlace } from "@/types";
 

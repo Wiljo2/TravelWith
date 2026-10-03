@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { initialDays } from "@/data/initialDays";
+import { initialDays } from "@/test/fixtures/initialDays";
 import { freeSlots, matchIdeasToPlan, snippet } from "./ideaPlan";
 import { placesOfDay, tripPlaces } from "./places";
 import type { Idea } from "@/types";

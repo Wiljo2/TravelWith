@@ -1,6 +1,6 @@
 "use client";
 import type { Extra, Day, RoomMember, Task } from "@/types";
-import type { MockPerson } from "@/hooks/useRoom";
+import type { MockPerson } from "@/types";
 import { usdToCop, fmtUSD, fmtCOP, fmtUSDNum, extraGroupUSD, optionGroupUSD } from "@/utils/currency";
 import { TH_CLASS, TABLE_CLASS, THEAD_CLASS, TBODY_CLASS, TFOOT_CLASS, SectionHeader } from "@/components/budget/shared";
 import GlobalExtraRow from "@/components/budget/GlobalExtraRow";

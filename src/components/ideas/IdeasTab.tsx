@@ -6,8 +6,8 @@ import { useFreshThumbnails } from "@/hooks/useFreshThumbnails";
 import { CLASSIFIER_VERSION, placeIndex } from "@/utils/ideas";
 import { isVenue, tripPlaces } from "@/utils/places";
 import type { useIdeas } from "@/hooks/useIdeas";
-import type { RoomPayload } from "@/hooks/useRoom";
-import type { Day, IdeaLink, IdeaPlanResult, TripInfo } from "@/types";
+import { apiFetch } from "@/lib/api";
+import type { Day, IdeaLink, IdeaPlanResult, RoomPayload, TripInfo } from "@/types";
 
 interface IdeasTabProps {
   api: ReturnType<typeof useIdeas>;
@@ -15,6 +15,7 @@ interface IdeasTabProps {
   localMode: boolean;
   mobile: boolean;
   user: User | null;
+  accessToken: string | undefined;
   days: Day[];
   trip: TripInfo | null;
   // The full room payload right now, and the way to persist it immediately.
@@ -24,7 +25,7 @@ interface IdeasTabProps {
 
 // Wires the Ideas board to the room: the trip's places, who is voting/adding,
 // and the server call behind "Analizar con Claude".
-export default function IdeasTab({ api, roomCode, localMode, mobile, user, days, trip, currentPayload, save }: IdeasTabProps) {
+export default function IdeasTab({ api, roomCode, localMode, mobile, user, accessToken, days, trip, currentPayload, save }: IdeasTabProps) {
   const { customPlaces, reclassify } = api;
   const index = useMemo(
     () => placeIndex(tripPlaces(trip?.destination, days, customPlaces), days),
@@ -47,7 +48,7 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, days,
     if (!localMode && !(await save(payload, { force: true }))) {
       throw new Error("No se pudo guardar el viaje (quizá otro miembro lo cambió). Intenta de nuevo.");
     }
-    const res = await fetch(`/api/rooms/${roomCode}/idea-plan`, {
+    const res = await apiFetch(`/api/rooms/${roomCode}/idea-plan`, accessToken, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ideaIds, payload: localMode ? payload : undefined }),

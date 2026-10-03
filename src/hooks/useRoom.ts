@@ -1,28 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 import { loadSnapshot, saveSnapshot, updateSnapshotPayload } from "@/lib/offline";
-import type { Day, EventPlace, Extra, Idea, IdeaLink, RoomMember, Task, TripInfo, TripSpan } from "@/types";
+import type { RoomMember, RoomPayload } from "@/types";
 
-export interface MockPerson {
-  id: string;
-  name: string;
-}
-
-export interface RoomPayload {
-  days: Day[];
-  extras: Extra[];
-  exchangeRate: number;
-  trip?: TripInfo;
-  mockPeople?: MockPerson[];
-  tripSpans?: TripSpan[];
-  tasks?: Task[];
-  ideas?: Idea[];
-  ideaPlaces?: string[];   // places for organizing ideas; unset = derived from the trip
-  ideaLinks?: IdeaLink[];  // last "Analizar con Claude" result (free matches are computed live)
-  ideaLinksAt?: string;    // ISO time of that analysis
-  ideaLinksIds?: string[]; // ideas that analysis read (the others are "new")
-  eventPlaces?: Record<string, EventPlace>; // trip map: where each activity happens, by event id
-}
+export type { MockPerson, RoomPayload } from "@/types";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -40,6 +22,7 @@ interface UseRoomResult {
 
 export function useRoom(
   code: string | null,
+  accessToken: string | undefined,
   onRemoteUpdate: (payload: RoomPayload) => void,
 ): UseRoomResult {
   const [connected, setConnected] = useState(false);
@@ -50,6 +33,12 @@ export function useRoom(
   const [attempt, setAttempt] = useState(0);
   const skipSave = useRef(false);
   const lastUpdatedAt = useRef<string | null>(null);
+  // Tokens refresh about hourly; a ref keeps saves current without resubscribing.
+  const token = useRef(accessToken);
+  useEffect(() => {
+    token.current = accessToken;
+  }, [accessToken]);
+  const hasToken = !!accessToken;
 
   const save = useCallback(
     async (payload: RoomPayload, opts?: { force?: boolean }) => {
@@ -60,7 +49,7 @@ export function useRoom(
       }
       setSaveState("saving");
       try {
-        const res = await fetch(`/api/rooms/${code}`, {
+        const res = await apiFetch(`/api/rooms/${code}`, token.current, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, expectedUpdatedAt: lastUpdatedAt.current ?? undefined }),
@@ -97,10 +86,13 @@ export function useRoom(
   );
 
   useEffect(() => {
-    if (!code || code === "LOCAL") return;
+    if (!code || code === "LOCAL" || !hasToken) return;
 
-    fetch(`/api/rooms/${code}`)
-      .then((r) => r.json())
+    apiFetch(`/api/rooms/${code}`, token.current)
+      .then((r) => {
+        if (!r.ok) throw new Error(`GET room ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         const p = data?.payload as RoomPayload | undefined;
         if (data?.updated_at) lastUpdatedAt.current = data.updated_at;
@@ -136,8 +128,11 @@ export function useRoom(
         { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${code}` },
         ({ new: row }) => {
           const r = row as { payload: RoomPayload; members?: RoomMember[]; updated_at?: string };
+          // Roster-only changes (join/leave) keep updated_at: don't reload the
+          // payload, or pending local edits would be replaced by the stored copy.
+          const payloadChanged = !r.updated_at || r.updated_at !== lastUpdatedAt.current;
           if (r.updated_at) lastUpdatedAt.current = r.updated_at;
-          if (r.payload?.days && Array.isArray(r.payload.days)) {
+          if (payloadChanged && r.payload?.days && Array.isArray(r.payload.days)) {
             skipSave.current = true;
             onRemoteUpdate(r.payload);
             saveSnapshot(code, { payload: r.payload, members: Array.isArray(r.members) ? r.members : loadSnapshot(code)?.members ?? [] });
@@ -154,7 +149,7 @@ export function useRoom(
       setConnected(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, attempt]);
+  }, [code, hasToken, attempt]);
 
   useEffect(() => {
     if (!offlineSince) return;

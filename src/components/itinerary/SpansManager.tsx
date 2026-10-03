@@ -4,6 +4,7 @@ import type { Day, DaySpan, TripSpan } from "@/types";
 import { SPAN_COLORS } from "@/constants/spanColors";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { LIMITS } from "@/constants/limits";
 
 interface SpansManagerProps {
   days: Day[];
@@ -43,6 +44,7 @@ function SpanCard({ label, bg, border, onRename, onDelete, onColor, subtitle }: 
             <Input
               autoFocus
               defaultValue={label ?? ""}
+              maxLength={LIMITS.label}
               onBlur={(e) => { onRename(e.target.value); setEditing(false); }}
               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setEditing(false); }}
               className="h-auto flex-1 bg-card px-1.5 py-0.5 text-xs"

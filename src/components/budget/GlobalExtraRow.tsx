@@ -9,6 +9,7 @@ import {
 } from "@/components/budget/shared";
 import type { Currency, SplitMode } from "@/components/budget/shared";
 import { cn } from "@/lib/utils";
+import { LIMITS } from "@/constants/limits";
 
 interface GlobalExtraRowProps {
   extra: Extra;
@@ -59,7 +60,7 @@ export default function GlobalExtraRow({
   return (
     <tr className={cn(ROW_CLASS, dirty && "bg-primary/5")}>
       <td className={cn(CELL_CLASS, CELL_FULL_CLASS, "max-md:pr-24")}>
-        <input value={label} onChange={(e) => { setLabel(e.target.value); setDirty(true); }}
+        <input value={label} maxLength={LIMITS.label} onChange={(e) => { setLabel(e.target.value); setDirty(true); }}
           className="w-full border-none bg-transparent text-[13px] text-foreground outline-none" />
         <ModeToggle mode={liveMode} onChange={changeMode} />
       </td>

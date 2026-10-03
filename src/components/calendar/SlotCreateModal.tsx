@@ -2,7 +2,8 @@
 import { useState } from "react";
 import type { Task, TaskPriority } from "@/types";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT, PRIORITIES, PRIORITY_ORDER } from "@/constants/taskCategories";
-import { CATEGORIES } from "@/constants/categories";
+import { CATEGORIES, DEFAULT_EVENT_CAT, EVENT_CATEGORY_KEYS } from "@/constants/categories";
+import { LIMITS } from "@/constants/limits";
 import { fmtHour } from "@/utils/time";
 import { findGoogleMapsLink } from "@/utils/googleMaps";
 import { rootZoom } from "@/utils/zoom";
@@ -15,7 +16,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 
 const DURATIONS = [0.5, 1, 2, 3] as const;
-const CAT_KEYS = Object.keys(CATEGORIES);
+const CAT_KEYS = EVENT_CATEGORY_KEYS;
 
 interface SlotCreateModalProps {
   x: number;
@@ -42,7 +43,7 @@ export default function SlotCreateModal({
   const [note, setNote]         = useState(existing?.note ?? "");
   const [maps, setMaps]         = useState("");
   const [dur, setDur]           = useState<number>(existing?.end && existing?.start ? existing.end - existing.start : 1);
-  const [actCat, setActCat]     = useState<string>("miami");
+  const [actCat, setActCat]     = useState<string>(DEFAULT_EVENT_CAT);
   const [taskCat, setTaskCat]   = useState<string>(existing?.cat ?? DEFAULT_TASK_CAT);
   const [priority, setPriority] = useState<TaskPriority>(existing?.priority ?? "media");
 
@@ -81,6 +82,7 @@ export default function SlotCreateModal({
       <Input
         autoFocus={!mobile}
         value={title}
+        maxLength={LIMITS.title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) save(); if (e.key === "Escape") onClose(); }}
         placeholder={tab === "activity" ? "Nombre de la actividad" : "¿Qué hay que hablar? (ej. ¿Excursión?)"}
@@ -89,6 +91,7 @@ export default function SlotCreateModal({
 
       <Textarea
         value={note}
+        maxLength={LIMITS.note}
         onChange={(e) => setNote(e.target.value)}
         placeholder={tab === "activity" ? "Nota…" : "Qué se va a discutir / decidir…"}
         rows={2}

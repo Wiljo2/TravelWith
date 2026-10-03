@@ -50,7 +50,7 @@ export default function LocationSection({ ev, place, onSetLink }: {
       </p>
       {located && (
         <a
-          href={ev.mapsUrl ?? googleMapsPlaceUrl({ lat: place.lat!, lng: place.lng!, query: place.query, name: place.name })}
+          href={findGoogleMapsLink(ev.mapsUrl ?? "") ?? googleMapsPlaceUrl({ lat: place.lat!, lng: place.lng!, query: place.query, name: place.name })}
           target="_blank"
           rel="noreferrer"
           className="mt-2 inline-flex items-center gap-1 rounded-full border border-emerald-700/40 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-accent"

@@ -8,7 +8,6 @@ import { useTasks } from "@/hooks/useTasks";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTripGeo } from "@/hooks/useTripGeo";
 import { chooseOption } from "@/utils/taskDecision";
-import type { RoomPayload, MockPerson } from "@/hooks/useRoom";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { snapHour } from "@/utils/time";
 import { extraGroupUSD } from "@/utils/currency";
@@ -28,9 +27,8 @@ import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
 import IdeasTab from "@/components/ideas/IdeasTab";
 import ItineraryMap from "@/components/map/ItineraryMap";
-import type { Task, ToastAction, TripInfo, TripSpan } from "@/types";
-import { initialDays } from "@/data/initialDays";
-import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE, mockRoomPayload } from "@/data/mockRoom";
+import type { MockPerson, RoomPayload, Task, ToastAction, TripInfo, TripSpan } from "@/types";
+import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
 import { generateDays, tripDayIndex } from "@/utils/tripDays";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import ItineraryView from "@/components/itinerary/ItineraryView";
@@ -43,6 +41,8 @@ export default function App() {
   const { roomCode, setRoomCode, resumeAttempted, localMode, auth, userRooms: rooms } = useTripSession();
   const { user, session, loading: authLoading, signInWithGoogle, signOut } = auth;
   const { rooms: userRooms, addRoom, removeRoom } = rooms;
+  // Beta: the assistant is owner-only (enforced server-side too).
+  const canUseAgent = localMode || userRooms.some((r) => r.room_code === roomCode && r.role === "owner");
 
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [slotDraft, setSlotDraft] = useState<{ dayId: string; hour: number; x: number; y: number; task: Task | null } | null>(null);
@@ -55,7 +55,7 @@ export default function App() {
   const [mockPeople, setMockPeople] = useState<MockPerson[]>([]);
   const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
   const { tasks, setTasks, addTask, toggleTask, updateTask, deleteTask, swapTaskDays } = useTasks();
-  const ideasApi = useIdeas(roomCode);
+  const ideasApi = useIdeas(roomCode, session?.access_token);
   const { ideas, loadPayload: loadIdeasPayload, payload: ideasPayload, customPlaces, planLinks, planLinksAt, planIdeaIds } = ideasApi;
   const [trip, setTrip] = useState<TripInfo | null>(null);
   const geoApi = useTripGeo();
@@ -94,15 +94,17 @@ export default function App() {
     geoApi.loadPayload(payload);
   }, [loadDays, loadBudget, loadIdeasPayload, geoApi.loadPayload]);
 
-  const { connected, offlineSince, members, saveState, save } = useRoom(roomCode, onRemoteUpdate);
+  const { connected, offlineSince, members, saveState, save } = useRoom(roomCode, session?.access_token, onRemoteUpdate);
 
   // useRoom fetches nothing for LOCAL, so the mock payload is seeded here. The
   // ref keeps edits from being wiped: onRemoteUpdate is a new function each render.
+  // The demo is imported lazily and never in production builds.
   const localSeeded = useRef(false);
   useEffect(() => {
-    if (!localMode || localSeeded.current) return;
+    // Inline NODE_ENV check (not LOCAL_MODE_ENABLED) so the bundler can drop the import.
+    if (process.env.NODE_ENV === "production" || !localMode || localSeeded.current) return;
     localSeeded.current = true;
-    onRemoteUpdate(mockRoomPayload);
+    import("@/data/mockRoom").then(({ mockRoomPayload }) => onRemoteUpdate(mockRoomPayload));
   }, [localMode, onRemoteUpdate]);
 
   const people = Math.max(1, members.length + mockPeople.length);
@@ -207,9 +209,10 @@ export default function App() {
       onRemoveTripSpan={removeTripSpan}
     />
   );
-  const agentPanel = (
+  const agentPanel = canUseAgent && (
     <AgentPanel
       roomCode={roomCode}
+      accessToken={session?.access_token}
       messages={agentMessages}
       setMessages={setAgentMessages}
       className={isMobile ? "h-[75dvh] rounded-none border-x-0 border-b-0" : "rounded-2xl border-0 shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-border/70"}
@@ -227,7 +230,7 @@ export default function App() {
         onReset={() => {
           if (confirm("¿Restablecer el itinerario? Se perderán las actividades del calendario.")) {
             const regenerated = trip ? generateDays(trip.startDate, trip.endDate) : null;
-            loadDays(regenerated ?? initialDays);
+            loadDays(regenerated ?? days.map((d) => ({ ...d, events: [], spans: [] })));
             setTripSpans([]);
           }
         }}
@@ -318,6 +321,7 @@ export default function App() {
           days={days}
           todayIdx={todayIdx}
           roomCode={roomCode}
+          accessToken={session?.access_token}
           localMode={localMode}
           currentPayload={payloadNow}
           save={save}
@@ -332,6 +336,7 @@ export default function App() {
           localMode={localMode}
           mobile={isMobile}
           user={user}
+          accessToken={session?.access_token}
           days={days}
           trip={trip}
           currentPayload={payloadNow}

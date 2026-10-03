@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { initialDays } from "@/data/initialDays";
+import { initialDays } from "@/test/fixtures/initialDays";
 import { tripPlaces } from "./places";
 import {
   canonicalUrl, classifyIdea, classifyIdeaFields, detectPlatform, findIdeaUrls, placeIndex, seedPlaces, suggestPlace, suggestType,

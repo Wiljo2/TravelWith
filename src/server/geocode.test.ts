@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { initialDays } from "@/data/initialDays";
+import { initialDays } from "@/test/fixtures/initialDays";
 import { eventKey } from "@/utils/tripGeo";
 import { buildGeoPrompt, placesFromLinks } from "./geocode";
 import type { EventPlace } from "@/types";

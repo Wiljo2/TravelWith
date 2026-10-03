@@ -9,8 +9,8 @@ import { useIsMobile } from "@/hooks/useMediaQuery";
 import { canStoreMap, needsRefresh, offlineMapState, storeMapOffline } from "@/lib/mapOffline";
 import { eventKey, inTripRegion, mapStops, missingPhotos, staleEvents, stopOrder, type LngLat } from "@/utils/tripGeo";
 import type { useTripGeo } from "@/hooks/useTripGeo";
-import type { RoomPayload } from "@/hooks/useRoom";
-import type { Day, EventPlace } from "@/types";
+import { apiFetch } from "@/lib/api";
+import type { Day, EventPlace, RoomPayload } from "@/types";
 
 // The map library only runs in the browser.
 const TripMap = dynamic(() => import("@/components/map/TripMap"), { ssr: false });
@@ -20,6 +20,7 @@ interface ItineraryMapProps {
   days: Day[];
   todayIdx?: number;
   roomCode: string;
+  accessToken: string | undefined;
   localMode: boolean;
   currentPayload: () => RoomPayload;
   save: (payload: RoomPayload, opts?: { force?: boolean }) => Promise<boolean>;
@@ -38,7 +39,7 @@ const LOCATE_DELAY = 2500;   // ms after the last itinerary change
 // Itinerary as a map: a pin per place, filtered by day, the user's position
 // and what's near it. Activities are located the first time (and when they
 // change), and the map of the trip's region is kept for use without internet.
-export default function ItineraryMap({ geo, days, todayIdx, roomCode, localMode, currentPayload, save, onOpenEvent }: ItineraryMapProps) {
+export default function ItineraryMap({ geo, days, todayIdx, roomCode, accessToken, localMode, currentPayload, save, onOpenEvent }: ItineraryMapProps) {
   const [dayIdx, setDayIdx] = useState<number | null>(todayIdx ?? null);
   const [position, setPosition] = useState<LngLat | null>(null);
   const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
@@ -63,7 +64,7 @@ export default function ItineraryMap({ geo, days, todayIdx, roomCode, localMode,
     try {
       const payload = currentPayload();
       if (!localMode && !(await save(payload, { force: true }))) throw new Error("No se pudo guardar el viaje. Intenta de nuevo.");
-      const res = await fetch(`/api/rooms/${roomCode}/places`, {
+      const res = await apiFetch(`/api/rooms/${roomCode}/places`, accessToken, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ payload: localMode ? payload : undefined }),

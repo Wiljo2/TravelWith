@@ -1,9 +1,9 @@
 import { useCallback, useState } from "react";
-import type { RoomPayload } from "@/hooks/useRoom";
+import { apiFetch } from "@/lib/api";
 import { canonicalUrl, classifyIdeaFields, detectPlatform, findIdeaUrls } from "@/utils/ideas";
 import type { IdeaTextFields, PlaceIndex } from "@/utils/ideas";
 import { tiktokVideoId } from "@/utils/ideaMedia";
-import type { Idea, IdeaLink, IdeaPlanResult, IdeaSuggestion } from "@/types";
+import type { Idea, IdeaLink, IdeaPlanResult, IdeaSuggestion, RoomPayload } from "@/types";
 
 function rulesSuggestion(fields: IdeaTextFields, index: PlaceIndex): IdeaSuggestion | undefined {
   const { place, cat } = classifyIdeaFields(fields, index);
@@ -14,8 +14,8 @@ type Meta = { url?: string; title?: string; author?: string; thumbnail?: string;
 
 // Post data via the server: caption, author, thumbnail and, for TikTok, hashtags
 // and the automatic transcript (TikTok blocks these requests from browsers).
-async function fetchMetadata(roomCode: string, idea: Idea): Promise<Meta> {
-  return fetch(`/api/rooms/${roomCode}/oembed?url=${encodeURIComponent(idea.url)}`)
+async function fetchMetadata(roomCode: string, accessToken: string | undefined, idea: Idea): Promise<Meta> {
+  return apiFetch(`/api/rooms/${roomCode}/oembed?url=${encodeURIComponent(idea.url)}`, accessToken)
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null);
 }
@@ -37,7 +37,7 @@ function mergeSuggestion(idea: Idea, s: IdeaSuggestion | undefined, keepExisting
   };
 }
 
-export function useIdeas(roomCode: string | null) {
+export function useIdeas(roomCode: string | null, accessToken: string | undefined) {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   // Undefined = derive the places from the trip (see seedPlaces); set once edited.
   const [customPlaces, setCustomPlaces] = useState<string[] | undefined>();
@@ -135,7 +135,7 @@ export function useIdeas(roomCode: string | null) {
   async function loadMetadata(idea: Idea, index: PlaceIndex): Promise<Idea | null> {
     if (!roomCode || (idea.platform !== "tiktok" && idea.platform !== "youtube")) return null;
     setLoadingIds((prev) => new Set(prev).add(idea.id));
-    const meta = await fetchMetadata(roomCode, idea);
+    const meta = await fetchMetadata(roomCode, accessToken, idea);
     setLoadingIds((prev) => {
       const next = new Set(prev);
       next.delete(idea.id);

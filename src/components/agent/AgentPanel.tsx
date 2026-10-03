@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
+import { LIMITS } from "@/constants/limits";
 
 export interface AgentChatMessage {
   role: "user" | "assistant";
@@ -19,6 +21,7 @@ const EXAMPLES = [
 
 interface AgentPanelProps {
   roomCode: string;
+  accessToken: string | undefined;
   messages: AgentChatMessage[];
   setMessages: React.Dispatch<React.SetStateAction<AgentChatMessage[]>>;
   className?: string;
@@ -26,7 +29,7 @@ interface AgentPanelProps {
   embedded?: boolean;
 }
 
-export default function AgentPanel({ roomCode, messages, setMessages, className, embedded }: AgentPanelProps) {
+export default function AgentPanel({ roomCode, accessToken, messages, setMessages, className, embedded }: AgentPanelProps) {
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -66,7 +69,7 @@ export default function AgentPanel({ roomCode, messages, setMessages, className,
     abortRef.current = controller;
 
     try {
-      const res = await fetch(`/api/rooms/${roomCode}/agent`, {
+      const res = await apiFetch(`/api/rooms/${roomCode}/agent`, accessToken, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: history.map(({ role, content }) => ({ role, content })) }),
@@ -161,6 +164,7 @@ export default function AgentPanel({ roomCode, messages, setMessages, className,
       <div className="flex gap-1.5 border-t border-border p-2.5 pb-[max(10px,env(safe-area-inset-bottom))] md:pb-2.5">
         <Textarea
           value={draft}
+          maxLength={LIMITS.chatMessage}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {

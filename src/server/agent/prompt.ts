@@ -1,10 +1,10 @@
-import { CATEGORIES } from "@/constants/categories";
+import { CATEGORIES, EVENT_CATEGORY_KEYS } from "@/constants/categories";
 import { TASK_CATEGORIES } from "@/constants/taskCategories";
 
 // Built from typed constants at module load — deterministic, so the rendered
 // system prompt stays byte-stable across requests and the prompt cache holds.
-const eventCats = Object.entries(CATEGORIES)
-  .map(([key, c]) => `${key} ("${c.label}")`)
+const eventCats = EVENT_CATEGORY_KEYS
+  .map((key) => `${key} ("${CATEGORIES[key].label}")`)
   .join(", ");
 const taskCats = Object.entries(TASK_CATEGORIES)
   .map(([key, c]) => `${key} ("${c.label}")`)

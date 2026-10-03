@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { normalizeRoomCode } from "@/lib/validate";
+import { requireMember } from "@/server/auth";
+import { errorResponse, roomCodeParam } from "@/server/http";
+import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
 import { detectPlatform } from "@/utils/ideas";
 import { fetchTikTokData, resolveTikTokUrl } from "@/server/tiktok";
 
@@ -27,9 +29,14 @@ async function fetchOEmbed(endpoint: string): Promise<OEmbed | null> {
 // and without API keys. TikTok: caption, hashtags, keywords and the automatic
 // transcript from the video page (oEmbed as fallback). YouTube: oEmbed.
 // Instagram requires a Meta app token, so it returns nothing.
+// Members only (the dev-only LOCAL room excepted), so the server can't be used
+// as an open proxy for these platforms.
 export async function GET(req: Request, { params }: { params: Params }) {
-  if (!normalizeRoomCode((await params).code)) {
-    return NextResponse.json({ error: "Código inválido" }, { status: 400 });
+  try {
+    const code = roomCodeParam((await params).code);
+    if (!(LOCAL_MODE_ENABLED && code === LOCAL_ROOM_CODE)) await requireMember(req, code);
+  } catch (e) {
+    return errorResponse(e, "GET /api/rooms/[code]/oembed");
   }
 
   let url: URL;

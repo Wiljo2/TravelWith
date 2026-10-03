@@ -87,13 +87,15 @@ export default function ItineraryView({
       <>
         {toolbar}
         {main}
-        <button
-          onClick={() => onOpenSheet("agent")}
-          aria-label="Asistente"
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+76px)] right-4 z-30 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_6px_20px_rgba(4,52,44,.28)] active:scale-95"
-        >
-          <Sparkles className="size-6" />
-        </button>
+        {agent && (
+          <button
+            onClick={() => onOpenSheet("agent")}
+            aria-label="Asistente"
+            className="fixed bottom-[calc(env(safe-area-inset-bottom)+76px)] right-4 z-30 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_6px_20px_rgba(4,52,44,.28)] active:scale-95"
+          >
+            <Sparkles className="size-6" />
+          </button>
+        )}
         <BottomSheet
           open={sheet !== null}
           onOpenChange={(open) => { if (!open) onCloseSheet(); }}
@@ -112,11 +114,13 @@ export default function ItineraryView({
       <div className="flex items-start gap-5">
         <div className="min-w-0 flex-1">{main}</div>
         <aside className="sticky top-4 flex w-[340px] shrink-0 flex-col gap-3">
-          <div className="inline-flex gap-1 self-start rounded-full bg-muted p-1">
-            <ModeButton label="Detalle" active={panel === "detail"} onClick={() => setPanel("detail")} />
-            <ModeButton icon={Sparkles} label="Asistente" active={panel === "agent"} onClick={() => setPanel("agent")} />
-          </div>
-          {panel === "agent" ? agent : (
+          {agent && (
+            <div className="inline-flex gap-1 self-start rounded-full bg-muted p-1">
+              <ModeButton label="Detalle" active={panel === "detail"} onClick={() => setPanel("detail")} />
+              <ModeButton icon={Sparkles} label="Asistente" active={panel === "agent"} onClick={() => setPanel("agent")} />
+            </div>
+          )}
+          {panel === "agent" && agent ? agent : (
             <div className={cn(PANEL, "max-h-[calc(100dvh-7rem)] overflow-y-auto")}>
               {detail ?? (
                 <>

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import TaskOptions from "@/components/tasks/TaskOptions";
 import NoteLinks from "@/components/NoteLinks";
+import { LIMITS } from "@/constants/limits";
 import { useIsTouch } from "@/hooks/useMediaQuery";
 
 interface TasksViewProps {
@@ -91,6 +92,7 @@ export default function TasksView({ days, tasks, people, exchangeRate, onAdd, on
             <Input
               ref={inputRef}
               value={draft}
+              maxLength={LIMITS.title}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="Nueva tarea, cosa por decidir..."
@@ -197,6 +199,7 @@ function TaskRow({
           <Input
             autoFocus
             value={editValue}
+            maxLength={LIMITS.title}
             onChange={(e) => onEditChange(e.target.value)}
             onBlur={onCommitEdit}
             onKeyDown={(e) => { if (e.key === "Enter") onCommitEdit(); if (e.key === "Escape") onCancelEdit(); }}
@@ -294,6 +297,7 @@ function TaskRow({
           <textarea
             ref={noteRef}
             value={task.note ?? ""}
+            maxLength={LIMITS.note}
             onChange={(e) => {
               onUpdate({ note: e.target.value });
               e.target.style.height = "auto";
