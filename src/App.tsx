@@ -6,6 +6,8 @@ import { useRoom } from "@/hooks/useRoom";
 import { useTripSession } from "@/hooks/useTripSession";
 import { useTasks } from "@/hooks/useTasks";
 import { useIdeas } from "@/hooks/useIdeas";
+import { useTripGeo } from "@/hooks/useTripGeo";
+import { chooseOption } from "@/utils/taskDecision";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { snapHour } from "@/utils/time";
 import { extraGroupUSD } from "@/utils/currency";
@@ -18,10 +20,13 @@ import HomeView from "@/components/home/HomeView";
 import TabBar from "@/components/TabBar";
 import type { Tab } from "@/components/TabBar";
 import AppHeader from "@/components/AppHeader";
+import OfflineBanner from "@/components/OfflineBanner";
+import { downloadTripPdf } from "@/lib/tripPdf";
 import Toast from "@/components/Toast";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
 import IdeasTab from "@/components/ideas/IdeasTab";
+import ItineraryMap from "@/components/map/ItineraryMap";
 import type { MockPerson, RoomPayload, Task, ToastAction, TripInfo, TripSpan } from "@/types";
 import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
 import { generateDays, tripDayIndex } from "@/utils/tripDays";
@@ -45,7 +50,7 @@ export default function App() {
   const [sheet, setSheet] = useState<ItinerarySheet | null>(null);
   const [agentMessages, setAgentMessages] = useState<AgentChatMessage[]>([]);
 
-  const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, loadDays, removeDaySpan, updateDaySpan } = useItinerary();
+  const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, setDaySub, loadDays, removeDaySpan, updateDaySpan } = useItinerary();
   const { extras, exchangeRate, setExchangeRate, updateExtra, addExtra, removeExtra, loadBudget } = useBudget();
   const [mockPeople, setMockPeople] = useState<MockPerson[]>([]);
   const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
@@ -53,6 +58,7 @@ export default function App() {
   const ideasApi = useIdeas(roomCode, session?.access_token);
   const { ideas, loadPayload: loadIdeasPayload, payload: ideasPayload, customPlaces, planLinks, planLinksAt, planIdeaIds } = ideasApi;
   const [trip, setTrip] = useState<TripInfo | null>(null);
+  const geoApi = useTripGeo();
 
   function addTripSpan(span: TripSpan) { setTripSpans((p) => [...p, span]); }
   function removeTripSpan(id: string)  { setTripSpans((p) => p.filter((s) => s.id !== id)); }
@@ -65,29 +71,7 @@ export default function App() {
     setMockPeople((prev) => prev.filter((p) => p.id !== id));
   }
 
-  // Confirm a decision: choosing an option promotes the task to a real activity
-  // (a calendar event if it's scheduled) plus a budget line, then removes the task.
-  function chooseTaskOption(taskId: string, optionId: string) {
-    const task = tasks.find((t) => t.id === taskId);
-    const option = task?.options?.find((o) => o.id === optionId);
-    if (!task || !option) return;
-
-    let linkedEventId: string | undefined;
-    if (task.dayId && task.start != null) {
-      const end = task.end ?? Math.min(task.start + 1, HOUR_END);
-      linkedEventId = addEvent(task.dayId, task.title, task.start, end, option.note ?? "", "logist");
-    }
-    if (option.amount && option.amount > 0) {
-      addExtra({
-        label: `${task.title}: ${option.label}`,
-        amount: option.amount,
-        currency: option.currency ?? "USD",
-        splitMode: option.splitMode ?? "group",
-        linkedEventId,
-      });
-    }
-    deleteTask(taskId);
-  }
+  const chooseTaskOption = (taskId: string, optionId: string) => chooseOption(tasks, taskId, optionId, { addEvent, addExtra, deleteTask });
 
   // Swap the whole contents of two days (events + spans) and their scheduled tasks.
   function swapDaysWithTasks(aId: string, bId: string) {
@@ -107,9 +91,10 @@ export default function App() {
     if (Array.isArray(payload.tripSpans))  setTripSpans(payload.tripSpans);
     if (Array.isArray(payload.tasks))      setTasks(payload.tasks);
     loadIdeasPayload(payload);
-  }, [loadDays, loadBudget, loadIdeasPayload]);
+    geoApi.loadPayload(payload);
+  }, [loadDays, loadBudget, loadIdeasPayload, geoApi.loadPayload]);
 
-  const { connected, members, saveState, save } = useRoom(roomCode, session?.access_token, onRemoteUpdate);
+  const { connected, offlineSince, members, saveState, save } = useRoom(roomCode, session?.access_token, onRemoteUpdate);
 
   // useRoom fetches nothing for LOCAL, so the mock payload is seeded here. The
   // ref keeps edits from being wiped: onRemoteUpdate is a new function each render.
@@ -134,6 +119,9 @@ export default function App() {
     updateExtra(extraId, { linkedEventId: eventId });
   }, [updateExtra]);
 
+  // The whole trip as stored in the room, right now.
+  const payloadNow = (): RoomPayload => ({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ...ideasPayload, ...geoApi.payload });
+
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!roomCode || roomCode === "LOCAL") return;
@@ -141,12 +129,10 @@ export default function App() {
     // state would overwrite the real trip.
     if (!connected) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      save({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ...ideasPayload });
-    }, 600);
+    saveTimer.current = setTimeout(() => save(payloadNow()), 600);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, planLinks, planLinksAt, planIdeaIds, roomCode, connected]);
+  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, planLinks, planLinksAt, planIdeaIds, geoApi.eventPlaces, roomCode, connected]);
 
   function handleSelect(id: string | null) {
     setSelectedId(id);
@@ -248,7 +234,9 @@ export default function App() {
           }
         }}
         onLeaveRoom={() => { localSeeded.current = false; setRoomCode(null); }}
+        onDownloadPdf={(kind) => downloadTripPdf(kind, { trip, days, travelers: [...members, ...mockPeople].map((p) => p.name) })}
       />
+      {offlineSince && <OfflineBanner since={offlineSince} />}
 
       <TabBar active={activeTab} onChange={setActiveTab} pendingTaskCount={pendingTaskCount} />
 
@@ -295,6 +283,7 @@ export default function App() {
               onAdd={openSlot}
               onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
               onToggleTask={toggleTask}
+              onSetDaySub={setDaySub}
             />
           }
           grid={
@@ -317,10 +306,25 @@ export default function App() {
             onToggleTask={toggleTask}
             onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
             onSwapDays={swapDaysWithTasks}
+            onSetDaySub={setDaySub}
             pendingNew={slotDraft && !slotDraft.task ? { dayId: slotDraft.dayId, hour: slotDraft.hour } : null}
             initialDayIdx={todayIdx}
           />
           }
+        />
+      )}
+
+      {activeTab === "map" && (
+        <ItineraryMap
+          geo={geoApi}
+          days={days}
+          todayIdx={todayIdx}
+          roomCode={roomCode}
+          accessToken={session?.access_token}
+          localMode={localMode}
+          currentPayload={payloadNow}
+          save={save}
+          onOpenEvent={(id) => { setActiveTab("calendar"); handleSelect(id); }}
         />
       )}
 
@@ -334,7 +338,7 @@ export default function App() {
           accessToken={session?.access_token}
           days={days}
           trip={trip}
-          currentPayload={() => ({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ...ideasPayload })}
+          currentPayload={payloadNow}
           save={save}
         />
       )}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRooms } from "@/hooks/useUserRooms";
 import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
+import { isOffline, lastSnapshotCode } from "@/lib/offline";
 
 // Which trip (room) is open, plus the signed-in user and their trips.
 export function useTripSession() {
@@ -23,7 +24,10 @@ export function useTripSession() {
     if (resumeAttempted) return;
     if (authLoading || userRooms.roomsLoading) return;
     setResumeAttempted(true);
-    if (user && userRooms.rooms.length === 1) setRoomCode(userRooms.rooms[0].room_code);
+    // Without network, reopen the last trip this device saved, signed in or not.
+    const offlineRoom = isOffline() ? lastSnapshotCode() : null;
+    if (offlineRoom) setRoomCode(offlineRoom);
+    else if (user && userRooms.rooms.length === 1) setRoomCode(userRooms.rooms[0].room_code);
   }, [resumeAttempted, authLoading, userRooms.roomsLoading, user, userRooms.rooms]);
 
   // `?local=1` boots straight into local mode, skipping sign-in and the

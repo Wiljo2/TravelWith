@@ -2,11 +2,12 @@
 import { useEffect, useMemo } from "react";
 import type { User } from "@supabase/supabase-js";
 import IdeasView from "@/components/ideas/IdeasView";
+import { useFreshThumbnails } from "@/hooks/useFreshThumbnails";
 import { CLASSIFIER_VERSION, placeIndex } from "@/utils/ideas";
 import { isVenue, tripPlaces } from "@/utils/places";
 import type { useIdeas } from "@/hooks/useIdeas";
 import { apiFetch } from "@/lib/api";
-import type { Day, IdeaLink, RoomPayload, TripInfo } from "@/types";
+import type { Day, IdeaLink, IdeaPlanResult, RoomPayload, TripInfo } from "@/types";
 
 interface IdeasTabProps {
   api: ReturnType<typeof useIdeas>;
@@ -34,6 +35,8 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, acces
   // Re-run the rules on existing ideas when the places or the rules change.
   const placesKey = `v${CLASSIFIER_VERSION}|${index.places.map((p) => p.name).join("|")}`;
   useEffect(() => { reclassify(index, placesKey); }, [placesKey, api.ideas.length]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed by the place list
+  // Expired TikTok covers are renewed in the background, for the whole group.
+  useFreshThumbnails(roomCode, api.ideas, (id, thumbnail) => api.updateIdea(id, { thumbnail }));
   const voter = user?.id ?? "local";
   const addedBy = user ? String(user.user_metadata?.full_name ?? user.email ?? "").split(" ")[0] || undefined : undefined;
 
@@ -52,21 +55,29 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, acces
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !Array.isArray(data?.links)) throw new Error(data?.error ?? "No se pudo analizar");
-    return { links: data.links as IdeaLink[], at: data.at as string, ideaIds: (data.ideaIds ?? []) as string[] };
+    return {
+      links: data.links as IdeaLink[],
+      classes: (data.classes ?? []) as IdeaPlanResult["classes"],
+      at: data.at as string,
+      ideaIds: (data.ideaIds ?? []) as string[],
+    };
   }
 
   return (
     <IdeasView
       ideas={api.ideas}
       index={index}
+      roomCode={roomCode}
       loadingIds={api.loadingIds}
       mobile={mobile}
       voter={voter}
       onAdd={(text, note) => api.addFromText(text, note, addedBy, index)}
       onUpdate={api.updateIdea}
+      onSetPlace={api.setPlaceByHand}
+      onSetCat={api.setCatByHand}
       onRemove={api.removeIdea}
       onVote={(id) => api.toggleVote(id, voter)}
-      onApplySuggestions={api.applySuggestions}
+      onApplyClaude={(classes) => api.applyClaude(classes, index.places.map((p) => p.name))}
       onAcceptAll={api.acceptAllSuggestions}
       onSetNote={(id, note) => api.setNote(id, note, index)}
       onRetry={(id) => api.refreshMetadata(id, index)}

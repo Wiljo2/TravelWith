@@ -43,6 +43,10 @@ describe("seedPlaces", () => {
     ]);
   });
 
+  it("reads a ship's name as the cruise", () => {
+    expect(seedPlaces("Orlando · Miami · Wonder of the Seas", [])).toEqual(["Orlando", "Miami", "Crucero"]);
+  });
+
   it("works for a fresh trip with empty subtitles", () => {
     expect(seedPlaces("Cartagena, San Andrés", [])).toEqual(["Cartagena", "San Andrés"]);
   });

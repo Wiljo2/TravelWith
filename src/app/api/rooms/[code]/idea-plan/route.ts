@@ -11,11 +11,11 @@ import type { RoomPayload } from "@/types";
 
 type Params = Promise<{ code: string }>;
 
-// POST /api/rooms/[code]/idea-plan — "Analizar con Claude": where each idea fits
-// the itinerary. Members only, and it counts against the caller's daily
-// assistant token quota (it is a paid Claude call). Reads the room from the
-// database (the client can't inject a different plan); only the dev-only LOCAL
-// demo room sends its payload inline.
+// POST /api/rooms/[code]/idea-plan — "Analizar con Claude": each idea's place,
+// type and where it fits the itinerary. Members only, and it counts against the
+// caller's daily assistant token quota (it is a paid Claude call). Reads the
+// room from the database (the client can't inject a different plan); only the
+// dev-only LOCAL demo room sends its payload inline.
 // Body: { ideaIds?: string[] } to analyze only those ideas (the new ones), and
 // { payload } for the LOCAL room.
 export async function POST(req: Request, { params }: { params: Params }) {
@@ -44,9 +44,9 @@ export async function POST(req: Request, { params }: { params: Params }) {
   }
 
   try {
-    const { links, ideaIds: analyzed, usage } = await planIdeasWithClaude(payload, ideaIds);
+    const { links, classes, ideaIds: analyzed, usage } = await planIdeasWithClaude(payload, ideaIds);
     if (userId) await recordUsage(userId, code, usage);
-    return NextResponse.json({ links, ideaIds: analyzed, at: new Date().toISOString(), usage });
+    return NextResponse.json({ links, classes, ideaIds: analyzed, at: new Date().toISOString(), usage });
   } catch (e) {
     if (e instanceof IdeaPlanError) return NextResponse.json({ error: e.message }, { status: 503 });
     if (e instanceof Anthropic.RateLimitError) return NextResponse.json({ error: "Claude está ocupado, intenta en un minuto." }, { status: 429 });

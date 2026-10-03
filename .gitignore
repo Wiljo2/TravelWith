@@ -25,6 +25,8 @@ dist-ssr
 .next
 
 .vercel
+/claude
+/public/vendor
 
 # Build artifacts and personal tool settings
 *.tsbuildinfo

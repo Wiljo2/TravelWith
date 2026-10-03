@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { loadSnapshot } from "@/lib/offline";
 
 interface RoomGateProps {
   onEnter: (code: string) => void;
@@ -45,9 +46,15 @@ export default function RoomGate({
     if (!c) return;
     setLoading(true);
     setError("");
-    const res = await apiFetch(`/api/rooms/${c}/members`, session?.access_token, { method: "POST" });
-    if (!res.ok) {
-      setError(res.status === 404 ? "Sala no encontrada." : "No se pudo entrar al viaje.");
+    const res = await apiFetch(`/api/rooms/${c}/members`, session?.access_token, { method: "POST" }).catch(() => null);
+    // Offline: open this device's last copy of the trip, if it has one.
+    if (!res && loadSnapshot(c)) {
+      setLoading(false);
+      onEnter(c);
+      return;
+    }
+    if (!res?.ok) {
+      setError(res?.status === 404 ? "Sala no encontrada." : "No se pudo entrar al viaje.");
       setLoading(false);
       return;
     }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
+import { loadSnapshot, saveSnapshot, updateSnapshotPayload } from "@/lib/offline";
 import type { RoomMember, RoomPayload } from "@/types";
 
 export type { MockPerson, RoomPayload } from "@/types";
@@ -9,6 +10,9 @@ export type SaveState = "idle" | "saving" | "saved" | "error";
 
 interface UseRoomResult {
   connected: boolean;
+  // Set while the room couldn't be reached and the device's last copy is shown:
+  // when that copy was taken (ISO).
+  offlineSince: string | null;
   members: RoomMember[];
   saveState: SaveState;
   // Resolves true only when this payload reached the database. `force` saves even
@@ -24,6 +28,9 @@ export function useRoom(
   const [connected, setConnected] = useState(false);
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [offlineSince, setOfflineSince] = useState<string | null>(null);
+  // Bumped when the network comes back, to load the room again.
+  const [attempt, setAttempt] = useState(0);
   const skipSave = useRef(false);
   const lastUpdatedAt = useRef<string | null>(null);
   // Tokens refresh about hourly; a ref keeps saves current without resubscribing.
@@ -67,6 +74,7 @@ export function useRoom(
 
         const data = await res.json();
         if (data?.updated_at) lastUpdatedAt.current = data.updated_at;
+        updateSnapshotPayload(code, payload);
         setSaveState("saved");
         return true;
       } catch {
@@ -91,13 +99,25 @@ export function useRoom(
         if (p?.days && Array.isArray(p.days)) {
           skipSave.current = true;
           onRemoteUpdate(p);
+          saveSnapshot(code, { payload: p, members: Array.isArray(data?.members) ? data.members : [] });
         }
         if (Array.isArray(data?.members)) {
           setMembers(data.members);
         }
+        setOfflineSince(null);
         setConnected(true);
       })
-      .catch(() => setConnected(false));
+      .catch(() => {
+        // No network: show this device's last copy, read-only (autosave waits
+        // for `connected`), and load the room again once the network is back.
+        setConnected(false);
+        const snap = loadSnapshot(code);
+        if (!snap) return;
+        skipSave.current = true;
+        onRemoteUpdate(snap.payload);
+        setMembers(snap.members);
+        setOfflineSince(snap.savedAt);
+      });
 
     if (!supabase) return;
 
@@ -115,6 +135,7 @@ export function useRoom(
           if (payloadChanged && r.payload?.days && Array.isArray(r.payload.days)) {
             skipSave.current = true;
             onRemoteUpdate(r.payload);
+            saveSnapshot(code, { payload: r.payload, members: Array.isArray(r.members) ? r.members : loadSnapshot(code)?.members ?? [] });
           }
           if (Array.isArray(r.members)) {
             setMembers(r.members);
@@ -128,7 +149,14 @@ export function useRoom(
       setConnected(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, hasToken]);
+  }, [code, hasToken, attempt]);
 
-  return { connected, members, saveState, save };
+  useEffect(() => {
+    if (!offlineSince) return;
+    const retry = () => setAttempt((n) => n + 1);
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [offlineSince]);
+
+  return { connected, offlineSince, members, saveState, save };
 }
