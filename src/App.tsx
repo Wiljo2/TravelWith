@@ -191,6 +191,7 @@ export default function App() {
     <ActivityDetail
       key={selectedEvent.ev.id}
       selected={selectedEvent}
+      place={geoApi.eventPlaces[selectedEvent.ev.id]}
       days={days}
       extras={extras}
       tripSpans={tripSpans}
@@ -382,8 +383,8 @@ export default function App() {
           dayLabel={days.find((d) => d.id === slotDraft.dayId)?.label ?? ""}
           hour={slotDraft.hour}
           existing={slotDraft.task}
-          onSaveActivity={({ title, note, cat, start, end }) => {
-            addEvent(slotDraft.dayId, title, start, end, note, cat);
+          onSaveActivity={({ title, note, cat, start, end, mapsUrl }) => {
+            addEvent(slotDraft.dayId, title, start, end, note, cat, mapsUrl);
             setSlotDraft(null);
           }}
           onSaveTask={(patch) => {

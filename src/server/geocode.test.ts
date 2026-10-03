@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { initialDays } from "@/data/initialDays";
 import { eventKey } from "@/utils/tripGeo";
-import { buildGeoPrompt } from "./geocode";
+import { buildGeoPrompt, placesFromLinks } from "./geocode";
 import type { EventPlace } from "@/types";
 
 const payload = (eventPlaces: Record<string, EventPlace> = {}) =>
@@ -27,5 +27,19 @@ describe("buildGeoPrompt", () => {
 
   it("gives each day its phase in the trip", () => {
     expect(buildGeoPrompt(payload()).user).toContain("crucero día 1 de 5 · embarque");
+  });
+});
+
+describe("placesFromLinks", () => {
+  const ev = { id: "x", title: "Cena", note: "ver https://www.google.com/maps/@25.1,-77.1,15z", start: 19, end: 20, cat: "comida" };
+
+  it("pins the exact spot of the activity's link, before a link in its note", async () => {
+    const own = "https://www.google.com/maps/place/Bayside+Marketplace/@25.77,-80.18,17z/data=!3d25.778231!4d-80.187108";
+    const places = await placesFromLinks([{ ...ev, mapsUrl: own }]);
+    expect(places.x).toMatchObject({ kind: "place", name: "Bayside Marketplace", lat: 25.778231, lng: -80.187108, source: "link" });
+  });
+
+  it("falls back to a link pasted in the note", async () => {
+    expect((await placesFromLinks([ev])).x).toMatchObject({ lat: 25.1, lng: -77.1 });
   });
 });

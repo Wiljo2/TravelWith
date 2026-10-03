@@ -32,7 +32,7 @@ export function useItinerary(): {
   setSelectedId: (id: string | null) => void;
   updateEvent: (patch: Partial<CalendarEvent>) => void;
   deleteEvent: () => void;
-  addEvent: (dayId: string, title: string, start: number, end: number, note?: string, cat?: string) => string;
+  addEvent: (dayId: string, title: string, start: number, end: number, note?: string, cat?: string, mapsUrl?: string) => string;
   moveEvent: (fromDayId: string, toDayId: string, ev: CalendarEvent, newStart: number) => void;
   swapDays: (aId: string, bId: string) => void;
   setDaySub: (dayId: string, sub: string) => void;
@@ -75,8 +75,8 @@ export function useItinerary(): {
     setSelectedId(null);
   }
 
-  function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = "miami") {
-    const nev: CalendarEvent = { id: uid(), start, end, title, cat, note };
+  function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = "miami", mapsUrl?: string) {
+    const nev: CalendarEvent = { id: uid(), start, end, title, cat, note, ...(mapsUrl ? { mapsUrl } : {}) };
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: [...d.events, nev] } : d)));
     setSelectedId(nev.id);
     return nev.id;
