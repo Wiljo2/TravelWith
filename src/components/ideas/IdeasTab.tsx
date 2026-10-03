@@ -2,6 +2,7 @@
 import { useEffect, useMemo } from "react";
 import type { User } from "@supabase/supabase-js";
 import IdeasView from "@/components/ideas/IdeasView";
+import { useFreshThumbnails } from "@/hooks/useFreshThumbnails";
 import { CLASSIFIER_VERSION, placeIndex } from "@/utils/ideas";
 import { isVenue, tripPlaces } from "@/utils/places";
 import type { useIdeas } from "@/hooks/useIdeas";
@@ -33,6 +34,8 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, days,
   // Re-run the rules on existing ideas when the places or the rules change.
   const placesKey = `v${CLASSIFIER_VERSION}|${index.places.map((p) => p.name).join("|")}`;
   useEffect(() => { reclassify(index, placesKey); }, [placesKey, api.ideas.length]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed by the place list
+  // Expired TikTok covers are renewed in the background, for the whole group.
+  useFreshThumbnails(roomCode, api.ideas, (id, thumbnail) => api.updateIdea(id, { thumbnail }));
   const voter = user?.id ?? "local";
   const addedBy = user ? String(user.user_metadata?.full_name ?? user.email ?? "").split(" ")[0] || undefined : undefined;
 
@@ -63,11 +66,14 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, days,
     <IdeasView
       ideas={api.ideas}
       index={index}
+      roomCode={roomCode}
       loadingIds={api.loadingIds}
       mobile={mobile}
       voter={voter}
       onAdd={(text, note) => api.addFromText(text, note, addedBy, index)}
       onUpdate={api.updateIdea}
+      onSetPlace={api.setPlaceByHand}
+      onSetCat={api.setCatByHand}
       onRemove={api.removeIdea}
       onVote={(id) => api.toggleVote(id, voter)}
       onApplyClaude={(classes) => api.applyClaude(classes, index.places.map((p) => p.name))}

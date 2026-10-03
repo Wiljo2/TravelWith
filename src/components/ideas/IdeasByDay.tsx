@@ -1,7 +1,8 @@
 "use client";
 import { useMemo } from "react";
-import { ClipboardList, Clock, Loader2 } from "lucide-react";
+import { ClipboardList, Clock, Loader2, Play } from "lucide-react";
 import { PANEL } from "@/components/home/shared";
+import IdeaThumb from "@/components/ideas/IdeaThumb";
 import { Disclosure } from "@/components/ui/disclosure";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { linkLabel } from "@/utils/linkify";
@@ -19,11 +20,16 @@ interface IdeasByDayProps {
   planLinks?: IdeaLink[];
   planLinksAt?: string;
   planIdeaIds?: string[];      // ideas the last analysis read
+  roomCode: string;
+  onOpen: (ideaId: string) => void;   // plays it in the idea viewer
 }
 
 // Read-only view: the itinerary as it is, with the ideas that fit each activity,
 // free gap or day, and what to do before the trip. Nothing here changes the plan.
-export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks, planLinksAt, planIdeaIds }: IdeasByDayProps) {
+export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks, planLinksAt, planIdeaIds, roomCode, onOpen }: IdeasByDayProps) {
+  const chip = (idea: Idea, key: string, link?: IdeaLink, context?: string) => (
+    <IdeaChip key={key} idea={idea} link={link} context={context} roomCode={roomCode} onOpen={() => onOpen(idea.id)} />
+  );
   // Ideas still being read aren't placed yet: their text is about to change.
   const active = useMemo(
     () => ideas.filter((i) => i.status !== "discarded" && !loadingIds.has(i.id)),
@@ -88,7 +94,7 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
           <h2 className="flex items-center gap-1.5 text-[15px] font-semibold"><ClipboardList className="size-4 text-emerald-700" />Antes del viaje</h2>
           <p className="text-[13px] text-muted-foreground">Qué comprar, reservar o decidir antes de salir</p>
           <ul className="mt-3 flex flex-col gap-1.5">
-            {before.map((l) => <IdeaChip key={`${l.ideaId}-before`} idea={byId.get(l.ideaId)!} link={l} context={`Para ${forWhat(l)}`} />)}
+            {before.map((l) => chip(byId.get(l.ideaId)!, `${l.ideaId}-before`, l, `Para ${forWhat(l)}`))}
           </ul>
         </section>
       )}
@@ -128,7 +134,7 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
                       : <><span className="w-[68px] shrink-0 tabular-nums text-muted-foreground">{g.time}</span><span className="font-medium">{g.title}</span></>}
                   </div>
                   <ul className="flex flex-col gap-1.5 md:pl-[76px]">
-                    {g.items.map((l) => <IdeaChip key={`${l.ideaId}-${g.key}`} idea={byId.get(l.ideaId)!} link={l} />)}
+                    {g.items.map((l) => chip(byId.get(l.ideaId)!, `${l.ideaId}-${g.key}`, l))}
                   </ul>
                 </div>
               ))}
@@ -136,7 +142,7 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
                 <div>
                   <div className="mb-1.5 text-[13px] font-medium text-secondary-foreground">Para el día</div>
                   <ul className="flex flex-col gap-1.5 md:pl-[76px]">
-                    {general.map((l) => <IdeaChip key={l.ideaId} idea={byId.get(l.ideaId)!} link={l} />)}
+                    {general.map((l) => chip(byId.get(l.ideaId)!, l.ideaId, l))}
                   </ul>
                 </div>
               )}
@@ -151,7 +157,7 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
             No encontramos dónde encajan en este viaje. Prueba &quot;Analizar con Claude&quot; o asígnales un lugar en &quot;Por lugar&quot;.
           </p>
           <ul className="flex flex-col gap-1.5">
-            {loose.map((i) => <IdeaChip key={i.id} idea={i} />)}
+            {loose.map((i) => chip(i, i.id))}
           </ul>
         </Disclosure>
       )}
@@ -159,7 +165,11 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
   );
 }
 
-function IdeaChip({ idea, link, context }: { idea: Idea; link?: IdeaLink; context?: string }) {
+// An idea under its moment of the plan: its cover (tap to play), what it is and
+// why it fits there.
+function IdeaChip({ idea, link, context, roomCode, onOpen }: {
+  idea: Idea; link?: IdeaLink; context?: string; roomCode: string; onOpen: () => void;
+}) {
   const type = idea.cat ?? idea.suggestion?.cat;
   const t = type ? IDEA_TYPES[type] : undefined;
   const heading = idea.note || idea.title || linkLabel(idea.url);
@@ -168,28 +178,27 @@ function IdeaChip({ idea, link, context }: { idea: Idea; link?: IdeaLink; contex
   const reason = link?.reason && !bare(heading).includes(bare(link.reason)) ? link.reason : undefined;
   return (
     <li>
-      <a
-        href={idea.url}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-start gap-2.5 rounded-xl bg-secondary px-2.5 py-2 hover:bg-muted"
-      >
-        {idea.thumbnail
-          // eslint-disable-next-line @next/next/no-img-element -- remote CDN thumbnails, not optimizable
-          ? <img src={idea.thumbnail} alt="" className="h-11 w-8 shrink-0 rounded-md object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-          : <span className="flex h-11 w-8 shrink-0 items-center justify-center rounded-md bg-card text-sm">{t?.icon ?? "💡"}</span>}
-        <span className="min-w-0 flex-1">
-          <span className="line-clamp-1 text-[13px] font-medium text-foreground">{heading}</span>
-          {context && <span className="block truncate text-xs font-medium text-emerald-700">{context}</span>}
+      <button onClick={onOpen} className="flex w-full cursor-pointer items-start gap-3 rounded-2xl bg-secondary p-2 text-left hover:bg-muted">
+        <span className="relative shrink-0">
+          <IdeaThumb idea={idea} roomCode={roomCode} className="h-[88px] w-[50px] rounded-xl" />
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="flex size-6 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur">
+              <Play className="size-3 fill-current" />
+            </span>
+          </span>
+        </span>
+        <span className="min-w-0 flex-1 py-0.5">
+          <span className="line-clamp-2 text-[13px] font-semibold leading-snug text-foreground">{heading}</span>
+          {context && <span className="mt-0.5 block truncate text-xs font-medium text-emerald-700">{context}</span>}
           {reason && (
-            <span className="mt-0.5 line-clamp-2 text-xs text-secondary-foreground">
+            <span className="mt-1 line-clamp-3 text-xs leading-snug text-secondary-foreground">
               {link?.source === "claude" && <span className="mr-1 font-semibold text-emerald-700">✨</span>}
               {reason}
             </span>
           )}
-          {!reason && t && <span className="text-xs text-muted-foreground">{t.icon} {t.label}</span>}
+          {!reason && t && <span className="mt-1 block text-xs text-muted-foreground">{t.icon} {t.label}</span>}
         </span>
-      </a>
+      </button>
     </li>
   );
 }

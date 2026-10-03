@@ -58,6 +58,11 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(index ? networkFirst(req, MAP_CACHE) : cacheFirst(req, MAP_CACHE));
     return;
   }
+  // Idea covers (an app route, so cacheable): seen once, shown offline too.
+  if (url.origin === self.location.origin && /^\/api\/rooms\/[^/]+\/thumb$/.test(url.pathname)) {
+    event.respondWith(cacheFirst(req, MAP_CACHE));
+    return;
+  }
   if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
 
   if (req.mode === "navigate") {

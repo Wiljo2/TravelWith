@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import type { RoomPayload } from "@/hooks/useRoom";
 import { canonicalUrl, classifyIdeaFields, detectPlatform, findIdeaUrls } from "@/utils/ideas";
 import type { IdeaTextFields, PlaceIndex } from "@/utils/ideas";
+import { tiktokVideoId } from "@/utils/ideaMedia";
 import type { Idea, IdeaLink, IdeaPlanResult, IdeaSuggestion } from "@/types";
 
 function rulesSuggestion(fields: IdeaTextFields, index: PlaceIndex): IdeaSuggestion | undefined {
@@ -9,7 +10,7 @@ function rulesSuggestion(fields: IdeaTextFields, index: PlaceIndex): IdeaSuggest
   return place || cat ? { place, cat, source: "rules" } : undefined;
 }
 
-type Meta = { title?: string; author?: string; thumbnail?: string; tags?: string[]; transcript?: string } | null;
+type Meta = { url?: string; title?: string; author?: string; thumbnail?: string; tags?: string[]; transcript?: string } | null;
 
 // Post data via the server: caption, author, thumbnail and, for TikTok, hashtags
 // and the automatic transcript (TikTok blocks these requests from browsers).
@@ -80,17 +81,27 @@ export function useIdeas(roomCode: string | null) {
     }));
   }
 
-  // Claude's reading of each idea's place and type. Unconfirmed fields take it
-  // as a suggestion; a confirmed field Claude reads differently gets one to review.
+  // Claude's reading of each idea's place and type is applied right away: one
+  // analysis updates both views. What a member set by hand stays as it is.
   function applyClaude(classes: IdeaPlanResult["classes"], places: string[]) {
     const byId = new Map(classes.map((c) => [c.ideaId, c]));
     setIdeas((prev) => prev.map((i) => {
       const c = byId.get(i.id);
       if (!c) return i;
-      const place = c.place && places.includes(c.place) && c.place !== i.place ? c.place : undefined;
-      const cat = c.cat && c.cat !== i.cat ? c.cat : undefined;
-      return { ...i, suggestion: place || cat ? { place, cat, source: "claude" } : undefined };
+      const place = c.place && places.includes(c.place) && !i.placeManual ? c.place : i.place;
+      const cat = c.cat && !i.catManual ? c.cat : i.cat;
+      const s = i.suggestion;
+      const keep = (!place && s?.place) || (!cat && s?.cat);
+      return { ...i, place, cat, suggestion: keep ? s : undefined };
     }));
+  }
+
+  // A place or type picked by hand: Claude's next analysis won't change it.
+  function setPlaceByHand(id: string, place: string | undefined) {
+    updateIdea(id, { place, placeManual: place ? true : undefined, suggestion: undefined });
+  }
+  function setCatByHand(id: string, cat: string | undefined) {
+    updateIdea(id, { cat, catManual: cat ? true : undefined, suggestion: undefined });
   }
 
   // Adds every new link found in `text`; returns how many were added.
@@ -137,6 +148,7 @@ export function useIdeas(roomCode: string | null) {
         title: meta.title,
         author: meta.author,
         thumbnail: meta.thumbnail,
+        embedId: (meta.url && tiktokVideoId(meta.url)) || i.embedId,
         tags: meta.tags ?? i.tags,
         transcript: meta.transcript ?? i.transcript,
       };
@@ -174,7 +186,9 @@ export function useIdeas(roomCode: string | null) {
         if (i.suggestion?.source === "claude") return { ...i, placesKey };
         const rules = rulesSuggestion(i, index);
         const ai = i.suggestion?.source === "ai" ? i.suggestion : undefined;
-        const place = rules?.place && rules.place !== i.place ? rules.place : i.place ? undefined : ai?.place;
+        // Only ideas without a place get one suggested: the rest were placed by
+        // Claude or by hand, and a second opinion would only add noise.
+        const place = i.place ? undefined : rules?.place ?? ai?.place;
         const cat = i.cat ? undefined : rules?.cat ?? ai?.cat;
         const fromRules = (place && place === rules?.place) || (!place && cat && cat === rules?.cat);
         const suggestion: IdeaSuggestion | undefined = place || cat ? { place, cat, source: fromRules ? "rules" : "ai" } : undefined;
@@ -207,6 +221,6 @@ export function useIdeas(roomCode: string | null) {
   return {
     ideas, loadingIds, customPlaces, setCustomPlaces, renamePlace,
     loadPayload, payload, planLinks, planLinksAt, planIdeaIds, savePlan,
-    updateIdea, removeIdea, toggleVote, applyClaude, acceptAllSuggestions, addFromText, refreshMetadata, setNote, reclassify,
+    updateIdea, removeIdea, toggleVote, applyClaude, setPlaceByHand, setCatByHand, acceptAllSuggestions, addFromText, refreshMetadata, setNote, reclassify,
   };
 }
