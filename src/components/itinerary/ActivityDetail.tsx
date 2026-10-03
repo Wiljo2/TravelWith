@@ -1,13 +1,15 @@
 "use client";
 import EventEditor from "@/components/editor/EventEditor";
 import LinkedExtrasSection from "@/components/itinerary/LinkedExtrasSection";
+import LocationSection from "@/components/itinerary/LocationSection";
 import RangesSection from "@/components/itinerary/RangesSection";
 import { Disclosure } from "@/components/ui/disclosure";
 import { extraGroupUSD, fmtUSD } from "@/utils/currency";
-import type { CalendarEvent, Day, Extra, TripSpan } from "@/types";
+import type { CalendarEvent, Day, EventPlace, Extra, TripSpan } from "@/types";
 
 interface ActivityDetailProps {
   selected: { ev: CalendarEvent; dayId: string };
+  place?: EventPlace;          // where the trip map located it
   days: Day[];
   extras: Extra[];
   tripSpans: TripSpan[];
@@ -25,7 +27,7 @@ interface ActivityDetailProps {
 
 // Everything about one activity: the essentials up front, money and ranges folded away.
 export default function ActivityDetail({
-  selected, days, extras, tripSpans, people, exchangeRate,
+  selected, place, days, extras, tripSpans, people, exchangeRate,
   onUpdate, onDelete, onMoveDay, onLinkExtra, onAddExtra, onRemoveExtra, onAddTripSpan, onRemoveTripSpan,
 }: ActivityDetailProps) {
   const linked = extras.filter((x) => x.linkedEventId === selected.ev.id);
@@ -41,6 +43,8 @@ export default function ActivityDetail({
         dayId={selected.dayId}
         onMoveDay={onMoveDay}
       />
+
+      <LocationSection ev={selected.ev} place={place} onSetLink={(mapsUrl) => onUpdate({ mapsUrl })} />
 
       <div className="mt-4">
         <Disclosure

@@ -220,57 +220,71 @@ function pinElement(stop: MapStop, n: number, color: string): HTMLElement {
   return el;
 }
 
-// Popup body, built as DOM (titles are user text: never as HTML).
+// Popup body, built as DOM (titles are user text: never as HTML). Sized to fit
+// without scrolling: a short photo with its credit on it, up to three
+// activities ("+N más" beyond), and the Google Maps buttons always in view.
+const POPUP_VISITS = 3;
+
 function popupContent(stop: MapStop, days: Day[], touch: boolean, onOpen: (eventId: string) => void): HTMLElement {
   const root = document.createElement("div");
-  root.className = cn("flex flex-col gap-1.5 overflow-y-auto text-[13px] text-foreground", touch ? "max-h-56" : "max-h-72");
+  root.className = "flex flex-col gap-1.5 text-[13px] text-foreground";
   if (stop.photo) {
+    const frame = document.createElement("div");
+    frame.className = cn("relative mb-0.5 w-full shrink-0 overflow-hidden rounded-lg bg-secondary", touch ? "h-24" : "h-28");
     const img = document.createElement("img");
     img.crossOrigin = "anonymous";   // a CORS image can be kept for offline use
     img.src = stop.photo;
     img.alt = "";
     img.loading = "lazy";
-    img.className = "mb-0.5 h-28 w-full shrink-0 rounded-lg bg-secondary object-cover";
-    img.onerror = () => img.remove();
-    root.append(img);
+    img.className = "size-full object-cover";
+    img.onerror = () => frame.remove();
+    frame.append(img);
+    if (stop.photoPage) {
+      const credit = document.createElement("a");
+      credit.href = stop.photoPage;
+      credit.target = "_blank";
+      credit.rel = "noreferrer";
+      credit.className = "absolute bottom-1 right-1 rounded bg-black/50 px-1.5 py-px text-[10px] text-white hover:underline";
+      credit.textContent = "Foto: Wikipedia";
+      frame.append(credit);
+    }
+    root.append(frame);
   }
   const title = document.createElement("strong");
-  title.className = "text-sm";
+  title.className = "text-sm leading-snug";
   title.textContent = stop.name;
   root.append(title);
-  for (const v of stop.visits) {
+  for (const v of stop.visits.slice(0, POPUP_VISITS)) {
     const row = document.createElement("button");
     row.type = "button";
-    row.className = "flex cursor-pointer items-baseline gap-1.5 rounded-md text-left hover:underline";
+    row.className = "flex cursor-pointer items-baseline gap-1.5 rounded-md text-left text-xs leading-snug hover:underline";
     const dot = document.createElement("span");
     dot.className = "size-2 shrink-0 rounded-full";
     dot.style.background = dayColor(v.dayIdx);
     const text = document.createElement("span");
+    text.className = "line-clamp-1";
     text.textContent = `${days[v.dayIdx]?.label.split("·")[0].trim() ?? ""} ${days[v.dayIdx]?.label.split("·")[1]?.trim() ?? ""} · ${fmtHour(v.start)} — ${v.title}`;
     row.append(dot, text);
     row.onclick = () => onOpen(v.eventId);
     root.append(row);
   }
+  if (stop.visits.length > POPUP_VISITS) {
+    const more = document.createElement("span");
+    more.className = "pl-3.5 text-xs text-muted-foreground";
+    more.textContent = `+${stop.visits.length - POPUP_VISITS} más`;
+    root.append(more);
+  }
   const links = document.createElement("div");
-  links.className = "mt-1 flex gap-3 text-xs font-semibold";
+  links.className = "mt-1 flex flex-wrap gap-1.5";
   for (const [label, href] of [["Abrir en Google Maps", googleMapsPlaceUrl(stop)], ["Cómo llegar", googleMapsDirectionsUrl(stop)]]) {
     const a = document.createElement("a");
     a.href = href;
     a.target = "_blank";
     a.rel = "noreferrer";
-    a.className = "text-emerald-700 hover:underline";
+    a.className = "inline-flex items-center rounded-full border border-emerald-700/40 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-accent";
     a.textContent = label;
     links.append(a);
   }
   root.append(links);
-  if (stop.photo && stop.photoPage) {
-    const credit = document.createElement("a");
-    credit.href = stop.photoPage;
-    credit.target = "_blank";
-    credit.rel = "noreferrer";
-    credit.className = "text-[11px] text-muted-foreground hover:underline";
-    credit.textContent = "Foto: Wikipedia";
-    root.append(credit);
-  }
   return root;
 }

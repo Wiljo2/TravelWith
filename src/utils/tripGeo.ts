@@ -20,7 +20,8 @@ const REGION_ZOOMS = [4, 5, 6, 7, 8, 9];
 // vector tiles stop at zoom 14; the map draws closer views from those.
 const STOP_RADIUS_KM: Record<number, number> = { 10: 12, 11: 7, 12: 4, 13: 2.5, 14: 1.5 };
 
-export const eventKey = (ev: CalendarEvent) => normalizeText(`${ev.title}|${ev.note ?? ""}`).trim();
+export const eventKey = (ev: CalendarEvent) =>
+  normalizeText(`${ev.title}|${ev.note ?? ""}${ev.mapsUrl ? `|${ev.mapsUrl}` : ""}`).trim();
 
 // Places without a photo search yet (located before photos existed).
 export const missingPhotos = (places: Record<string, EventPlace>) =>
