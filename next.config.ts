@@ -20,7 +20,7 @@ function supabaseOrigins(): string {
 // - idea covers from TikTok/YouTube CDNs (the /thumb route is the same-origin fallback)
 // - the TikTok/YouTube players embedded in the idea viewer
 const MAP_TILES = "https://tiles.openfreemap.org";
-const PLACE_PHOTOS = "https://upload.wikimedia.org";
+const PLACE_PHOTOS = "https://upload.wikimedia.org https://thumb.wikimedia.org";
 const COVERS = "https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://i.ytimg.com";
 const PLAYERS = "https://www.tiktok.com https://www.youtube.com";
 
