@@ -139,6 +139,9 @@ export interface Idea {
   placesKey?: string;       // the place list its suggestion was computed with
   dayId?: string;           // legacy, ignored
   eventId?: string;         // legacy, ignored
+  embedId?: string;         // TikTok video id, for the in-app player (short links don't carry it)
+  placeManual?: boolean;    // place set by hand: "Analizar con Claude" leaves it alone
+  catManual?: boolean;      // type set by hand: likewise
 }
 
 // Where an idea fits the existing plan — shown read-only, never schedules anything.

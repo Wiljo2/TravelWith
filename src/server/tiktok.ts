@@ -22,6 +22,9 @@ export function isSubtitleUrl(raw: string): boolean {
   }
 }
 
+// Video covers come from the same CDNs.
+export const isTikTokCdnUrl = isSubtitleUrl;
+
 export interface TikTokData {
   title?: string;        // caption
   author?: string;
