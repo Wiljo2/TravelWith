@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import type { RoomPayload } from "@/hooks/useRoom";
 import { canonicalUrl, classifyIdeaFields, detectPlatform, findIdeaUrls } from "@/utils/ideas";
 import type { IdeaTextFields, PlaceIndex } from "@/utils/ideas";
-import type { Idea, IdeaLink, IdeaSuggestion } from "@/types";
+import type { Idea, IdeaLink, IdeaPlanResult, IdeaSuggestion } from "@/types";
 
 function rulesSuggestion(fields: IdeaTextFields, index: PlaceIndex): IdeaSuggestion | undefined {
   const { place, cat } = classifyIdeaFields(fields, index);
@@ -80,13 +80,17 @@ export function useIdeas(roomCode: string | null) {
     }));
   }
 
-  // AI suggestions only fill gaps: they never overwrite what the group confirmed,
-  // nor a rules match (rules key off exact place names and keywords).
-  // Returns how many ideas actually got something new.
-  function applySuggestions(suggestions: Map<string, IdeaSuggestion>): number {
-    const added = ideas.filter((i) => mergeSuggestion(i, suggestions.get(i.id), true)).length;
-    setIdeas((prev) => prev.map((i) => mergeSuggestion(i, suggestions.get(i.id), true) ?? i));
-    return added;
+  // Claude's reading of each idea's place and type. Unconfirmed fields take it
+  // as a suggestion; a confirmed field Claude reads differently gets one to review.
+  function applyClaude(classes: IdeaPlanResult["classes"], places: string[]) {
+    const byId = new Map(classes.map((c) => [c.ideaId, c]));
+    setIdeas((prev) => prev.map((i) => {
+      const c = byId.get(i.id);
+      if (!c) return i;
+      const place = c.place && places.includes(c.place) && c.place !== i.place ? c.place : undefined;
+      const cat = c.cat && c.cat !== i.cat ? c.cat : undefined;
+      return { ...i, suggestion: place || cat ? { place, cat, source: "claude" } : undefined };
+    }));
   }
 
   // Adds every new link found in `text`; returns how many were added.
@@ -166,6 +170,8 @@ export function useIdeas(roomCode: string | null) {
       const next = prev.map((i) => {
         if (i.placesKey === placesKey || i.status === "discarded") return i;
         changed = true;
+        // Claude read the whole video and the trip: the rules don't override it.
+        if (i.suggestion?.source === "claude") return { ...i, placesKey };
         const rules = rulesSuggestion(i, index);
         const ai = i.suggestion?.source === "ai" ? i.suggestion : undefined;
         const place = rules?.place && rules.place !== i.place ? rules.place : i.place ? undefined : ai?.place;
@@ -201,6 +207,6 @@ export function useIdeas(roomCode: string | null) {
   return {
     ideas, loadingIds, customPlaces, setCustomPlaces, renamePlace,
     loadPayload, payload, planLinks, planLinksAt, planIdeaIds, savePlan,
-    updateIdea, removeIdea, toggleVote, applySuggestions, acceptAllSuggestions, addFromText, refreshMetadata, setNote, reclassify,
+    updateIdea, removeIdea, toggleVote, applyClaude, acceptAllSuggestions, addFromText, refreshMetadata, setNote, reclassify,
   };
 }

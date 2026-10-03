@@ -1,17 +1,15 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { Clock, Loader2, Sparkles } from "lucide-react";
+import { useMemo } from "react";
+import { ClipboardList, Clock, Loader2 } from "lucide-react";
 import { PANEL } from "@/components/home/shared";
-import { Button } from "@/components/ui/button";
 import { Disclosure } from "@/components/ui/disclosure";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
-import { isModelCached, matchEventsWithAI } from "@/lib/ideaAI";
 import { linkLabel } from "@/utils/linkify";
 import { matchIdeasToPlan } from "@/utils/ideaPlan";
-import { findPlace, type TripPlace } from "@/utils/places";
+import type { TripPlace } from "@/utils/places";
 import { fmtHour } from "@/utils/time";
 import { cn } from "@/lib/utils";
-import type { Day, Idea, IdeaLink, IdeaPlanResult } from "@/types";
+import type { Day, Idea, IdeaLink } from "@/types";
 
 interface IdeasByDayProps {
   ideas: Idea[];
@@ -21,14 +19,11 @@ interface IdeasByDayProps {
   planLinks?: IdeaLink[];
   planLinksAt?: string;
   planIdeaIds?: string[];      // ideas the last analysis read
-  // Runs "Analizar con Claude" on the server (only `ideaIds` when given).
-  onAnalyze: (ideaIds?: string[]) => Promise<IdeaPlanResult>;
-  onSavePlan: (links: IdeaLink[], at: string, ideaIds: string[]) => void;
 }
 
 // Read-only view: the itinerary as it is, with the ideas that fit each activity,
-// free gap or day. Nothing here changes the plan.
-export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks, planLinksAt, planIdeaIds, onAnalyze, onSavePlan }: IdeasByDayProps) {
+// free gap or day, and what to do before the trip. Nothing here changes the plan.
+export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks, planLinksAt, planIdeaIds }: IdeasByDayProps) {
   // Ideas still being read aren't placed yet: their text is about to change.
   const active = useMemo(
     () => ideas.filter((i) => i.status !== "discarded" && !loadingIds.has(i.id)),
@@ -36,62 +31,29 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
   );
   const reading = ideas.filter((i) => loadingIds.has(i.id));
   const rules = useMemo(() => matchIdeasToPlan(active, days, places), [active, days, places]);
-  const [aiLinks, setAiLinks] = useState<IdeaLink[]>([]);
-  const [claude, setClaude] = useState<"idle" | "running" | { error: string }>("idle");
-
-  // Free model pass for ideas the rules couldn't tie to an activity — only when
-  // it's already downloaded (no surprise 118 MB on a phone).
-  const unmatched = useMemo(
-    () => active.filter((i) => !rules.some((l) => l.ideaId === i.id && l.eventId)),
-    [active, rules],
-  );
-  const unmatchedKey = unmatched.map((i) => `${i.id}:${i.note ?? ""}:${i.transcript?.length ?? 0}`).join("|");
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (unmatched.length === 0 || !(await isModelCached())) return;
-      const allowed = (i: Idea) => findPlace(places, i.place ?? i.suggestion?.place)?.dayIds ?? null;
-      const links = await matchEventsWithAI(unmatched, days, allowed, () => {}).catch(() => []);
-      if (!cancelled) setAiLinks(links);
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run only when unmatched ideas change
-  }, [unmatchedKey, days]);
 
   // Claude's analysis covers the ideas it actually read; the rest use the free
   // match. Analyses saved before the ids were recorded fall back to the linked ideas.
   const analyzedIds = new Set(planIdeaIds ?? (planLinks ?? []).map((l) => l.ideaId));
   const analyzed = (i: Idea) => !!planLinksAt && analyzedIds.has(i.id);
-  const fresh = planLinksAt ? active.filter((i) => !analyzed(i)) : [];
-  const newSinceAnalysis = fresh.length;
   // Links to activities removed from the plan since the analysis are dropped.
   const eventIds = new Set(days.flatMap((d) => d.events.map((e) => e.id)));
+  const dayIds = new Set(days.map((d) => d.id));
   const links: IdeaLink[] = active.flatMap((i) => {
-    if (analyzed(i)) return (planLinks ?? []).filter((l) => l.ideaId === i.id && (!l.eventId || eventIds.has(l.eventId)));
+    if (analyzed(i)) return (planLinks ?? []).filter((l) => l.ideaId === i.id && dayIds.has(l.dayId) && (!l.eventId || eventIds.has(l.eventId)));
     const own = rules.filter((l) => l.ideaId === i.id);
     const events = own.filter((l) => l.eventId);
-    if (events.length) return events;
-    const ai = aiLinks.filter((l) => l.ideaId === i.id);
-    return ai.length ? ai : own;
+    return events.length ? events : own;
   });
   const linkedIds = new Set(links.map((l) => l.ideaId));
   const loose = active.filter((i) => !linkedIds.has(i.id));
   const byId = new Map(active.map((i) => [i.id, i]));
-
-  // With a previous analysis, only the new ideas are sent (cheaper); the rest
-  // keep their links. "Todo de nuevo" re-reads everything (e.g. after plan changes).
-  async function analyze(onlyNew: boolean) {
-    setClaude("running");
-    try {
-      const ids = onlyNew ? fresh.map((i) => i.id) : undefined;
-      const { links: next, at, ideaIds: read } = await onAnalyze(ids);
-      const kept = ids ? (planLinks ?? []).filter((l) => !ids.includes(l.ideaId)) : [];
-      onSavePlan([...kept, ...next], at, ids ? [...new Set([...analyzedIds, ...read])] : read);
-      setClaude("idle");
-    } catch (e) {
-      setClaude({ error: e instanceof Error ? e.message : "No se pudo analizar" });
-    }
-  }
+  const before = links.filter((l) => l.before);
+  const forWhat = (l: IdeaLink) => {
+    const day = days.find((d) => d.id === l.dayId);
+    const ev = l.eventId ? day?.events.find((e) => e.id === l.eventId) : undefined;
+    return [day?.label.split("·")[0].trim(), ev?.title ?? day?.sub].filter(Boolean).join(" · ");
+  };
 
   const readingPanel = reading.length > 0 && (
     <section className={cn(PANEL, "flex flex-col gap-2")} aria-live="polite">
@@ -117,36 +79,22 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
   return (
     <div className="flex flex-col gap-4">
       {readingPanel}
-      <section className={cn(PANEL, "flex flex-col gap-3 bg-linear-to-br from-accent to-card md:flex-row md:items-center")}>
-        <p className="flex-1 text-[13px] leading-relaxed text-secondary-foreground">
-          Tus ideas sobre el itinerario que ya tienen: qué hacer o probar en cada actividad y en los ratos libres.
-          {" "}No cambia el plan.
-          {planLinksAt && (
-            <span className="mt-1 block text-xs text-muted-foreground">
-              Analizado con Claude el {new Date(planLinksAt).toLocaleDateString("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
-              {newSinceAnalysis > 0 && ` · ${newSinceAnalysis} ${newSinceAnalysis === 1 ? "idea nueva" : "ideas nuevas"} sin analizar`}
-            </span>
-          )}
-        </p>
-        <div className="flex flex-col items-start gap-1 md:items-end">
-          <Button onClick={() => analyze(newSinceAnalysis > 0)} disabled={claude === "running"} className="h-9 gap-1.5 rounded-full px-4 font-semibold">
-            {claude === "running" ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-            {claude === "running" ? "Analizando…"
-              : newSinceAnalysis > 0 ? `Analizar ${newSinceAnalysis === 1 ? "la nueva" : `las ${newSinceAnalysis} nuevas`}`
-              : planLinksAt ? "Analizar de nuevo" : "Analizar con Claude"}
-          </Button>
-          <span className="text-[11px] text-muted-foreground">
-            {newSinceAnalysis > 0 ? "Solo las nuevas · menos de 1 centavo" : "Más preciso y explica el porqué · ~1 centavo"}
-            {newSinceAnalysis > 0 && claude !== "running" && (
-              <> · <button onClick={() => analyze(false)} className="cursor-pointer underline underline-offset-2 hover:text-foreground">todo de nuevo</button></>
-            )}
-          </span>
-          {typeof claude === "object" && <span className="text-xs text-destructive">{claude.error}</span>}
-        </div>
-      </section>
+      <p className="text-[13px] leading-relaxed text-secondary-foreground">
+        Tus ideas sobre el itinerario que ya tienen: qué hacer o probar en cada actividad y en los ratos libres. No cambia el plan.
+      </p>
+
+      {before.length > 0 && (
+        <section className={PANEL}>
+          <h2 className="flex items-center gap-1.5 text-[15px] font-semibold"><ClipboardList className="size-4 text-emerald-700" />Antes del viaje</h2>
+          <p className="text-[13px] text-muted-foreground">Qué comprar, reservar o decidir antes de salir</p>
+          <ul className="mt-3 flex flex-col gap-1.5">
+            {before.map((l) => <IdeaChip key={`${l.ideaId}-before`} idea={byId.get(l.ideaId)!} link={l} context={`Para ${forWhat(l)}`} />)}
+          </ul>
+        </section>
+      )}
 
       {days.map((day) => {
-        const dayLinks = links.filter((l) => l.dayId === day.id);
+        const dayLinks = links.filter((l) => l.dayId === day.id && !l.before);
         if (dayLinks.length === 0) return null;
         const [weekday, date] = day.label.split("·").map((s) => s.trim());
         const eventGroups = [...day.events]
@@ -200,7 +148,7 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
       {loose.length > 0 && (
         <Disclosure title="Sin momento en el plan" hint={loose.length} className="border-b">
           <p className="mb-2 text-xs text-muted-foreground">
-            No encontramos dónde encajan. Asígnales un lugar en &quot;Por lugar&quot; o prueba &quot;Analizar con Claude&quot;.
+            No encontramos dónde encajan en este viaje. Prueba &quot;Analizar con Claude&quot; o asígnales un lugar en &quot;Por lugar&quot;.
           </p>
           <ul className="flex flex-col gap-1.5">
             {loose.map((i) => <IdeaChip key={i.id} idea={i} />)}
@@ -211,7 +159,7 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
   );
 }
 
-function IdeaChip({ idea, link }: { idea: Idea; link?: IdeaLink }) {
+function IdeaChip({ idea, link, context }: { idea: Idea; link?: IdeaLink; context?: string }) {
   const type = idea.cat ?? idea.suggestion?.cat;
   const t = type ? IDEA_TYPES[type] : undefined;
   const heading = idea.note || idea.title || linkLabel(idea.url);
@@ -232,6 +180,7 @@ function IdeaChip({ idea, link }: { idea: Idea; link?: IdeaLink }) {
           : <span className="flex h-11 w-8 shrink-0 items-center justify-center rounded-md bg-card text-sm">{t?.icon ?? "💡"}</span>}
         <span className="min-w-0 flex-1">
           <span className="line-clamp-1 text-[13px] font-medium text-foreground">{heading}</span>
+          {context && <span className="block truncate text-xs font-medium text-emerald-700">{context}</span>}
           {reason && (
             <span className="mt-0.5 line-clamp-2 text-xs text-secondary-foreground">
               {link?.source === "claude" && <span className="mr-1 font-semibold text-emerald-700">✨</span>}

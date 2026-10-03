@@ -6,7 +6,7 @@ import { CLASSIFIER_VERSION, placeIndex } from "@/utils/ideas";
 import { isVenue, tripPlaces } from "@/utils/places";
 import type { useIdeas } from "@/hooks/useIdeas";
 import type { RoomPayload } from "@/hooks/useRoom";
-import type { Day, IdeaLink, TripInfo } from "@/types";
+import type { Day, IdeaLink, IdeaPlanResult, TripInfo } from "@/types";
 
 interface IdeasTabProps {
   api: ReturnType<typeof useIdeas>;
@@ -51,7 +51,12 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, days,
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !Array.isArray(data?.links)) throw new Error(data?.error ?? "No se pudo analizar");
-    return { links: data.links as IdeaLink[], at: data.at as string, ideaIds: (data.ideaIds ?? []) as string[] };
+    return {
+      links: data.links as IdeaLink[],
+      classes: (data.classes ?? []) as IdeaPlanResult["classes"],
+      at: data.at as string,
+      ideaIds: (data.ideaIds ?? []) as string[],
+    };
   }
 
   return (
@@ -65,7 +70,7 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, days,
       onUpdate={api.updateIdea}
       onRemove={api.removeIdea}
       onVote={(id) => api.toggleVote(id, voter)}
-      onApplySuggestions={api.applySuggestions}
+      onApplyClaude={(classes) => api.applyClaude(classes, index.places.map((p) => p.name))}
       onAcceptAll={api.acceptAllSuggestions}
       onSetNote={(id, note) => api.setNote(id, note, index)}
       onRetry={(id) => api.refreshMetadata(id, index)}

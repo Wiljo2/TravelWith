@@ -6,6 +6,7 @@ import { cssZoom } from "@/utils/zoom";
 import { EventCard } from "./EventBlock";
 import EventBlock from "./EventBlock";
 import TaskBlock from "./TaskBlock";
+import DaySubtitle from "@/components/itinerary/DaySubtitle";
 import { cn } from "@/lib/utils";
 import type { Day, CalendarEvent, DragPreview, DaySpan, Task } from "@/types";
 
@@ -96,6 +97,7 @@ interface DayColumnProps {
   onToggleTask: (id: string) => void;
   onEditTask: (task: Task, x: number, y: number) => void;
   onSwapDays: (aId: string, bId: string) => void;
+  onSetDaySub: (dayId: string, sub: string) => void;
   selectedId: string | null;
   isDragTarget: boolean;
   dragPreview: DragPreview | null;
@@ -108,7 +110,7 @@ const DAY_SWAP_MIME = "application/x-day-swap";
 
 export default function DayColumn({
   day, tasks, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd,
-  onSelect, onAddEvent, onToggleTask, onEditTask, onSwapDays, selectedId, isDragTarget, dragPreview, pendingHour,
+  onSelect, onAddEvent, onToggleTask, onEditTask, onSwapDays, onSetDaySub, selectedId, isDragTarget, dragPreview, pendingHour,
   onTouchPress, touchDraggingId,
 }: DayColumnProps) {
   const touch = !!onTouchPress;
@@ -117,6 +119,8 @@ export default function DayColumn({
   const dragging = useRef(false);
   const [hoverY, setHoverY] = useState<number | null>(null);
   const [swapOver, setSwapOver] = useState(false);
+  // Typing in the subtitle must not start a day swap.
+  const [editingSub, setEditingSub] = useState(false);
 
   function getHour(clientY: number) {
     const el = colRef.current!;
@@ -132,7 +136,7 @@ export default function DayColumn({
       {/* Header: fixed 56px so all grid lines align across columns.
           Draggable onto another day header to swap the two days' contents (mouse only). */}
       <div
-        draggable={!touch}
+        draggable={!touch && !editingSub}
         onDragStart={(e) => {
           e.dataTransfer.setData(DAY_SWAP_MIME, day.id);
           e.dataTransfer.effectAllowed = "move";
@@ -156,9 +160,13 @@ export default function DayColumn({
         <div className="truncate text-[13px] font-medium text-foreground">
           {!touch && <span className="mr-1 opacity-40">⇄</span>}{day.label}
         </div>
-        <div className="mt-0.5 truncate text-[11px] text-secondary-foreground">
-          {day.sub}
-        </div>
+        <DaySubtitle
+          value={day.sub ?? ""}
+          onCommit={(sub) => onSetDaySub(day.id, sub)}
+          onEditingChange={setEditingSub}
+          compact
+          className="mt-0.5 text-[11px] text-secondary-foreground"
+        />
       </div>
 
       {/* Time grid */}

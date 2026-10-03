@@ -5,7 +5,7 @@ import IdeaRow from "@/components/ideas/IdeaRow";
 import IdeaGroup from "@/components/ideas/IdeaGroup";
 import IdeasByDay from "@/components/ideas/IdeasByDay";
 import AddIdeaForm from "@/components/ideas/AddIdeaForm";
-import OrganizeWithAI from "@/components/ideas/OrganizeWithAI";
+import AnalyzeWithClaude from "@/components/ideas/AnalyzeWithClaude";
 import PlacesEditor from "@/components/ideas/PlacesEditor";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { PANEL } from "@/components/home/shared";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { cn } from "@/lib/utils";
-import type { Day, Idea, IdeaLink, IdeaPlanResult, IdeaSuggestion } from "@/types";
+import type { Day, Idea, IdeaLink, IdeaPlanResult } from "@/types";
 import type { PlaceIndex } from "@/utils/ideas";
 import { isVenue } from "@/utils/places";
 
@@ -28,7 +28,7 @@ interface IdeasViewProps {
   onUpdate: (id: string, patch: Partial<Idea>) => void;
   onRemove: (id: string) => void;
   onVote: (id: string) => void;
-  onApplySuggestions: (suggestions: Map<string, IdeaSuggestion>) => number;
+  onApplyClaude: (classes: IdeaPlanResult["classes"]) => void;
   onAcceptAll: () => void;
   onSetNote: (id: string, note: string) => void;
   onRetry: (id: string) => Promise<Idea | null>;
@@ -49,7 +49,7 @@ const REVIEW = "review";
 // filtered by type. Kept apart from the itinerary on purpose.
 export default function IdeasView({
   ideas, index, loadingIds, mobile, voter,
-  onAdd, onUpdate, onRemove, onVote, onApplySuggestions, onAcceptAll, onSetNote, onRetry, onAddPlace, onRemovePlace,
+  onAdd, onUpdate, onRemove, onVote, onApplyClaude, onAcceptAll, onSetNote, onRetry, onAddPlace, onRemovePlace,
   days, planLinks, planLinksAt, planIdeaIds, onAnalyze, onSavePlan,
 }: IdeasViewProps) {
   const places = index.places.map((p) => p.name);
@@ -68,7 +68,6 @@ export default function IdeasView({
   // Needs a human look: unclassified, or a suggestion waiting for "Sí".
   const needsReview = (i: Idea) => !i.place || !validCat(i) || !!(i.suggestion?.place || i.suggestion?.cat);
   const toReview = active.filter(needsReview);
-  const toClassify = active.filter((i) => !i.place || !validCat(i));
   const withSuggestion = active.filter((i) => i.suggestion?.place || i.suggestion?.cat).length;
   // Group by the confirmed place, or the suggested one while it awaits a "Sí".
   const placeOf = (i: Idea) => {
@@ -108,7 +107,16 @@ export default function IdeasView({
         <Button onClick={openForm} className="h-9 gap-1.5 rounded-full px-4 font-semibold">
           <Plus className="size-4" /> Agregar idea
         </Button>
-        <OrganizeWithAI ideas={toClassify} profiles={index.profiles} onApply={onApplySuggestions} onEnrich={(i) => onRetry(i.id)} />
+        <AnalyzeWithClaude
+          ideas={active}
+          reading={active.filter((i) => loadingIds.has(i.id)).length}
+          planLinks={planLinks}
+          planLinksAt={planLinksAt}
+          planIdeaIds={planIdeaIds}
+          onAnalyze={onAnalyze}
+          onSavePlan={onSavePlan}
+          onApplyClaude={onApplyClaude}
+        />
         {withSuggestion > 1 && (
           <Button variant="ghost" onClick={onAcceptAll} className="ml-auto h-9 gap-1.5 rounded-full px-3 text-emerald-800">
             <Check className="size-4" /> Aceptar todas ({withSuggestion})
@@ -143,8 +151,6 @@ export default function IdeasView({
           planLinks={planLinks}
           planLinksAt={planLinksAt}
           planIdeaIds={planIdeaIds}
-          onAnalyze={onAnalyze}
-          onSavePlan={onSavePlan}
         />
       ) : (
       <>

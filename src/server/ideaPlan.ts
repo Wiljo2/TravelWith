@@ -4,58 +4,66 @@ import { fmtHour } from "@/utils/time";
 import { freeSlots } from "@/utils/ideaPlan";
 import { normalizeText, vocab } from "@/utils/ideas";
 import { transcriptExcerpt } from "@/utils/excerpt";
-import { isVenue, tripPlaces, type TripPlace } from "@/utils/places";
+import { CRUISE_PLACE, isVenue, tripPlaces, type TripPlace } from "@/utils/places";
 import type { RoomPayload } from "@/hooks/useRoom";
-import type { Idea, IdeaLink } from "@/types";
+import type { Day, Idea, IdeaLink, IdeaPlanResult } from "@/types";
 
-// "Analizar con Claude": one cheap call (Haiku) that reads the itinerary, the
-// trip's places and the ideas (with the relevant part of what each video says),
-// and says where each idea fits, with a one-line reason. The model only picks
-// among labeled options (activities, free gaps, days), so it can't invent ids or
-// times; every answer is validated against the plan.
+// "Analizar con Claude": one call that reads the whole trip (places, each day's
+// phase, every activity and free gap) and the ideas, and says for each idea its
+// place, its type and when it helps — an activity, a free gap, a day, or before
+// the trip. Both views (by place, by day) are built from this one answer.
 //
-// Token budget: ids are short labels (i3, e12, s2, D4) instead of UUIDs — they
-// also appear in the output, which costs 5x the input — and transcripts are cut
-// to the opening plus the passages that mention the trip (transcriptExcerpt).
+// The model only picks among labeled options (P3, e12, s2, D4), so it can't
+// invent ids or times, and every answer is validated against the plan. The
+// trip overview goes in a cached system block: analyzing only the new ideas
+// later reuses it. Transcripts are cut to the opening plus the passages that
+// mention the trip (transcriptExcerpt).
 
-const MODEL = process.env.IDEAS_MODEL ?? "claude-haiku-4-5";
+const MODEL = process.env.IDEAS_MODEL ?? "claude-sonnet-5-5";
 const MAX_IDEAS = 60;
-const TRANSCRIPT_CHARS = 700;     // ~170 tokens per video
-const TRANSCRIPT_WITH_NOTE = 400; // the member's note already says what it's about
+const TRANSCRIPT_CHARS = 900;     // ~220 tokens per video
+const TRANSCRIPT_WITH_NOTE = 500; // the member's note already says what it's about
 
-const SYSTEM = `Eres el asistente de un grupo que planea un viaje. Tienen un itinerario ya armado y una lista de ideas (videos de TikTok, reels) sobre comida, planes, compras y tips.
+const SYSTEM = `Eres el asistente de un grupo que planea un viaje. Tienen un itinerario armado y guardan ideas (TikToks, reels) sobre comida, planes, compras y tips. Para cada idea decides, sin cambiar el plan:
 
-Tu tarea: para cada idea, decir dónde encaja mejor dentro del itinerario existente, sin cambiarlo. Elige UNA opción por idea (usa la etiqueta tal cual):
-- "e…" una actividad concreta cuando la idea sirve para esa actividad (ej. un video de tiendas de los outlets → la visita a los outlets; un restaurante de Disney Springs → la cena en Disney Springs; un tip de un parque → la visita a ese parque).
-- "s…" un hueco libre de un día en ese lugar, cuando la idea es un plan que cabe ahí.
-- "D…" el día en general, si aplica al lugar de ese día pero no a una actividad ni a un hueco.
-- "none" si no encaja en ningún día del viaje.
+- place: el lugar del viaje del que trata la idea (etiqueta P…), o "none" si no trata de un lugar del viaje.
+- cat: tip, comida, actividad, compras o noche.
+- target: dónde les sirve. "e…" una actividad concreta a la que la idea aporta (qué hacer, comer o saber ahí); "s…" un hueco libre, si es un plan nuevo que cabe ahí; "D…" el día en general; "none" si no aplica a este viaje.
+- before: true si hay que actuar ANTES del viaje (comprar algo, empacar, reservar, registrarse, decidir un paquete). El target es entonces el día o la actividad para la que se preparan.
 
-LUGARES lista cada zona del viaje con sus sitios (otros nombres entre paréntesis). El "lugar sugerido" de una idea es una clasificación automática y puede estar mal: decide con la nota, el post y lo que dice el video (extracto de una transcripción automática, puede tener errores). Usa el sentido común (Brickell está en Miami). Si una idea encaja en varias actividades, elige la más útil.
-Reglas:
-- El target debe ser exactamente la actividad o el hueco del que habla tu reason (si la razón menciona Royal Beach Club, el target es esa actividad).
-- Respeta el momento del día: un plan de noche (bar, fiesta, rooftop) no va en un desayuno o almuerzo; una comida va en la comida más cercana en ese lugar o en un hueco.
+Cómo decidir:
+- Geografía: usa tu conocimiento del mundo. Barrios, parques, restaurantes y aeropuertos pertenecen a su ciudad (International Drive, Kissimmee y Lake Buena Vista están en Orlando; Brickell, Wynwood y Little Havana en Miami; MCO es el aeropuerto de Orlando, MIA el de Miami). Una idea solo va a días en los que el grupo está en ese lugar.
+- Palabras genéricas (buffet, piscina, cena, playa, parque) no dicen el lugar: decide por los nombres propios y el contexto del video.
+- Tiempo: respeta la fase de cada día (ITINERARIO). Lo del embarque va al día de embarque; lo del desembarque (maletas, salida del barco, self-assist) solo a la última noche a bordo o a la mañana de desembarque. Un plan de noche no va a un desayuno.
+- Transporte: un tip de aeropuerto aplica solo al vuelo que usa ese aeropuerto en esa dirección (llegada o salida); si no lo usan así, "none". Un tip de carro rentado va a la recogida del carro o al trayecto que menciona (peajes, parqueo).
+- Prefiere la actividad cuyo tema coincide con la idea sobre un hueco libre (un tip de parqueo en Universal → el traslado a Universal; comida de Disney Springs → la visita a Disney Springs).
+- Tips generales de un crucero (comida incluida, bebidas, happy hour) van a la primera actividad a bordo donde sirven, o before=true si implican comprar o decidir algo antes de embarcar.
+- Un video sobre un destino que no visitan: place "none" y target "none".
 - No inventes datos: menciona solo lo que dicen la idea o el itinerario.
-En "reason" escribe en español, máximo 18 palabras, por qué encaja y qué deberían hacer o probar ahí (ej. "El sábado van a los outlets: el video recomienda la tienda de Nike").`;
+
+En "reason" escribe en español, máximo 18 palabras, por qué encaja y qué hacer o probar ahí (ej. "El sábado van a Universal: con el contrato de Avis el parqueo prime es gratis"). Nombra los días por su fecha o día de la semana, nunca por etiqueta (D3, e12). Si no aplica, di por qué.`;
 
 const SCHEMA = {
   type: "object",
   properties: {
-    links: {
+    ideas: {
       type: "array",
       items: {
         type: "object",
         properties: {
-          ideaId: { type: "string" },
-          target: { type: "string" },
+          idea: { type: "string" },
           reason: { type: "string" },
+          place: { type: "string" },
+          cat: { type: "string", enum: [...Object.keys(IDEA_TYPES), "none"] },
+          before: { type: "boolean" },
+          target: { type: "string" },
         },
-        required: ["ideaId", "target", "reason"],
+        required: ["idea", "reason", "place", "cat", "before", "target"],
         additionalProperties: false,
       },
     },
   },
-  required: ["links"],
+  required: ["ideas"],
   additionalProperties: false,
 };
 
@@ -68,15 +76,13 @@ function cut(text: string | undefined, max: number) {
 }
 
 function describeIdea(i: Idea, label: string, keywords: Set<string>): string {
-  const type = i.cat ?? i.suggestion?.cat;
-  const place = i.place ?? i.suggestion?.place;
   const title = cut(i.title, 300);
   // Hashtags the caption already contains add nothing.
   const inTitle = normalizeText(title);
   const tags = (i.tags ?? []).filter((t) => !inTitle.includes(normalizeText(t))).slice(0, 8);
   const lines = [
-    `${label} ${i.platform}${place ? ` · lugar sugerido: ${place}` : ""}${type && IDEA_TYPES[type] ? ` · tipo: ${IDEA_TYPES[type].label}` : ""}`,
-    i.note && ` nota: ${cut(i.note, 200)}`,
+    `${label} ${i.platform}`,
+    i.note && ` nota del grupo: ${cut(i.note, 200)}`,
     title && ` post: ${title}`,
     tags.length > 0 && ` tags: ${tags.join(", ")}`,
     i.transcript && ` video: ${transcriptExcerpt(i.transcript, keywords, i.note ? TRANSCRIPT_WITH_NOTE : TRANSCRIPT_CHARS)}`,
@@ -84,18 +90,29 @@ function describeIdea(i: Idea, label: string, keywords: Set<string>): string {
   return lines.filter(Boolean).join("\n");
 }
 
-// Each area with its spots, and up to 3 other names per spot.
-function describePlaces(places: TripPlace[]): string {
-  const areas = places.filter((p) => !isVenue(p));
-  const home = (v: TripPlace) => [...v.parents].sort((a, b) => a.length - b.length)[0];
-  return areas.map((a) => {
-    const spots = places.filter((v) => isVenue(v) && home(v) === a.name)
-      .map((v) => (v.aliases.length ? `${v.name} (${v.aliases.slice(0, 3).join(", ")})` : v.name));
-    return spots.length ? `${a.name}: ${spots.join("; ")}` : a.name;
-  }).join("\n");
+// Where each day sits in the trip, beyond its subtitle: "día 5 de 9", and for a
+// cruise, "crucero día 5 de 5 · desembarque" — what puts a disembarkation tip on
+// the last morning and not on a sea day.
+export function dayPhases(days: Day[], places: TripPlace[]): string[] {
+  const onCruise = (d: Day) => places.some((p) => p.name === CRUISE_PLACE && p.dayIds.includes(d.id));
+  const first = days.findIndex((d) => /\bembarque\b/i.test(d.sub ?? "") || onCruise(d));
+  const disembark = days.findLastIndex((d) => /desembarque/i.test(d.sub ?? ""));
+  const last = disembark >= first ? disembark : days.findLastIndex(onCruise);
+  return days.map((_, n) => {
+    const parts = [`día ${n + 1} de ${days.length}`];
+    if (first >= 0 && last > first && n >= first && n <= last) {
+      const k = n - first + 1;
+      const total = last - first + 1;
+      parts.push(`crucero día ${k} de ${total}`);
+      if (k === 1) parts.push("embarque");
+      if (k === total - 1) parts.push("última noche a bordo");
+      if (k === total) parts.push("desembarque por la mañana");
+    }
+    return parts.join(" · ");
+  });
 }
 
-type Target = Omit<IdeaLink, "ideaId" | "reason" | "source">;
+type Target = Omit<IdeaLink, "ideaId" | "reason" | "source" | "before">;
 
 // The prompt, plus the label → id maps to read the answer back. Pure, so it can
 // be tested and measured without calling the API. `onlyIds` limits the ideas.
@@ -104,27 +121,33 @@ export function buildPlanPrompt(payload: RoomPayload, onlyIds?: string[]) {
   const places = tripPlaces(payload.trip?.destination, days, payload.ideaPlaces);
   const areas = places.filter((p) => !isVenue(p));
   const ideas = (payload.ideas ?? [])
-    .filter((i) => i.status !== "discarded" && (i.note || i.title || i.transcript || i.place))
+    .filter((i) => i.status !== "discarded" && (i.note || i.title || i.transcript))
     .filter((i) => !onlyIds || onlyIds.includes(i.id))
     .slice(0, MAX_IDEAS);
 
-  // Labeled options the model can pick from.
-  const placeEvents = new Set(places.flatMap((p) => p.eventIds));
+  const dayLabel = new Map(days.map((d, n) => [d.id, `D${n + 1}`]));
+  const placeLabels = new Map(places.map((p, n) => [`P${n + 1}`, p.name]));
+  const home = (v: TripPlace) => [...v.parents].sort((a, b) => a.length - b.length)[0];
+  const placeText = places.map((p, n) => {
+    const where = isVenue(p) && home(p) ? ` (en ${home(p)})` : "";
+    const aka = p.aliases.length ? ` · también: ${p.aliases.slice(0, 4).join(", ")}` : "";
+    return `P${n + 1} ${p.name}${where}${aka} · días ${p.dayIds.map((id) => dayLabel.get(id)).filter(Boolean).join(", ")}`;
+  }).join("\n");
+
+  const phases = dayPhases(days, places);
   const targets = new Map<string, Target>();
   let e = 0;
   let s = 0;
   const itinerary = days.map((day, n) => {
-    const dayLabel = `D${n + 1}`;
+    const label = `D${n + 1}`;
     const dayAreas = areas.filter((p) => p.dayIds.includes(day.id)).map((p) => p.name);
-    const lines = [`${dayLabel} ${day.label}${day.sub ? ` · ${day.sub}` : ""}${dayAreas.length ? ` · zonas: ${dayAreas.join(", ")}` : ""}`];
-    targets.set(dayLabel, { dayId: day.id });
+    const head = [`${label} ${day.label}`, day.sub, phases[n], dayAreas.length && `zonas: ${dayAreas.join(", ")}`];
+    const lines = [head.filter(Boolean).join(" · ")];
+    targets.set(label, { dayId: day.id });
     for (const ev of [...day.events].sort((a, b) => a.start - b.start)) {
-      // Flights, car rentals, check-outs: never where an idea goes (the cruise
-      // check-in is, as a place of its own), and they are a third of the prompt.
-      if (ev.cat === "logist" && !placeEvents.has(ev.id)) continue;
       const key = `e${++e}`;
       targets.set(key, { dayId: day.id, eventId: ev.id });
-      lines.push(` ${key} ${fmtHour(ev.start)}${ev.end > ev.start ? `–${fmtHour(ev.end)}` : ""} ${ev.title}${ev.note ? ` — ${cut(ev.note, 90)}` : ""}`);
+      lines.push(` ${key} ${fmtHour(ev.start)}${ev.end > ev.start ? `–${fmtHour(ev.end)}` : ""} ${ev.title}${ev.note ? ` — ${cut(ev.note.replace(/https?:\/\/\S+/g, ""), 90)}` : ""}`);
     }
     for (const slot of freeSlots(day)) {
       const key = `s${++s}`;
@@ -142,27 +165,52 @@ export function buildPlanPrompt(payload: RoomPayload, onlyIds?: string[]) {
   const ideaIds = new Map(ideas.map((i, n) => [`i${n + 1}`, i.id]));
   const ideaText = ideas.map((i, n) => describeIdea(i, `i${n + 1}`, keywords)).join("\n\n");
 
-  const user = `LUGARES\n${describePlaces(places)}\n\nITINERARIO\n${itinerary}\n\nIDEAS\n${ideaText}\n\n` +
-    `Devuelve un elemento en "links" por cada idea (ideaId = su etiqueta: i1, i2…).`;
-  return { system: SYSTEM, user, ideaIds, targets, count: ideas.length };
+  const trip = `LUGARES DEL VIAJE\n${placeText}\n\nITINERARIO\n${itinerary}`;
+  const user = `IDEAS\n${ideaText}\n\nDevuelve un elemento en "ideas" por cada idea (idea = su etiqueta: i1, i2…).`;
+  return { system: SYSTEM, trip, user, ideaIds, placeLabels, targets, count: ideas.length };
+}
+
+type Answer = { idea: string; reason: string; place: string; cat: string; before: boolean; target: string };
+
+// Reads the model's answer back into links (where each idea helps) and classes
+// (its place and type). Labels that don't exist — "none" or invented — are dropped.
+export function readAnswer(answers: Answer[], prompt: ReturnType<typeof buildPlanPrompt>) {
+  const links: IdeaLink[] = [];
+  const classes: IdeaPlanResult["classes"] = [];
+  for (const a of answers) {
+    const ideaId = prompt.ideaIds.get(a.idea?.trim());
+    if (!ideaId) continue;
+    // The label, or (sometimes) the place's name itself.
+    const place = prompt.placeLabels.get(a.place?.trim())
+      ?? [...prompt.placeLabels.values()].find((n) => normalizeText(n) === normalizeText(a.place?.trim() ?? ""));
+    const cat = IDEA_TYPES[a.cat] ? a.cat : undefined;
+    if (place || cat) classes.push({ ideaId, place, cat });
+    const target = prompt.targets.get(a.target?.trim());
+    if (target) links.push({ ideaId, ...target, ...(a.before ? { before: true } : {}), reason: cut(a.reason, 160), source: "claude" });
+  }
+  return { links, classes };
 }
 
 export async function planIdeasWithClaude(
-  payload: RoomPayload, onlyIds?: string[],
-): Promise<{ links: IdeaLink[]; ideaIds: string[]; usage: { input: number; output: number } }> {
+  payload: RoomPayload, onlyIds?: string[], model = MODEL,
+): Promise<Omit<IdeaPlanResult, "at"> & { usage: { input: number; cached: number; output: number } }> {
   if (!process.env.ANTHROPIC_API_KEY) throw new IdeaPlanError("Falta ANTHROPIC_API_KEY en el servidor.");
-  const { system, user, ideaIds, targets, count } = buildPlanPrompt(payload, onlyIds);
+  const prompt = buildPlanPrompt(payload, onlyIds);
   // The ideas actually sent: the client marks exactly these as analyzed.
-  const sent = [...ideaIds.values()];
-  if (count === 0) return { links: [], ideaIds: sent, usage: { input: 0, output: 0 } };
+  const sent = [...prompt.ideaIds.values()];
+  if (prompt.count === 0) return { links: [], classes: [], ideaIds: sent, usage: { input: 0, cached: 0, output: 0 } };
 
   const client = new Anthropic();
   const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 200 + count * 80,   // a cap (~40 tokens per answer), not a cost
-    system,
-    messages: [{ role: "user", content: user }],
-    output_config: { format: { type: "json_schema", schema: SCHEMA } },
+    model,
+    max_tokens: 1000 + prompt.count * 200,
+    system: [
+      { type: "text", text: prompt.system },
+      { type: "text", text: prompt.trip, cache_control: { type: "ephemeral" } },
+    ],
+    messages: [{ role: "user", content: prompt.user }],
+    // Haiku has no effort setting.
+    output_config: { ...(model.includes("haiku") ? {} : { effort: "low" as const }), format: { type: "json_schema", schema: SCHEMA } },
   });
 
   if (response.stop_reason === "refusal") throw new IdeaPlanError("El modelo no pudo analizar estas ideas.");
@@ -170,13 +218,11 @@ export async function planIdeasWithClaude(
   const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text")?.text;
   if (!text) throw new IdeaPlanError("Respuesta vacía del modelo.");
 
-  const parsed = JSON.parse(text) as { links: { ideaId: string; target: string; reason: string }[] };
-  const links: IdeaLink[] = [];
-  for (const l of parsed.links ?? []) {
-    const ideaId = ideaIds.get(l.ideaId?.trim());
-    const target = targets.get(l.target?.trim());
-    if (!ideaId || !target) continue;   // "none" or anything invented is dropped
-    links.push({ ideaId, ...target, reason: cut(l.reason, 160), source: "claude" });
-  }
-  return { links, ideaIds: sent, usage: { input: response.usage.input_tokens, output: response.usage.output_tokens } };
+  const parsed = JSON.parse(text) as { ideas?: Answer[] };
+  const { links, classes } = readAnswer(parsed.ideas ?? [], prompt);
+  const u = response.usage;
+  return {
+    links, classes, ideaIds: sent,
+    usage: { input: u.input_tokens + (u.cache_creation_input_tokens ?? 0), cached: u.cache_read_input_tokens ?? 0, output: u.output_tokens },
+  };
 }

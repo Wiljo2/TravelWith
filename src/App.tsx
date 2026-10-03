@@ -45,7 +45,7 @@ export default function App() {
   const [sheet, setSheet] = useState<ItinerarySheet | null>(null);
   const [agentMessages, setAgentMessages] = useState<AgentChatMessage[]>([]);
 
-  const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, loadDays, removeDaySpan, updateDaySpan } = useItinerary();
+  const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, setDaySub, loadDays, removeDaySpan, updateDaySpan } = useItinerary();
   const { extras, exchangeRate, setExchangeRate, updateExtra, addExtra, removeExtra, loadBudget } = useBudget();
   const [mockPeople, setMockPeople] = useState<MockPerson[]>([]);
   const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
@@ -292,6 +292,7 @@ export default function App() {
               onAdd={openSlot}
               onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
               onToggleTask={toggleTask}
+              onSetDaySub={setDaySub}
             />
           }
           grid={
@@ -314,6 +315,7 @@ export default function App() {
             onToggleTask={toggleTask}
             onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
             onSwapDays={swapDaysWithTasks}
+            onSetDaySub={setDaySub}
             pendingNew={slotDraft && !slotDraft.task ? { dayId: slotDraft.dayId, hour: slotDraft.hour } : null}
             initialDayIdx={todayIdx}
           />

@@ -108,12 +108,13 @@ export interface Task {
 export type IdeaPlatform = "tiktok" | "instagram" | "youtube" | "other";
 export type IdeaStatus = "idea" | "planned" | "discarded";
 
-// Where a place/type suggestion came from: keyword rules or the in-browser model.
+// Where a place/type suggestion came from: keyword rules, Claude's analysis, or
+// the in-browser model of early builds ("ai", legacy).
 export interface IdeaSuggestion {
   place?: string;
   cat?: string;           // key of IDEA_TYPES
   dayId?: string;         // legacy (early builds suggested days); ignored
-  source: "rules" | "ai";
+  source: "rules" | "ai" | "claude";
 }
 
 // Inspiration a member shared (reel, TikTok, link) about places of the trip.
@@ -142,11 +143,13 @@ export interface Idea {
 
 // Where an idea fits the existing plan — shown read-only, never schedules anything.
 // Either a specific activity (eventId), a free gap of a day (slot), or the day in general.
+// `before`: something to do before the trip (buy, pack, book) for that day/activity.
 export interface IdeaLink {
   ideaId: string;
   dayId: string;
   eventId?: string;
   slot?: { start: number; end: number };
+  before?: boolean;
   reason?: string;           // why it fits (Claude) or the matching phrase (rules)
   source: "rules" | "ai" | "claude";
 }
@@ -154,6 +157,8 @@ export interface IdeaLink {
 // One "Analizar con Claude" run: its links and the ideas it actually read.
 export interface IdeaPlanResult {
   links: IdeaLink[];
+  // Place and type Claude read in each idea (only what it could tell).
+  classes: { ideaId: string; place?: string; cat?: string }[];
   at: string;
   ideaIds: string[];
 }

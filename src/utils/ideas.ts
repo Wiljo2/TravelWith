@@ -48,7 +48,8 @@ const asWords = (s: string) => ` ${normalizeText(s).replace(/[^a-z0-9ñ]+/g, " "
 // ── Places ────────────────────────────────────────────────────────────────────
 
 export const CRUISE_PLACE = "Crucero";
-const CRUISE_RE = /crucero|cruise|barco|a bordo|en el mar|navegaci/i;
+// "Wonder of the Seas": Royal Caribbean names its ships "… of the Seas".
+const CRUISE_RE = /crucero|cruise|barco|a bordo|en el mar|navegaci|of the seas/i;
 const CRUISE_ALIASES = ["crucero", "cruise", "barco", "ship", "a bordo", "onboard", "royal caribbean", "cabina", "cubierta", "deck", "of the seas"];
 // Itinerary wording that describes a moment of the trip, not a place.
 const LEADING_GENERIC = /^(vuelo|llegada a|llegada|traslado a|traslado|embarque|desembarque|regreso a|regreso|salida de|salida a|salida|tiempo libre en|perfect day at|visita a|dia libre en|dia en)\s+/;
@@ -243,7 +244,7 @@ export function classifyIdea(text: string, index: PlaceIndex, tags: string[] = [
 }
 
 // Bump when the rules change, so saved ideas get classified again.
-export const CLASSIFIER_VERSION = 2;
+export const CLASSIFIER_VERSION = 3;
 
 export interface IdeaTextFields {
   note?: string;
