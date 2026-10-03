@@ -8,8 +8,9 @@ import type { RoomPayload } from "@/hooks/useRoom";
 
 type Params = Promise<{ code: string }>;
 
-// One model call plus a few dozen geocoder lookups: ~30 s for a whole trip.
-export const maxDuration = 60;
+// One or two model calls plus geocoder and photo lookups: up to ~60 s for a
+// whole trip the first time; later runs only touch new activities.
+export const maxDuration = 120;
 
 // POST /api/rooms/[code]/places — "Ubicar lugares" for the trip map: where each
 // activity not located yet happens. Reads the saved room (the client can't

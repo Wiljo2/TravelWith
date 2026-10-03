@@ -60,8 +60,8 @@ export async function withPhotos(places: Record<string, EventPlace>): Promise<Re
   for (const p of Object.values(places)) if (p.kind === "place" && p.photo === undefined && p.name) pending.set(spot(p), p);
   const found = new Map<string, Photo | null>();
   const list = [...pending];
-  for (let i = 0; i < list.length; i += 4) {
-    await Promise.all(list.slice(i, i + 4).map(async ([k, p]) => found.set(k, await findPhoto(p))));
+  for (let i = 0; i < list.length; i += 8) {
+    await Promise.all(list.slice(i, i + 8).map(async ([k, p]) => found.set(k, await findPhoto(p))));
   }
   return Object.fromEntries(Object.entries(places).map(([id, p]) => {
     if (!found.has(spot(p)) || p.photo !== undefined) return [id, p];

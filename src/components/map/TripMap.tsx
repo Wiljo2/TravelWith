@@ -6,13 +6,18 @@ import { version as maplibreVersion } from "maplibre-gl/package.json";
 import { dayColor } from "@/constants/mapColors";
 import { MAP_STYLE } from "@/lib/mapOffline";
 import { googleMapsDirectionsUrl, googleMapsPlaceUrl } from "@/utils/googleMaps";
-import { boundsOf, TRIP_REGION, type LngLat, type MapStop } from "@/utils/tripGeo";
+import { boundsOf, inTripRegion, TRIP_REGION, type LngLat, type MapStop } from "@/utils/tripGeo";
 import { fmtHour } from "@/utils/time";
+import { cn } from "@/lib/utils";
 import type { Day } from "@/types";
 
 interface TripMapProps {
+  className: string;           // size and frame (the parent decides: full screen on phones)
+  touch: boolean;              // phone: pinch to zoom (no +/- buttons), credits tucked top-left
+  bottomInset: number;         // px covered by overlays at the bottom (place cards)
   days: Day[];
   stops: MapStop[];            // pins to show (already filtered by day)
+  order: Map<string, number>;  // each pin's place in the itinerary (see stopOrder)
   dayIdx: number | null;       // selected day: its route is drawn
   fitRequest: number;          // bumped when the user picks a day (or the whole trip) again
   focus: { id: string; n: number } | null;  // fly to this pin (n re-triggers the same one)
@@ -22,12 +27,12 @@ interface TripMapProps {
 
 const PIN = 36;          // pin circle, px
 const NAMES_ZOOM = 11;   // place names show from about city level in
+const POPUP_ROOM = 260;  // px kept above a focused pin on phones (popup height)
 
-const inRegion = (p: LngLat) => p.lng >= TRIP_REGION.west && p.lng <= TRIP_REGION.east && p.lat >= TRIP_REGION.south && p.lat <= TRIP_REGION.north;
 
 // MapLibre map (OpenFreeMap tiles) with the trip's pins, the selected day's
 // route and the user's live position. Loaded on demand: it's a large library.
-export default function TripMap({ days, stops, dayIdx, fitRequest, focus, onPosition, onOpenEvent }: TripMapProps) {
+export default function TripMap({ className, touch, bottomInset, days, stops, order, dayIdx, fitRequest, focus, onPosition, onOpenEvent }: TripMapProps) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibre | null>(null);
   const lib = useRef<typeof import("maplibre-gl") | null>(null);
@@ -39,6 +44,10 @@ export default function TripMap({ days, stops, dayIdx, fitRequest, focus, onPosi
   // Latest callbacks, so the map's listeners never go stale.
   const cb = useRef({ onPosition, onOpenEvent });
   cb.current = { onPosition, onOpenEvent };
+  const inset = useRef(bottomInset);
+  inset.current = bottomInset;
+  const padding = () => ({ top: 56, left: 40, right: 40, bottom: 56 + inset.current });
+  const centered = () => ({ top: 0, left: 0, right: 0, bottom: inset.current });
 
   useEffect(() => {
     let cancelled = false;
@@ -53,10 +62,11 @@ export default function TripMap({ days, stops, dayIdx, fitRequest, focus, onPosi
         container: box.current,
         style: MAP_STYLE,
         bounds: [[TRIP_REGION.west, TRIP_REGION.south], [TRIP_REGION.east, TRIP_REGION.north]],
-        attributionControl: { compact: true },
+        attributionControl: false,
       });
       map.current = instance;
-      instance.addControl(new maplibre.NavigationControl({ showCompass: false }), "top-right");
+      instance.addControl(new maplibre.AttributionControl({ compact: true }), touch ? "top-left" : "bottom-right");
+      if (!touch) instance.addControl(new maplibre.NavigationControl({ showCompass: false }), "top-right");
       const geo: GeolocateControl = new maplibre.GeolocateControl({
         positionOptions: { enableHighAccuracy: true },
         trackUserLocation: true,
@@ -67,9 +77,9 @@ export default function TripMap({ days, stops, dayIdx, fitRequest, focus, onPosi
         const p = { lat: e.coords.latitude, lng: e.coords.longitude };
         cb.current.onPosition(p);
         // First fix inside the trip's region: show what's around.
-        if (!located.current && inRegion(p)) {
+        if (!located.current && inTripRegion(p)) {
           located.current = true;
-          instance?.flyTo({ center: [p.lng, p.lat], zoom: Math.max(instance.getZoom(), 13) });
+          instance?.flyTo({ center: [p.lng, p.lat], zoom: Math.max(instance.getZoom(), 13), padding: centered() });
         }
       });
       geo.on("trackuserlocationend", () => cb.current.onPosition(null));
@@ -78,6 +88,10 @@ export default function TripMap({ days, stops, dayIdx, fitRequest, focus, onPosi
       instance.on("zoomend", showNames);
       instance.on("load", () => {
         showNames();
+        // Credits start folded behind the (i) button: open, they'd cover the map.
+        const credits = box.current?.querySelector(".maplibregl-ctrl-attrib");
+        credits?.classList.remove("maplibregl-compact-show");
+        credits?.removeAttribute("open");
         if (cancelled) return;
         instance!.addSource("route", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         instance!.addLayer({
@@ -100,7 +114,7 @@ export default function TripMap({ days, stops, dayIdx, fitRequest, focus, onPosi
     };
   }, []);
 
-  // Pins: one per spot, numbered and colored by the first day it's visited.
+  // Pins: one per spot, numbered by itinerary order and colored by its day.
   useEffect(() => {
     const m = map.current;
     const maplibre = lib.current;
@@ -110,13 +124,16 @@ export default function TripMap({ days, stops, dayIdx, fitRequest, focus, onPosi
     for (const stop of stops) {
       // Anchored at the top, nudged up by half the circle: the circle's center
       // sits on the spot and the name hangs below it.
-      const marker = new maplibre.Marker({ element: pinElement(stop), anchor: "top", offset: [0, -PIN / 2] })
+      const color = dayColor(dayIdx ?? stop.visits[0].dayIdx);
+      const marker = new maplibre.Marker({ element: pinElement(stop, order.get(stop.id) ?? 0, color), anchor: "top", offset: [0, -PIN / 2] })
         .setLngLat([stop.lng, stop.lat])
-        .setPopup(new maplibre.Popup({ offset: PIN / 2 + 2, maxWidth: "min(240px, 70vw)" }).setDOMContent(popupContent(stop, days, (id) => cb.current.onOpenEvent(id))))
+        // Phones: always above the pin, clear of the place cards at the bottom.
+        .setPopup(new maplibre.Popup({ offset: PIN / 2 + 2, maxWidth: "min(240px, 70vw)", ...(touch ? { anchor: "bottom" as const } : {}) })
+          .setDOMContent(popupContent(stop, days, touch, (id) => cb.current.onOpenEvent(id))))
         .addTo(m);
       markers.current.set(stop.id, marker);
     }
-  }, [ready, stops, days]);
+  }, [ready, stops, order, dayIdx, days, touch]);
 
   // The selected day's route, in visit order. The camera frames the selection
   // when the user picks it; pins arriving later don't pull it away from the
@@ -138,22 +155,22 @@ export default function TripMap({ days, stops, dayIdx, fitRequest, focus, onPosi
     const picked = request !== lastFit.current;
     lastFit.current = request;
     if (!picked && located.current) return;
-    const local = dayIdx == null ? stops.filter(inRegion) : stops;
-    const b = boundsOf(local);
-    if (b) m.fitBounds([[b.west, b.south], [b.east, b.north]], { padding: 56, maxZoom: 15, duration: 600 });
+    const b = boundsOf(stops);
+    if (b) m.fitBounds([[b.west, b.south], [b.east, b.north]], { padding: padding(), maxZoom: 15, duration: 600 });
   }, [ready, stops, dayIdx, fitRequest]);
 
   useEffect(() => {
     const m = map.current;
     const stop = focus && stops.find((s) => s.id === focus.id);
     if (!ready || !m || !stop) return;
-    m.flyTo({ center: [stop.lng, stop.lat], zoom: Math.max(m.getZoom(), 15) });
+    // Phones: the pin lands low enough for its popup to fit above it.
+    m.flyTo({ center: [stop.lng, stop.lat], zoom: Math.max(m.getZoom(), 15), padding: { ...centered(), top: touch ? POPUP_ROOM : 0 } });
     const marker = markers.current.get(stop.id);
     if (marker && !marker.getPopup()?.isOpen()) marker.togglePopup();
-  }, [ready, focus, stops]);
+  }, [ready, focus, stops, touch]);
 
   return (
-    <div className="relative h-[60dvh] min-h-[360px] overflow-hidden rounded-2xl ring-1 ring-border md:h-[68dvh]">
+    <div className={cn("relative min-h-[320px] overflow-hidden", className)}>
       {/* MapLibre makes its container position: relative, so size it directly. */}
       <div ref={box} className="group/map h-full w-full" />
       {(!ready || failed) && (
@@ -165,12 +182,10 @@ export default function TripMap({ days, stops, dayIdx, fitRequest, focus, onPosi
   );
 }
 
-// A pin: the place's photo in a circle ringed with the day's color (or the
-// day's number when there's no photo), the day in a corner badge, and the
+// A pin: the place's photo in a circle ringed with the day's color (or its
+// order number when there's no photo), the order in a corner badge, and the
 // place's name below. Built as DOM: names are user text, never HTML.
-function pinElement(stop: MapStop): HTMLElement {
-  const first = stop.visits[0].dayIdx;
-  const color = dayColor(first);
+function pinElement(stop: MapStop, n: number, color: string): HTMLElement {
   const el = document.createElement("button");
   el.type = "button";
   el.setAttribute("aria-label", stop.name);
@@ -179,7 +194,7 @@ function pinElement(stop: MapStop): HTMLElement {
   const circle = document.createElement("span");
   circle.className = "relative flex items-center justify-center rounded-full border-[3px] bg-white text-[12px] font-bold text-white shadow-md";
   Object.assign(circle.style, { width: `${PIN}px`, height: `${PIN}px`, borderColor: color, background: color });
-  const number = () => { circle.textContent = String(first + 1); };
+  const number = () => { circle.textContent = String(n); };
   if (stop.photo) {
     const img = document.createElement("img");
     img.crossOrigin = "anonymous";   // the same cached copy as the popup's
@@ -194,7 +209,7 @@ function pinElement(stop: MapStop): HTMLElement {
   const badge = document.createElement("span");
   badge.className = "absolute -right-1.5 -top-1.5 flex size-[18px] items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white";
   badge.style.background = color;
-  badge.textContent = String(first + 1);
+  badge.textContent = String(n);
   if (stop.photo) circle.append(badge);
 
   const name = document.createElement("span");
@@ -206,9 +221,9 @@ function pinElement(stop: MapStop): HTMLElement {
 }
 
 // Popup body, built as DOM (titles are user text: never as HTML).
-function popupContent(stop: MapStop, days: Day[], onOpen: (eventId: string) => void): HTMLElement {
+function popupContent(stop: MapStop, days: Day[], touch: boolean, onOpen: (eventId: string) => void): HTMLElement {
   const root = document.createElement("div");
-  root.className = "flex max-h-72 flex-col gap-1.5 overflow-y-auto text-[13px] text-foreground";
+  root.className = cn("flex flex-col gap-1.5 overflow-y-auto text-[13px] text-foreground", touch ? "max-h-56" : "max-h-72");
   if (stop.photo) {
     const img = document.createElement("img");
     img.crossOrigin = "anonymous";   // a CORS image can be kept for offline use

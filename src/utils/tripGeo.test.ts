@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { initialDays } from "@/data/initialDays";
-import { distanceKm, eventKey, mapStops, offlineTiles, staleEvents, tilesInBBox } from "./tripGeo";
+import { distanceKm, eventKey, inTripRegion, mapStops, offlineTiles, staleEvents, stopOrder, tilesInBBox } from "./tripGeo";
 import type { Day, EventPlace } from "@/types";
 
 const day = (id: string, events: [string, string, number][]): Day => ({
@@ -28,6 +28,33 @@ describe("trip map", () => {
     const stops = mapStops(days, places);
     expect(stops).toHaveLength(2);
     expect(stops[0].visits.map((v) => v.eventId)).toEqual(["a", "b"]);
+  });
+
+  it("numbers pins in itinerary order, overall or within a day", () => {
+    const two = [
+      day("d0", [["a", "Hotel", 8], ["c", "Disney Springs", 18]]),
+      day("d1", [["e", "Disney Springs", 9], ["d", "Hotel", 20]]),
+    ];
+    const ps = { ...places, d: at(two[1].events[1], 28.378, -81.5016), e: at(two[1].events[0], 28.3712, -81.5184) };
+    const stops = mapStops(two, ps);
+    const hotel = stops.find((s) => s.name === "Hotel")!.id;
+    const springs = stops.find((s) => s.name === "Disney Springs")!.id;
+    expect(stopOrder(stops, null)).toEqual(new Map([[hotel, 1], [springs, 2]]));
+    expect(stopOrder(stops, 1)).toEqual(new Map([[springs, 1], [hotel, 2]]));
+  });
+
+  it("follows the itinerary: a moved activity changes the order, an edited one keeps its pin", () => {
+    const moved = [day("d0", [["a", "Hotel", 20], ["b", "Desayuno en hotel", 21], ["c", "Disney Springs", 8]]), days[1]];
+    const stops = mapStops(moved, places);
+    expect(stopOrder(stops, 0).get(stops.find((s) => s.name === "Disney Springs")!.id)).toBe(1);
+    const edited = { ...places, c: { ...places.c, key: "texto anterior" } };
+    expect(mapStops(days, edited).some((s) => s.name === "Disney Springs")).toBe(true);
+  });
+
+  it("keeps only the trip's region", () => {
+    expect(inTripRegion({ lat: 28.378, lng: -81.5 })).toBe(true);    // Orlando
+    expect(inTripRegion({ lat: 25.08, lng: -77.34 })).toBe(true);    // Nassau
+    expect(inTripRegion({ lat: 3.54, lng: -76.38 })).toBe(false);    // Cali
   });
 
   it("measures distances", () => {

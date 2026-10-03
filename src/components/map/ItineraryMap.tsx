@@ -1,12 +1,13 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CloudDownload, Loader2, MapPin } from "lucide-react";
 import dynamic from "next/dynamic";
+import DayStrip from "@/components/map/DayStrip";
 import NearbyList from "@/components/map/NearbyList";
-import { dayColor } from "@/constants/mapColors";
+import PlaceCarousel from "@/components/map/PlaceCarousel";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import { canStoreMap, needsRefresh, offlineMapState, storeMapOffline } from "@/lib/mapOffline";
-import { mapStops, missingPhotos, staleEvents, type LngLat } from "@/utils/tripGeo";
-import { cn } from "@/lib/utils";
+import { eventKey, inTripRegion, mapStops, missingPhotos, staleEvents, stopOrder, type LngLat } from "@/utils/tripGeo";
 import type { useTripGeo } from "@/hooks/useTripGeo";
 import type { RoomPayload } from "@/hooks/useRoom";
 import type { Day, EventPlace } from "@/types";
@@ -28,8 +29,11 @@ interface ItineraryMapProps {
 type Status = { kind: "idle" } | { kind: "locating"; count: number } | { kind: "error"; message: string };
 type Storing = { done: number; total: number } | "ready" | null;
 
-// Rooms already located in this session: opening the map again doesn't re-ask.
-const attempted = new Set<string>();
+// What this session already asked to locate (activity id + its text), and the
+// rooms whose photos were looked up: each is asked once, edits ask again.
+const tried = new Set<string>();
+const photosTried = new Set<string>();
+const LOCATE_DELAY = 2500;   // ms after the last itinerary change
 
 // Itinerary as a map: a pin per place, filtered by day, the user's position
 // and what's near it. Activities are located the first time (and when they
@@ -48,9 +52,10 @@ export default function ItineraryMap({ geo, days, todayIdx, roomCode, localMode,
   const [storing, setStoring] = useState<Storing>(() => (offlineMapState() ? "ready" : null));
   const storingRun = useRef(false);
 
-  const allStops = useMemo(() => mapStops(days, geo.eventPlaces), [days, geo.eventPlaces]);
+  const allStops = useMemo(() => mapStops(days, geo.eventPlaces).filter(inTripRegion), [days, geo.eventPlaces]);
   const stops = dayIdx == null ? allStops : allStops.filter((s) => s.visits.some((v) => v.dayIdx === dayIdx));
   const stale = staleEvents(days, geo.eventPlaces);
+  const order = useMemo(() => stopOrder(allStops, dayIdx), [allStops, dayIdx]);
 
   // The server reads the saved room (save first); the local demo room sends it.
   async function locate() {
@@ -72,14 +77,22 @@ export default function ItineraryMap({ geo, days, todayIdx, roomCode, localMode,
     }
   }
 
-  // New or edited activities, or places still without a photo search.
-  const noPhotos = missingPhotos(geo.eventPlaces);
+  // The map follows the itinerary: activities added or edited (here or by
+  // another member) are located a moment after the changes stop. Places still
+  // without a photo search get one, once per session.
+  const untried = stale.filter((ev) => !tried.has(`${roomCode}|${ev.id}|${eventKey(ev)}`));
+  const untriedKey = untried.map((ev) => ev.id).join(",");
+  const noPhotos = missingPhotos(geo.eventPlaces) && !photosTried.has(roomCode);
   useEffect(() => {
-    if ((stale.length === 0 && !noPhotos) || attempted.has(roomCode) || !navigator.onLine) return;
-    attempted.add(roomCode);
-    void locate();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- once per room and session
-  }, [roomCode, stale.length, noPhotos]);
+    if ((!untriedKey && !noPhotos) || status.kind === "locating" || !navigator.onLine) return;
+    const timer = setTimeout(() => {
+      for (const ev of untried) tried.add(`${roomCode}|${ev.id}|${eventKey(ev)}`);
+      photosTried.add(roomCode);
+      void locate();
+    }, LOCATE_DELAY);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by what's still to locate
+  }, [roomCode, untriedKey, noPhotos, status.kind]);
 
   // Keep the region and every pin's surroundings on the device (production only).
   useEffect(() => {
@@ -95,67 +108,95 @@ export default function ItineraryMap({ geo, days, todayIdx, roomCode, localMode,
       .finally(() => { storingRun.current = false; });
   }, [allStops]);
 
+  // Phone: the map fills the screen down to the tab bar, edge to edge.
+  const mobile = useIsMobile();
+  const fillRef = useRef<HTMLDivElement>(null);
+  const [fill, setFill] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (!mobile) return;
+    const update = () => {
+      const el = fillRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const bar = document.querySelector("nav")?.getBoundingClientRect().height ?? 0;
+      setFill(Math.max(320, window.innerHeight - top - bar));
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [mobile]);
+
+  const focusStop = (id: string) => setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
+  const map = (className: string, bottomInset: number) => (
+    <TripMap
+      className={className}
+      touch={mobile}
+      bottomInset={bottomInset}
+      days={days}
+      stops={stops}
+      order={order}
+      dayIdx={dayIdx}
+      fitRequest={fitRequest}
+      focus={focus}
+      onPosition={setPosition}
+      onOpenEvent={onOpenEvent}
+    />
+  );
+
+  const locating = status.kind === "locating" && (
+    <span className="flex items-center gap-1.5"><Loader2 className="size-3.5 animate-spin" />
+      {status.count > 0 ? `Ubicando ${status.count} actividades en el mapa…` : "Buscando fotos de los lugares…"}
+    </span>
+  );
+  const failed = status.kind === "error" && (
+    <span className="text-destructive">
+      {status.message} · <button onClick={locate} className="cursor-pointer underline underline-offset-2">reintentar</button>
+    </span>
+  );
+  const pending = status.kind === "idle" && stale.length > 0 && (
+    <button onClick={locate} className="flex cursor-pointer items-center gap-1.5 underline-offset-2 hover:underline">
+      <MapPin className="size-3.5" />Ubicar {stale.length} {stale.length === 1 ? "actividad nueva" : "actividades nuevas"}
+    </button>
+  );
+  const saving = storing && storing !== "ready" && (
+    <span className="flex items-center gap-1.5">
+      <CloudDownload className="size-3.5" />Guardando mapa sin conexión… {Math.round((storing.done / storing.total) * 100)}%
+    </span>
+  );
+
+  if (mobile) {
+    const notice = locating || failed || pending || saving;
+    return (
+      <div className="flex flex-col gap-2">
+        <DayStrip days={days} selected={dayIdx} onSelect={pickDay} />
+        <div ref={fillRef} className="relative -mx-4" style={{ height: fill ?? "60dvh" }}>
+          {map("h-full", 112)}
+          {notice && (
+            <div role="status" className="absolute left-1/2 top-3 z-10 max-w-[80%] -translate-x-1/2 rounded-full bg-card/95 px-3 py-1.5 text-xs text-secondary-foreground shadow-md ring-1 ring-border backdrop-blur">
+              {notice}
+            </div>
+          )}
+          <div className="absolute inset-x-0 bottom-3 z-10">
+            <PlaceCarousel stops={stops} order={order} days={days} dayIdx={dayIdx} position={position} onFocus={focusStop} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3">
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-wrap md:px-0">
-        <DayChip label="Todo el viaje" active={dayIdx == null} onClick={() => pickDay(null)} />
-        {days.map((d, i) => (
-          <DayChip key={d.id} label={d.label} color={dayColor(i)} active={dayIdx === i} onClick={() => pickDay(i)} />
-        ))}
-      </div>
-
-      <TripMap
-        days={days}
-        stops={stops}
-        dayIdx={dayIdx}
-        fitRequest={fitRequest}
-        focus={focus}
-        onPosition={setPosition}
-        onOpenEvent={onOpenEvent}
-      />
-
-      <div className="flex flex-col gap-1 text-xs text-muted-foreground" aria-live="polite">
-        {status.kind === "locating" && (
-          <span className="flex items-center gap-1.5"><Loader2 className="size-3.5 animate-spin" />
-            {status.count > 0 ? `Ubicando ${status.count} actividades en el mapa… (unos segundos)` : "Buscando fotos de los lugares…"}
-          </span>
-        )}
-        {status.kind === "error" && (
-          <span className="text-destructive">
-            {status.message} · <button onClick={locate} className="cursor-pointer underline underline-offset-2">reintentar</button>
-          </span>
-        )}
-        {status.kind === "idle" && stale.length > 0 && (
-          <button onClick={locate} className="flex cursor-pointer items-center gap-1.5 self-start underline-offset-2 hover:underline">
-            <MapPin className="size-3.5" />Ubicar {stale.length} {stale.length === 1 ? "actividad nueva" : "actividades nuevas"}
-          </button>
-        )}
-        {storing && storing !== "ready" && (
-          <span className="flex items-center gap-1.5">
-            <CloudDownload className="size-3.5" />Guardando el mapa del viaje para usar sin internet… {Math.round((storing.done / storing.total) * 100)}%
-          </span>
-        )}
+      <DayStrip days={days} selected={dayIdx} onSelect={pickDay} />
+      {map("h-[68dvh] rounded-2xl ring-1 ring-border", 0)}
+      <div className="flex flex-col items-start gap-1 text-xs text-muted-foreground" aria-live="polite">
+        {locating}
+        {failed}
+        {pending}
+        {saving}
         {storing === "ready" && <span className="flex items-center gap-1.5"><CloudDownload className="size-3.5" />Mapa de Orlando, Miami y el crucero guardado para usar sin internet</span>}
         <span>Tip: pega un link de Google Maps en la nota de una actividad para fijar su ubicación exacta.</span>
       </div>
-
-      {position && <NearbyList position={position} stops={allStops} days={days} onFocus={(id) => setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }))} />}
+      {position && <NearbyList position={position} stops={allStops} days={days} onFocus={focusStop} />}
     </div>
-  );
-}
-
-function DayChip({ label, color, active, onClick }: { label: string; color?: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium ring-1 transition-colors",
-        active ? "bg-foreground text-background ring-foreground" : "bg-card text-secondary-foreground ring-border hover:text-foreground",
-      )}
-    >
-      {color && <span className="size-2 rounded-full" style={{ background: color }} />}
-      {label}
-    </button>
   );
 }

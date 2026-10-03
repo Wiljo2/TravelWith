@@ -96,7 +96,7 @@ export function buildGeoPrompt(payload: RoomPayload, located: Record<string, Eve
     return lines.join("\n");
   }).join("\n");
   const user = `${payload.trip?.destination ? `Destino: ${payload.trip.destination}\n` : ""}ITINERARIO\n${itinerary}\n\n` +
-    `Devuelve un elemento en "events" por cada actividad con etiqueta (e1, e2…).`;
+    `Hay ${labels.size} actividades con etiqueta. Devuelve exactamente ${labels.size} elementos en "events", uno por etiqueta (e1, e2…), sin saltarte ninguna.`;
   return { system: SYSTEM, user, labels, count: labels.size };
 }
 
@@ -144,8 +144,8 @@ async function geocode(query: string, near: { lat: number; lng: number }): Promi
 // Claude's estimate refined by the geocoder, a few lookups at a time.
 export async function refine(answers: (Answer & { id: string; key: string })[]): Promise<Record<string, EventPlace>> {
   const out: Record<string, EventPlace> = {};
-  for (let i = 0; i < answers.length; i += 4) {
-    await Promise.all(answers.slice(i, i + 4).map(async (a) => {
+  for (let i = 0; i < answers.length; i += 8) {
+    await Promise.all(answers.slice(i, i + 8).map(async (a) => {
       const valid = a.kind === "place" && Number.isFinite(a.lat) && Number.isFinite(a.lng) && (a.lat !== 0 || a.lng !== 0);
       if (!valid) {
         out[a.id] = { key: a.key, kind: a.kind === "place" ? "none" : a.kind };
@@ -168,15 +168,15 @@ function missingPhotos(payload: RoomPayload): Record<string, EventPlace> {
   return Object.fromEntries(Object.entries(payload.eventPlaces ?? {}).filter(([, p]) => p.kind === "place" && p.photo === undefined));
 }
 
-export async function locateEvents(payload: RoomPayload): Promise<{ places: Record<string, EventPlace>; usage: { input: number; output: number } }> {
-  if (!process.env.ANTHROPIC_API_KEY) throw new GeocodeError("Falta ANTHROPIC_API_KEY en el servidor.");
-  const fromLinks = await placesFromLinks(staleEvents(payload.days ?? [], payload.eventPlaces ?? {}));
-  const prompt = buildGeoPrompt(payload, fromLinks);
-  if (prompt.count === 0) return { places: await withPhotos({ ...missingPhotos(payload), ...fromLinks }), usage: { input: 0, output: 0 } };
+const MAX_ROUNDS = 3;
 
+type Located = Answer & { id: string; key: string };
+
+// One model call: the answers for the labeled activities of `prompt`.
+async function ask(prompt: ReturnType<typeof buildGeoPrompt>): Promise<{ answers: Located[]; input: number; output: number }> {
   const response = await new Anthropic().messages.create({
     model: MODEL,
-    max_tokens: 1000 + prompt.count * 120,
+    max_tokens: 2000 + prompt.count * 150,
     system: prompt.system,
     messages: [{ role: "user", content: prompt.user }],
     output_config: { ...(MODEL.includes("haiku") ? {} : { effort: "low" as const }), format: { type: "json_schema", schema: SCHEMA } },
@@ -185,12 +185,35 @@ export async function locateEvents(payload: RoomPayload): Promise<{ places: Reco
   if (response.stop_reason === "max_tokens") throw new GeocodeError("Demasiadas actividades para ubicar de una vez.");
   const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text")?.text;
   if (!text) throw new GeocodeError("Respuesta vacía del modelo.");
+  const answers = ((JSON.parse(text) as { events?: Answer[] }).events ?? []).flatMap((a) => {
+    const ev = prompt.labels.get(a.event?.trim());
+    return ev ? [{ ...a, ...ev }] : [];
+  });
+  return { answers, input: response.usage.input_tokens, output: response.usage.output_tokens };
+}
 
-  const answers = ((JSON.parse(text) as { events?: Answer[] }).events ?? [])
-    .flatMap((a) => {
-      const ev = prompt.labels.get(a.event?.trim());
-      return ev ? [{ ...a, ...ev }] : [];
-    });
-  const places = await withPhotos({ ...missingPhotos(payload), ...fromLinks, ...(await refine(answers)) });
-  return { places, usage: { input: response.usage.input_tokens, output: response.usage.output_tokens } };
+export async function locateEvents(payload: RoomPayload): Promise<{ places: Record<string, EventPlace>; usage: { input: number; output: number } }> {
+  if (!process.env.ANTHROPIC_API_KEY) throw new GeocodeError("Falta ANTHROPIC_API_KEY en el servidor.");
+  const fromLinks = await placesFromLinks(staleEvents(payload.days ?? [], payload.eventPlaces ?? {}));
+
+  // The model sometimes answers only part of a long list: ask again for the
+  // activities still missing, with the ones already answered as context.
+  const answered: Record<string, EventPlace> = { ...fromLinks };
+  const found: Located[] = [];
+  const usage = { input: 0, output: 0 };
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const prompt = buildGeoPrompt(payload, answered);
+    if (prompt.count === 0) break;
+    const { answers, input, output } = await ask(prompt);
+    usage.input += input;
+    usage.output += output;
+    if (answers.length === 0) break;
+    for (const a of answers) {
+      found.push(a);
+      answered[a.id] = { key: a.key, kind: a.kind, name: a.name || undefined };
+    }
+  }
+
+  const places = await withPhotos({ ...missingPhotos(payload), ...fromLinks, ...(await refine(found)) });
+  return { places, usage };
 }

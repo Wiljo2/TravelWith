@@ -11,6 +11,10 @@ export type BBox = { west: number; south: number; east: number; north: number };
 // Orlando, Miami and the cruise (Nassau, CocoCay): always kept for offline use
 // at overview zooms, so the ship's position can be seen anywhere on the route.
 export const TRIP_REGION: BBox = { west: -82.2, south: 23.0, east: -76.0, north: 29.2 };
+
+// Only the trip's region goes on the map (not, say, the home airport).
+export const inTripRegion = (p: LngLat) =>
+  p.lng >= TRIP_REGION.west && p.lng <= TRIP_REGION.east && p.lat >= TRIP_REGION.south && p.lat <= TRIP_REGION.north;
 const REGION_ZOOMS = [4, 5, 6, 7, 8, 9];
 // Around each pin, more detail the closer in (km of radius per zoom). The
 // vector tiles stop at zoom 14; the map draws closer views from those.
@@ -31,13 +35,15 @@ export interface StopVisit { dayIdx: number; dayId: string; eventId: string; tit
 export interface MapStop extends LngLat { id: string; name: string; query?: string; photo?: string; photoPage?: string; visits: StopVisit[] }
 
 // One pin per spot: activities closer than ~80 m share it, and so do those
-// named the same within 2 km (one mall located twice). In trip order.
+// named the same within 2 km (one mall located twice). In trip order. An
+// activity edited since it was located keeps its pin until it's located again.
+// Visits follow the itinerary as it is now (moved activities move with it).
 export function mapStops(days: Day[], places: Record<string, EventPlace>): MapStop[] {
   const stops: MapStop[] = [];
   days.forEach((day, dayIdx) => {
     for (const ev of [...day.events].sort((a, b) => a.start - b.start)) {
       const p = places[ev.id];
-      if (p?.kind !== "place" || p.lat == null || p.lng == null || p.key !== eventKey(ev)) continue;
+      if (p?.kind !== "place" || p.lat == null || p.lng == null) continue;
       const at = { lat: p.lat, lng: p.lng };
       const name = normalizeText(p.name ?? "");
       let stop = stops.find((s) => {
@@ -53,6 +59,17 @@ export function mapStops(days: Day[], places: Record<string, EventPlace>): MapSt
     }
   });
   return stops;
+}
+
+// Each pin's place in the itinerary: 1, 2, 3… by its first visit (day, then
+// time). With a day selected, the order within that day.
+export function stopOrder(stops: MapStop[], dayIdx: number | null): Map<string, number> {
+  const visits = stops
+    .flatMap((s) => s.visits.filter((v) => dayIdx == null || v.dayIdx === dayIdx).map((v) => ({ id: s.id, v })))
+    .sort((a, b) => a.v.dayIdx - b.v.dayIdx || a.v.start - b.v.start);
+  const order = new Map<string, number>();
+  for (const { id } of visits) if (!order.has(id)) order.set(id, order.size + 1);
+  return order;
 }
 
 export function distanceKm(a: LngLat, b: LngLat): number {
