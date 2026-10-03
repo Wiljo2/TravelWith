@@ -5,6 +5,7 @@ import { TASK_CATEGORIES, DEFAULT_TASK_CAT, PRIORITIES, PRIORITY_ORDER } from "@
 import { CATEGORIES, DEFAULT_EVENT_CAT, EVENT_CATEGORY_KEYS } from "@/constants/categories";
 import { LIMITS } from "@/constants/limits";
 import { fmtHour } from "@/utils/time";
+import { findGoogleMapsLink } from "@/utils/googleMaps";
 import { rootZoom } from "@/utils/zoom";
 import { HOUR_END } from "@/constants/time";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,7 @@ interface SlotCreateModalProps {
   dayLabel: string;
   hour: number;
   existing?: Task | null;
-  onSaveActivity: (fields: { title: string; note: string; cat: string; start: number; end: number }) => void;
+  onSaveActivity: (fields: { title: string; note: string; cat: string; start: number; end: number; mapsUrl?: string }) => void;
   onSaveTask: (patch: Partial<Task>) => void;
   onDeleteTask?: () => void;
   onClose: () => void;
@@ -40,25 +41,29 @@ export default function SlotCreateModal({
 
   const [title, setTitle]       = useState(existing?.title ?? "");
   const [note, setNote]         = useState(existing?.note ?? "");
+  const [maps, setMaps]         = useState("");
   const [dur, setDur]           = useState<number>(existing?.end && existing?.start ? existing.end - existing.start : 1);
   const [actCat, setActCat]     = useState<string>(DEFAULT_EVENT_CAT);
   const [taskCat, setTaskCat]   = useState<string>(existing?.cat ?? DEFAULT_TASK_CAT);
   const [priority, setPriority] = useState<TaskPriority>(existing?.priority ?? "media");
 
-  const canSave = title.trim().length > 0;
+  // Optional Google Maps link (activities only): must really be one.
+  const mapsLink = maps.trim() ? findGoogleMapsLink(maps) : undefined;
+  const mapsInvalid = !!maps.trim() && !mapsLink;
+  const canSave = title.trim().length > 0 && !mapsInvalid;
 
   function save() {
     if (!canSave) return;
     const start = startHour;
     const end = Math.min(start + dur, HOUR_END);
-    if (tab === "activity") onSaveActivity({ title: title.trim(), note: note.trim(), cat: actCat, start, end });
+    if (tab === "activity") onSaveActivity({ title: title.trim(), note: note.trim(), cat: actCat, start, end, mapsUrl: mapsLink });
     else onSaveTask({ title: title.trim(), note: note.trim(), cat: taskCat, priority, start, end });
   }
 
   // x/y arrive as client coordinates; the modal is positioned inside the zoomed
   // body, so both the cursor point and the viewport bounds go back to local px.
   const W = 288;
-  const H = 440;
+  const H = 480;
   const z = rootZoom();
   const left = typeof window !== "undefined" ? Math.min(x, window.innerWidth - (W + 12) * z) / z : x;
   const top  = typeof window !== "undefined" ? Math.min(y, window.innerHeight - H * z) / z : y;
@@ -92,6 +97,20 @@ export default function SlotCreateModal({
         rows={2}
         className="min-h-0 bg-secondary text-xs leading-normal"
       />
+
+      {tab === "activity" && (
+        <div>
+          <Input
+            value={maps}
+            onChange={(e) => setMaps(e.target.value)}
+            placeholder="Link de Google Maps (opcional)"
+            inputMode="url"
+            aria-invalid={mapsInvalid}
+            className="bg-secondary text-xs"
+          />
+          {mapsInvalid && <p className="mt-1 text-[11px] text-destructive">No parece un link de Google Maps.</p>}
+        </div>
+      )}
 
       <div>
         <div className="mb-1.5 text-[10px] font-semibold tracking-[.06em] text-muted-foreground">CATEGORÍA</div>

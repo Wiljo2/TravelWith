@@ -30,6 +30,16 @@ describe("payloadIssues", () => {
     expect(payloadIssues(many)).not.toEqual([]);
   });
 
+  it("only stores https links as an event's mapsUrl", () => {
+    const withLink = (mapsUrl: string) => {
+      const p = base();
+      p.days[0].events.push({ id: "e1", start: 9, end: 10, title: "X", cat: "comida", note: "", mapsUrl });
+      return payloadIssues(p);
+    };
+    expect(withLink("https://maps.app.goo.gl/abc123")).toEqual([]);
+    expect(withLink("javascript:alert(1)")).not.toEqual([]);
+  });
+
   it("only allows plain colors in spans (no url())", () => {
     const span = (bg: string) => ({ ...base(), tripSpans: [{ id: "s", startEventId: "a", endEventId: "b", bg, border: "transparent" }] });
     expect(payloadIssues(span("rgba(59,130,246,.14)"))).toEqual([]);

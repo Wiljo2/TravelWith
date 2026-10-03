@@ -81,7 +81,7 @@ export function buildGeoPrompt(payload: RoomPayload, located: Record<string, Eve
   const itinerary = days.map((day, i) => {
     const lines = [`${day.label}${day.sub ? ` · ${day.sub}` : ""} · ${phases[i]}`];
     for (const ev of [...day.events].sort((a, b) => a.start - b.start)) {
-      const note = (ev.note ?? "")
+      const note = `${ev.note ?? ""} ${ev.mapsUrl ?? ""}`
         .replace(new RegExp(GOOGLE_MAPS_RE.source, "gi"), (url) => `[Google Maps: ${placeNameFromGoogleMapsUrl(url) ?? "link"}]`)
         .replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 120);
       const known = located[ev.id] ?? payload.eventPlaces?.[ev.id];
@@ -117,7 +117,8 @@ async function resolveLink(url: string): Promise<string> {
 export async function placesFromLinks(events: CalendarEvent[]): Promise<Record<string, EventPlace>> {
   const out: Record<string, EventPlace> = {};
   await Promise.all(events.map(async (ev) => {
-    const link = findGoogleMapsLink(`${ev.title} ${ev.note ?? ""}`);
+    // The activity's own link field first, then a link pasted in its text.
+    const link = findGoogleMapsLink(`${ev.mapsUrl ?? ""} ${ev.title} ${ev.note ?? ""}`);
     if (!link) return;
     const url = await resolveLink(link);
     const at = coordsFromGoogleMapsUrl(url);

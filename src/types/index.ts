@@ -13,6 +13,7 @@ export interface CalendarEvent {
   title: string;
   cat: string;
   note: string;
+  mapsUrl?: string;       // Google Maps link: pins the activity's exact spot on the trip map
 }
 
 // A span defined at the trip level that can cross multiple days.

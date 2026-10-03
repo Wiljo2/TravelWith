@@ -23,6 +23,7 @@ const calendarEvent = z.looseObject({
   title: text(LIMITS.title),
   cat: text(LIMITS.id),
   note: text(LIMITS.note).nullish(),
+  mapsUrl: text(LIMITS.note).regex(/^https:\/\//).nullish(),
 });
 
 const daySpan = z.looseObject({

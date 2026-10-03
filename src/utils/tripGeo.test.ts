@@ -57,6 +57,11 @@ describe("trip map", () => {
     expect(inTripRegion({ lat: 3.54, lng: -76.38 })).toBe(false);    // Cali
   });
 
+  it("locates an activity again when its Google Maps link is added, and only then", () => {
+    const withLink = days.map((d) => ({ ...d, events: d.events.map((e) => (e.id === "c" ? { ...e, mapsUrl: "https://maps.app.goo.gl/x" } : e)) }));
+    expect(staleEvents(withLink, places).map((e) => e.id)).toEqual(["c", "d"]);
+  });
+
   it("measures distances", () => {
     expect(distanceKm({ lat: 25.7782, lng: -80.1871 }, { lat: 25.0812, lng: -77.3375 })).toBeCloseTo(294, -1);
   });
