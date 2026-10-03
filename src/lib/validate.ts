@@ -40,6 +40,7 @@ export function validateRoomPayload(body: unknown): RoomPayload | null {
   }
 
   if (p.trip !== undefined && !validateTripInput(p.trip)) return null;
+  if (p.eventPlaces !== undefined && (typeof p.eventPlaces !== "object" || p.eventPlaces === null || Array.isArray(p.eventPlaces))) return null;
 
   return p as unknown as RoomPayload;
 }

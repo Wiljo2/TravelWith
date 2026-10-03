@@ -6,6 +6,8 @@ import { useRoom } from "@/hooks/useRoom";
 import { useTripSession } from "@/hooks/useTripSession";
 import { useTasks } from "@/hooks/useTasks";
 import { useIdeas } from "@/hooks/useIdeas";
+import { useTripGeo } from "@/hooks/useTripGeo";
+import { chooseOption } from "@/utils/taskDecision";
 import type { RoomPayload, MockPerson } from "@/hooks/useRoom";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { snapHour } from "@/utils/time";
@@ -25,6 +27,7 @@ import Toast from "@/components/Toast";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
 import IdeasTab from "@/components/ideas/IdeasTab";
+import ItineraryMap from "@/components/map/ItineraryMap";
 import type { Task, ToastAction, TripInfo, TripSpan } from "@/types";
 import { initialDays } from "@/data/initialDays";
 import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE, mockRoomPayload } from "@/data/mockRoom";
@@ -55,6 +58,7 @@ export default function App() {
   const ideasApi = useIdeas(roomCode);
   const { ideas, loadPayload: loadIdeasPayload, payload: ideasPayload, customPlaces, planLinks, planLinksAt, planIdeaIds } = ideasApi;
   const [trip, setTrip] = useState<TripInfo | null>(null);
+  const geoApi = useTripGeo();
 
   function addTripSpan(span: TripSpan) { setTripSpans((p) => [...p, span]); }
   function removeTripSpan(id: string)  { setTripSpans((p) => p.filter((s) => s.id !== id)); }
@@ -67,29 +71,7 @@ export default function App() {
     setMockPeople((prev) => prev.filter((p) => p.id !== id));
   }
 
-  // Confirm a decision: choosing an option promotes the task to a real activity
-  // (a calendar event if it's scheduled) plus a budget line, then removes the task.
-  function chooseTaskOption(taskId: string, optionId: string) {
-    const task = tasks.find((t) => t.id === taskId);
-    const option = task?.options?.find((o) => o.id === optionId);
-    if (!task || !option) return;
-
-    let linkedEventId: string | undefined;
-    if (task.dayId && task.start != null) {
-      const end = task.end ?? Math.min(task.start + 1, HOUR_END);
-      linkedEventId = addEvent(task.dayId, task.title, task.start, end, option.note ?? "", "logist");
-    }
-    if (option.amount && option.amount > 0) {
-      addExtra({
-        label: `${task.title}: ${option.label}`,
-        amount: option.amount,
-        currency: option.currency ?? "USD",
-        splitMode: option.splitMode ?? "group",
-        linkedEventId,
-      });
-    }
-    deleteTask(taskId);
-  }
+  const chooseTaskOption = (taskId: string, optionId: string) => chooseOption(tasks, taskId, optionId, { addEvent, addExtra, deleteTask });
 
   // Swap the whole contents of two days (events + spans) and their scheduled tasks.
   function swapDaysWithTasks(aId: string, bId: string) {
@@ -109,7 +91,8 @@ export default function App() {
     if (Array.isArray(payload.tripSpans))  setTripSpans(payload.tripSpans);
     if (Array.isArray(payload.tasks))      setTasks(payload.tasks);
     loadIdeasPayload(payload);
-  }, [loadDays, loadBudget, loadIdeasPayload]);
+    geoApi.loadPayload(payload);
+  }, [loadDays, loadBudget, loadIdeasPayload, geoApi.loadPayload]);
 
   const { connected, offlineSince, members, saveState, save } = useRoom(roomCode, onRemoteUpdate);
 
@@ -134,6 +117,9 @@ export default function App() {
     updateExtra(extraId, { linkedEventId: eventId });
   }, [updateExtra]);
 
+  // The whole trip as stored in the room, right now.
+  const payloadNow = (): RoomPayload => ({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ...ideasPayload, ...geoApi.payload });
+
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!roomCode || roomCode === "LOCAL") return;
@@ -141,12 +127,10 @@ export default function App() {
     // state would overwrite the real trip.
     if (!connected) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      save({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ...ideasPayload });
-    }, 600);
+    saveTimer.current = setTimeout(() => save(payloadNow()), 600);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, planLinks, planLinksAt, planIdeaIds, roomCode, connected]);
+  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, planLinks, planLinksAt, planIdeaIds, geoApi.eventPlaces, roomCode, connected]);
 
   function handleSelect(id: string | null) {
     setSelectedId(id);
@@ -327,6 +311,19 @@ export default function App() {
         />
       )}
 
+      {activeTab === "map" && (
+        <ItineraryMap
+          geo={geoApi}
+          days={days}
+          todayIdx={todayIdx}
+          roomCode={roomCode}
+          localMode={localMode}
+          currentPayload={payloadNow}
+          save={save}
+          onOpenEvent={(id) => { setActiveTab("calendar"); handleSelect(id); }}
+        />
+      )}
+
       {activeTab === "ideas" && (
         <IdeasTab
           api={ideasApi}
@@ -336,7 +333,7 @@ export default function App() {
           user={user}
           days={days}
           trip={trip}
-          currentPayload={() => ({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ...ideasPayload })}
+          currentPayload={payloadNow}
           save={save}
         />
       )}

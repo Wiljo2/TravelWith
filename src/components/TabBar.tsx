@@ -1,9 +1,9 @@
 "use client";
-import { CalendarDays, House, Lightbulb, ListChecks, Wallet } from "lucide-react";
+import { CalendarDays, House, Lightbulb, ListChecks, Map as MapIcon, Wallet } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type Tab = "home" | "calendar" | "ideas" | "budget" | "tasks";
+export type Tab = "home" | "calendar" | "map" | "ideas" | "budget" | "tasks";
 
 interface TabBarProps {
   active: Tab;
@@ -14,6 +14,7 @@ interface TabBarProps {
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "home",     label: "Inicio",     icon: House },
   { id: "calendar", label: "Itinerario", icon: CalendarDays },
+  { id: "map",      label: "Mapa",       icon: MapIcon },
   { id: "ideas",    label: "Ideas",      icon: Lightbulb },
   { id: "budget",   label: "Gastos",     icon: Wallet },
   { id: "tasks",    label: "Pendientes", icon: ListChecks },

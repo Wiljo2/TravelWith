@@ -154,6 +154,22 @@ export interface IdeaLink {
   source: "rules" | "ai" | "claude";
 }
 
+// Where an activity happens, for the trip map. Taken from a Google Maps link in
+// the activity when there is one; otherwise found by Claude (which place it is)
+// and a geocoder (its exact coordinates). Found again when the activity's title
+// or note change (`key`).
+export interface EventPlace {
+  key: string;                   // the title + note it was located from
+  kind: "place" | "ship" | "none"; // ship = aboard the cruise; none = not a place
+  name?: string;                 // "Bayside Marketplace"
+  query?: string;                // "Bayside Marketplace, Miami, Florida": opens it in Google Maps
+  lat?: number;
+  lng?: number;
+  source?: "link" | "geocoder" | "claude";
+  photo?: string;                // Wikipedia photo of the place; "" = searched, none found
+  photoPage?: string;            // the Wikipedia article it comes from (credit)
+}
+
 // One "Analizar con Claude" run: its links and the ideas it actually read.
 export interface IdeaPlanResult {
   links: IdeaLink[];

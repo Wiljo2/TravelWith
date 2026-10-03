@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { loadSnapshot, saveSnapshot, updateSnapshotPayload } from "@/lib/offline";
-import type { Day, Extra, Idea, IdeaLink, RoomMember, Task, TripInfo, TripSpan } from "@/types";
+import type { Day, EventPlace, Extra, Idea, IdeaLink, RoomMember, Task, TripInfo, TripSpan } from "@/types";
 
 export interface MockPerson {
   id: string;
@@ -21,6 +21,7 @@ export interface RoomPayload {
   ideaLinks?: IdeaLink[];  // last "Analizar con Claude" result (free matches are computed live)
   ideaLinksAt?: string;    // ISO time of that analysis
   ideaLinksIds?: string[]; // ideas that analysis read (the others are "new")
+  eventPlaces?: Record<string, EventPlace>; // trip map: where each activity happens, by event id
 }
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
