@@ -14,21 +14,22 @@ function supabaseOrigins(): string {
   return `https://${host} wss://${host}`;
 }
 
-// Third parties the app loads directly in the browser:
-// - Google avatars (sign-in)
-// - trip map: OpenFreeMap style/tiles/glyphs and Wikimedia place photos
-// - idea covers from TikTok/YouTube CDNs (the /thumb route is the same-origin fallback)
+// Images load from any https origin: their URLs come from external APIs
+// (Wikipedia place photos, TikTok/YouTube covers, Google avatars) that pick
+// and change their own hosts. Scripts, connections and frames stay locked down.
+// Third parties the app connects to or embeds directly in the browser:
+// - trip map: OpenFreeMap style/tiles/glyphs, and Wikimedia place photos
+//   fetched for offline use (service worker and mapOffline)
 // - the TikTok/YouTube players embedded in the idea viewer
 const MAP_TILES = "https://tiles.openfreemap.org";
-const PLACE_PHOTOS = "https://upload.wikimedia.org https://thumb.wikimedia.org";
-const COVERS = "https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://i.ytimg.com";
+const PLACE_PHOTOS = "https://*.wikimedia.org";
 const PLAYERS = "https://www.tiktok.com https://www.youtube.com";
 
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: https://lh3.googleusercontent.com ${MAP_TILES} ${PLACE_PHOTOS} ${COVERS}`,
+  "img-src 'self' data: blob: https:",
   "font-src 'self'",
   `connect-src 'self' ${supabaseOrigins()} ${MAP_TILES} ${PLACE_PHOTOS}`,
   "worker-src 'self' blob:",
