@@ -9,7 +9,7 @@
 const CACHE = "tw-app-v1";
 const MAP_CACHE = "tw-map-v1";
 const MAP_HOST = "tiles.openfreemap.org";
-const PHOTO_HOSTS = ["upload.wikimedia.org", "thumb.wikimedia.org"];   // place photos (CORS, so cheap to keep)
+const PHOTO_DOMAIN = ".wikimedia.org";   // place photos, any Wikimedia host (CORS, so cheap to keep)
 const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icon.png", "/apple-icon.png"];
 
 const put = (key, res, cache = CACHE) => caches.open(cache).then((c) => c.put(key, res));
@@ -49,7 +49,7 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-  if (PHOTO_HOSTS.includes(url.host)) {
+  if (url.host.endsWith(PHOTO_DOMAIN)) {
     event.respondWith(cacheFirst(req, MAP_CACHE));
     return;
   }
