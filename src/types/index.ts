@@ -143,6 +143,15 @@ export interface Idea {
   embedId?: string;         // TikTok video id, for the in-app player (short links don't carry it)
   placeManual?: boolean;    // place set by hand: "Analizar con Claude" leaves it alone
   catManual?: boolean;      // type set by hand: likewise
+  moment?: IdeaMoment;      // moment in the plan set by hand: wins over the analysis and the rules
+}
+
+// Where a member put an idea on the plan: an activity (eventId), a whole day,
+// before the trip, or nowhere ({} = "no moment in this trip").
+export interface IdeaMoment {
+  dayId?: string;
+  eventId?: string;
+  before?: boolean;
 }
 
 // Where an idea fits the existing plan — shown read-only, never schedules anything.
@@ -155,7 +164,7 @@ export interface IdeaLink {
   slot?: { start: number; end: number };
   before?: boolean;
   reason?: string;           // why it fits (Claude) or the matching phrase (rules)
-  source: "rules" | "ai" | "claude";
+  source: "rules" | "ai" | "claude" | "manual";
 }
 
 // Where an activity happens, for the trip map. Taken from a Google Maps link in

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, Lightbulb, Plus } from "lucide-react";
 import IdeaCard from "@/components/ideas/IdeaCard";
 import IdeaViewer from "@/components/ideas/IdeaViewer";
@@ -13,9 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Disclosure } from "@/components/ui/disclosure";
 import { PANEL } from "@/components/home/shared";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
+import { ideaLinks, matchIdeasToPlan } from "@/utils/ideaPlan";
 import { fmtHour } from "@/utils/time";
 import { cn } from "@/lib/utils";
-import type { Day, Idea, IdeaLink, IdeaPlanResult } from "@/types";
+import type { Day, Idea, IdeaLink, IdeaMoment, IdeaPlanResult } from "@/types";
 import type { PlaceIndex } from "@/utils/ideas";
 import { isVenue, zonesOf } from "@/utils/places";
 
@@ -30,6 +31,7 @@ interface IdeasViewProps {
   onUpdate: (id: string, patch: Partial<Idea>) => void;
   onSetPlace: (id: string, place: string | undefined) => void;
   onSetCat: (id: string, cat: string | undefined) => void;
+  onSetMoment: (id: string, moment: IdeaMoment | undefined) => void;
   onRemove: (id: string) => void;
   onVote: (id: string) => void;
   onApplyClaude: (classes: IdeaPlanResult["classes"]) => void;
@@ -62,7 +64,7 @@ const GRID = "grid grid-cols-2 gap-2.5 md:grid-cols-[repeat(auto-fill,minmax(150
 // or over the itinerary, by day. Tapping one plays it.
 export default function IdeasView({
   ideas, index, roomCode, loadingIds, mobile, voter,
-  onAdd, onUpdate, onSetPlace, onSetCat, onRemove, onVote, onApplyClaude, onAcceptAll, onSetNote, onRetry, onAddPlace, onRemovePlace,
+  onAdd, onUpdate, onSetPlace, onSetCat, onSetMoment, onRemove, onVote, onApplyClaude, onAcceptAll, onSetNote, onRetry, onAddPlace, onRemovePlace,
   days, planLinks, planLinksAt, planIdeaIds, onAnalyze, onSavePlan, phase, todayIdx,
 }: IdeasViewProps) {
   const places = index.places.map((p) => p.name);
@@ -109,9 +111,15 @@ export default function IdeasView({
     <IdeaCard key={idea.id} idea={idea} roomCode={roomCode} loading={loadingIds.has(idea.id)} spot={spotOf(idea)} onOpen={() => setViewing(idea.id)} className={className} />
   );
 
-  // Where the opened idea fits the plan, from the last analysis.
+  // Where each idea fits the plan. Ideas still being read aren't placed yet:
+  // their text is about to change.
+  const ready = useMemo(() => ideas.filter((i) => i.status !== "discarded" && !loadingIds.has(i.id)), [ideas, loadingIds]);
+  const rules = useMemo(() => matchIdeasToPlan(ready, days, index.places), [ready, days, index.places]);
+  const links = ideaLinks(ready, days, rules, { links: planLinks, at: planLinksAt, ideaIds: planIdeaIds });
+  const placeGroups = zoneNames.map((z) => ({ zone: z, names: places.filter((p) => (zones.get(p) ?? p) === z) }));
+
   const current = ideas.find((i) => i.id === shown);
-  const link = current && planLinks?.find((l) => l.ideaId === current.id);
+  const link = current && links.find((l) => l.ideaId === current.id);
   const linkDay = link && days.find((d) => d.id === link.dayId);
   const linkEvent = link?.eventId ? linkDay?.events.find((e) => e.id === link.eventId) : undefined;
   const plan = link && linkDay ? {
@@ -123,12 +131,14 @@ export default function IdeasView({
       key={current.id}
       idea={current}
       roomCode={roomCode}
-      places={places}
+      placeGroups={placeGroups}
+      days={days}
       voter={voter}
       loading={loadingIds.has(current.id)}
       plan={plan}
       onUpdate={(patch) => onUpdate(current.id, patch)}
       onSetPlace={(place) => onSetPlace(current.id, place)}
+      onSetMoment={(moment) => onSetMoment(current.id, moment)}
       onSetCat={(cat) => onSetCat(current.id, cat)}
       onVote={() => onVote(current.id)}
       onRemove={() => { onRemove(current.id); setViewing(null); }}
@@ -184,11 +194,8 @@ export default function IdeasView({
           loadingIds={loadingIds}
           ideas={ideas}
           days={days}
-          places={index.places}
+          links={links}
           roomCode={roomCode}
-          planLinks={planLinks}
-          planLinksAt={planLinksAt}
-          planIdeaIds={planIdeaIds}
           phase={phase}
           todayIdx={todayIdx}
           onOpen={setViewing}

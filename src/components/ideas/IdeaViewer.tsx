@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CalendarDays, Check, ExternalLink, Loader2, ThumbsUp, Trash2, Undo2, X } from "lucide-react";
+import { Check, ExternalLink, Loader2, ThumbsUp, Trash2, Undo2, X } from "lucide-react";
+import IdeaMomentSelect from "@/components/ideas/IdeaMomentSelect";
 import IdeaNote from "@/components/ideas/IdeaNote";
 import IdeaThumb from "@/components/ideas/IdeaThumb";
 import { IDEA_PLATFORMS } from "@/constants/ideaPlatforms";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { ideaEmbedUrl, tiktokVideoId } from "@/utils/ideaMedia";
 import { cn } from "@/lib/utils";
-import type { Idea } from "@/types";
+import type { Day, Idea, IdeaMoment } from "@/types";
 
 const SELECT = "h-10 w-full min-w-0 cursor-pointer truncate rounded-xl border border-border bg-card px-2.5 text-[13px] text-foreground outline-none";
 const ACTION = "flex h-10 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium";
@@ -15,12 +16,14 @@ const ACTION = "flex h-10 cursor-pointer items-center gap-1.5 rounded-full px-3.
 interface IdeaViewerProps {
   idea: Idea;
   roomCode: string;
-  places: string[];
+  placeGroups: { zone: string; names: string[] }[];   // the trip's places, by zone
+  days: Day[];
   voter: string;
   loading: boolean;
   plan?: { when: string; reason?: string };   // where it fits the itinerary
   onUpdate: (patch: Partial<Idea>) => void;
   onSetPlace: (place: string | undefined) => void;
+  onSetMoment: (moment: IdeaMoment | undefined) => void;
   onSetCat: (cat: string | undefined) => void;
   onVote: () => void;
   onRemove: () => void;
@@ -31,7 +34,7 @@ interface IdeaViewerProps {
 // One idea, opened: its video playing in the app (TikTok, YouTube, Instagram),
 // where it fits the plan, and everything to edit about it.
 export default function IdeaViewer({
-  idea, roomCode, places, voter, loading, plan, onUpdate, onSetPlace, onSetCat, onVote, onRemove, onSetNote, onRetry,
+  idea, roomCode, placeGroups, days, voter, loading, plan, onUpdate, onSetPlace, onSetMoment, onSetCat, onVote, onRemove, onSetNote, onRetry,
 }: IdeaViewerProps) {
   const p = IDEA_PLATFORMS[idea.platform];
   const embed = ideaEmbedUrl(idea);
@@ -39,7 +42,7 @@ export default function IdeaViewer({
   const votes = idea.votes?.length ?? 0;
   const voted = idea.votes?.includes(voter) ?? false;
   const cat = idea.cat && IDEA_TYPES[idea.cat] ? idea.cat : undefined;
-  const placeOptions = idea.place && !places.includes(idea.place) ? [...places, idea.place] : places;
+  const lostPlace = idea.place && !placeGroups.some((g) => g.names.includes(idea.place!)) ? idea.place : undefined;
   const s = idea.suggestion?.place || idea.suggestion?.cat ? idea.suggestion : undefined;
   const wide = idea.platform === "youtube" && !idea.url.includes("/shorts/");
 
@@ -94,16 +97,6 @@ export default function IdeaViewer({
         </p>
       </div>
 
-      {plan && (
-        <div className="flex gap-2.5 rounded-xl bg-accent px-3 py-2.5 text-[13px] text-accent-foreground">
-          <CalendarDays className="mt-0.5 size-4 shrink-0" />
-          <span>
-            <span className="font-semibold">{plan.when}</span>
-            {plan.reason && <span className="block text-xs">{plan.reason}</span>}
-          </span>
-        </div>
-      )}
-
       {s && !discarded && (
         <div className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2 text-[13px]">
           <span className="min-w-0 flex-1">¿{[s.place && `📍 ${s.place}`, s.cat && IDEA_TYPES[s.cat] && `${IDEA_TYPES[s.cat].icon} ${IDEA_TYPES[s.cat].label}`].filter(Boolean).join(" · ")}?</span>
@@ -121,9 +114,18 @@ export default function IdeaViewer({
 
       {!discarded && (
         <div className="grid grid-cols-2 gap-2">
+          <IdeaMomentSelect days={days} moment={idea.moment} when={plan?.when} onChange={onSetMoment} className="col-span-2" />
+          {plan?.reason && !idea.moment && (
+            <p className="col-span-2 -mt-0.5 px-1 text-xs leading-snug text-secondary-foreground">✨ {plan.reason}</p>
+          )}
           <select value={idea.place ?? ""} onChange={(e) => onSetPlace(e.target.value || undefined)} aria-label="Lugar" className={SELECT}>
             <option value="">📍 Sin lugar</option>
-            {placeOptions.map((pl) => <option key={pl} value={pl}>{pl}</option>)}
+            {placeGroups.map((g) => (
+              <optgroup key={g.zone} label={g.zone}>
+                {g.names.map((pl) => <option key={pl} value={pl}>{pl === g.zone ? `📍 ${pl}` : pl}</option>)}
+              </optgroup>
+            ))}
+            {lostPlace && <option value={lostPlace}>{lostPlace}</option>}
           </select>
           <select value={cat ?? ""} onChange={(e) => onSetCat(e.target.value || undefined)} aria-label="Tipo" className={SELECT}>
             <option value="">Sin tipo</option>

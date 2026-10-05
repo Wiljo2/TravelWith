@@ -77,6 +77,7 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, acces
       onUpdate={api.updateIdea}
       onSetPlace={api.setPlaceByHand}
       onSetCat={api.setCatByHand}
+      onSetMoment={api.setMomentByHand}
       onRemove={api.removeIdea}
       onVote={(id) => api.toggleVote(id, voter)}
       onApplyClaude={(classes) => api.applyClaude(classes, index.places.map((p) => p.name))}

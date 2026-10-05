@@ -148,3 +148,35 @@ export function matchIdeasToPlan(ideas: Idea[], days: Day[], places: TripPlace[]
   }
   return links;
 }
+
+export interface SavedPlan {
+  links?: IdeaLink[];
+  at?: string;          // when Claude's last analysis ran
+  ideaIds?: string[];   // ideas it read
+}
+
+// Where each idea shows on the plan: the moment a member set by hand, else
+// Claude's last analysis for the ideas it read, else the free match (`rules`).
+// Days and activities no longer in the plan are skipped.
+export function ideaLinks(ideas: Idea[], days: Day[], rules: IdeaLink[], plan: SavedPlan): IdeaLink[] {
+  // Analyses saved before the ids were recorded fall back to the linked ideas.
+  const analyzedIds = new Set(plan.ideaIds ?? (plan.links ?? []).map((l) => l.ideaId));
+  const dayById = new Map(days.map((d) => [d.id, d]));
+  const eventIds = new Set(days.flatMap((d) => d.events.map((e) => e.id)));
+  return ideas.flatMap((i): IdeaLink[] => {
+    const m = i.moment;
+    if (m?.before) return [{ ideaId: i.id, dayId: m.dayId ?? "", before: true, source: "manual" }];
+    if (m && !m.dayId) return [];
+    const day = m?.dayId ? dayById.get(m.dayId) : undefined;
+    if (day) {
+      const ev = m!.eventId && day.events.some((e) => e.id === m!.eventId) ? m!.eventId : undefined;
+      return [{ ideaId: i.id, dayId: day.id, ...(ev ? { eventId: ev } : {}), source: "manual" }];
+    }
+    if (plan.at && analyzedIds.has(i.id)) {
+      return (plan.links ?? []).filter((l) => l.ideaId === i.id && dayById.has(l.dayId) && (!l.eventId || eventIds.has(l.eventId)));
+    }
+    const own = rules.filter((l) => l.ideaId === i.id);
+    const events = own.filter((l) => l.eventId);
+    return events.length ? events : own;
+  });
+}
