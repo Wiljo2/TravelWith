@@ -17,7 +17,7 @@ import { fmtHour } from "@/utils/time";
 import { cn } from "@/lib/utils";
 import type { Day, Idea, IdeaLink, IdeaPlanResult } from "@/types";
 import type { PlaceIndex } from "@/utils/ideas";
-import { isVenue } from "@/utils/places";
+import { isVenue, zonesOf } from "@/utils/places";
 
 interface IdeasViewProps {
   ideas: Idea[];
@@ -44,25 +44,32 @@ interface IdeasViewProps {
   planIdeaIds?: string[];
   onAnalyze: (ideaIds?: string[]) => Promise<IdeaPlanResult>;
   onSavePlan: (links: IdeaLink[], at: string, ideaIds: string[]) => void;
+  phase?: "before" | "during" | "after";
+  todayIdx?: number;
 }
 
 const ALL = "all";
 const REVIEW = "review";
-// Phone: a swipeable row of cards per place; desktop: a grid.
-const ROW = "-mx-4 flex snap-x gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden";
+const NONE = "__none";
+// Phone: a swipeable row of cards per zone; desktop: a grid.
+const ROW = "-mx-4 flex snap-x scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden";
 const CARD = "w-[38%] max-w-[170px] md:w-auto md:max-w-none";
+// One zone picked: all its ideas as a grid.
+const GRID = "grid grid-cols-2 gap-2.5 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]";
 
 // Inspiration board: reels/TikToks about the trip's places, as cover cards
-// grouped by place (or over the itinerary, by day). Tapping one plays it.
+// grouped by zone (Orlando, Miami, Crucero…), each card naming its exact spot;
+// or over the itinerary, by day. Tapping one plays it.
 export default function IdeasView({
   ideas, index, roomCode, loadingIds, mobile, voter,
   onAdd, onUpdate, onSetPlace, onSetCat, onRemove, onVote, onApplyClaude, onAcceptAll, onSetNote, onRetry, onAddPlace, onRemovePlace,
-  days, planLinks, planLinksAt, planIdeaIds, onAnalyze, onSavePlan,
+  days, planLinks, planLinksAt, planIdeaIds, onAnalyze, onSavePlan, phase, todayIdx,
 }: IdeasViewProps) {
   const places = index.places.map((p) => p.name);
   const areas = index.places.filter((p) => !isVenue(p)).map((p) => p.name);
   const venues = index.places.filter(isVenue).map((p) => p.name);
   const [filter, setFilter] = useState<string>(ALL);
+  const [zone, setZone] = useState<string>(ALL);
   const [view, setView] = useState<"place" | "day">("place");
   const [adding, setAdding] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
@@ -79,18 +86,27 @@ export default function IdeasView({
   const toReview = active.filter((i) => !i.place || !validCat(i));
   const withSuggestion = active.filter((i) => i.suggestion?.place || i.suggestion?.cat).length;
   const placeOf = (i: Idea) => (i.place && places.includes(i.place) ? i.place : undefined);
-  const visible = filter === ALL ? active : filter === REVIEW ? toReview : active.filter((i) => validCat(i) === filter);
+  const zones = zonesOf(index.places);
+  const zoneOf = (i: Idea) => { const p = placeOf(i); return p ? zones.get(p) ?? p : NONE; };
+  const byType = filter === ALL ? active : filter === REVIEW ? toReview : active.filter((i) => validCat(i) === filter);
+  const zoneNames = [...new Set(index.places.map((p) => zones.get(p.name) ?? p.name))];
+  const zoneChips = [...zoneNames, NONE]
+    .map((z) => ({ key: z, title: z === NONE ? "Sin lugar" : z, count: active.filter((i) => zoneOf(i) === z).length }))
+    .filter((z) => z.count > 0);
+  const pickedZone = zone !== ALL && zoneChips.some((z) => z.key === zone) ? zone : ALL;
+  const visible = pickedZone === ALL ? byType : byType.filter((i) => zoneOf(i) === pickedZone);
 
   // Most-liked first, then newest.
   const order = (a: Idea, b: Idea) =>
     (b.votes?.length ?? 0) - (a.votes?.length ?? 0) || b.createdAt.localeCompare(a.createdAt);
-  const groups = [
-    { key: "__none", title: "Sin lugar", items: visible.filter((i) => !placeOf(i)) },
-    ...index.places.map((p) => ({ key: p.name, title: p.name, sub: [...p.parents].sort((x, y) => x.length - y.length)[0], items: visible.filter((i) => placeOf(i) === p.name) })),
-  ].filter((g) => g.items.length > 0);
+  const groups = zoneChips
+    .map((z) => ({ ...z, items: visible.filter((i) => zoneOf(i) === z.key).sort(order) }))
+    .filter((g) => g.items.length > 0);
 
-  const card = (idea: Idea) => (
-    <IdeaCard key={idea.id} idea={idea} roomCode={roomCode} loading={loadingIds.has(idea.id)} onOpen={() => setViewing(idea.id)} className={CARD} />
+  // The exact spot, when it says more than the zone it is under.
+  const spotOf = (i: Idea) => { const p = placeOf(i); return p && p !== zones.get(p) ? p : undefined; };
+  const card = (idea: Idea, className = CARD) => (
+    <IdeaCard key={idea.id} idea={idea} roomCode={roomCode} loading={loadingIds.has(idea.id)} spot={spotOf(idea)} onOpen={() => setViewing(idea.id)} className={className} />
   );
 
   // Where the opened idea fits the plan, from the last analysis.
@@ -173,6 +189,8 @@ export default function IdeasView({
           planLinks={planLinks}
           planLinksAt={planLinksAt}
           planIdeaIds={planIdeaIds}
+          phase={phase}
+          todayIdx={todayIdx}
           onOpen={setViewing}
         />
       ) : ideas.length === 0 ? (
@@ -189,29 +207,34 @@ export default function IdeasView({
         </section>
       ) : (
         <>
-          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-wrap md:px-0">
-            <FilterChip label="Todas" count={active.length} active={filter === ALL} onClick={() => setFilter(ALL)} />
+          <div className="-mx-4 flex items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-wrap md:px-0 [&::-webkit-scrollbar]:hidden">
+            <FilterChip label="Todas" count={active.length} active={pickedZone === ALL} onClick={() => setZone(ALL)} />
+            {zoneChips.length > 1 && zoneChips.map((z) => (
+              <FilterChip key={z.key} label={`📍 ${z.title}`} count={z.count} active={pickedZone === z.key} onClick={() => setZone(z.key)} />
+            ))}
+            <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />
             {toReview.length > 0 && (
               <FilterChip label="Sin clasificar" count={toReview.length} active={filter === REVIEW} onClick={() => setFilter(REVIEW)} tone="amber" />
             )}
             {Object.entries(IDEA_TYPES).map(([k, t]) => {
               const n = active.filter((i) => validCat(i) === k).length;
-              return n > 0 && <FilterChip key={k} label={`${t.icon} ${t.label}`} count={n} active={filter === k} onClick={() => setFilter(k)} />;
+              return n > 0 && <FilterChip key={k} label={`${t.icon} ${t.label}`} count={n} active={filter === k} onClick={() => setFilter(filter === k ? ALL : k)} />;
             })}
           </div>
 
           {groups.length === 0 ? (
             <p className="py-6 text-center text-[13px] text-muted-foreground">
-              {filter === REVIEW ? "Todo está clasificado. 🎉" : "No hay ideas de este tipo todavía."}
+              {filter === REVIEW ? "Todo está clasificado. 🎉" : "No hay ideas de este tipo aquí."}
             </p>
+          ) : pickedZone !== ALL ? (
+            <div className={GRID}>{groups.flatMap((g) => g.items).map((i) => card(i, ""))}</div>
           ) : groups.map((g) => (
             <section key={g.key} className="flex flex-col gap-2">
               <h2 className="flex items-baseline gap-2">
-                <span className={cn("truncate text-[15px] font-semibold", g.key === "__none" && "text-secondary-foreground")}>📍 {g.title}</span>
-                {"sub" in g && g.sub && <span className="truncate text-xs text-muted-foreground">{g.sub}</span>}
+                <span className={cn("truncate text-[15px] font-semibold", g.key === NONE && "text-secondary-foreground")}>📍 {g.title}</span>
                 <span className="text-xs text-muted-foreground">{g.items.length}</span>
               </h2>
-              <div className={ROW}>{[...g.items].sort(order).map(card)}</div>
+              <div className={ROW}>{g.items.map((i) => card(i))}</div>
             </section>
           ))}
         </>
@@ -223,7 +246,7 @@ export default function IdeasView({
         </Disclosure>
         {discarded.length > 0 && (
           <Disclosure title="Descartadas" hint={discarded.length} className="border-b">
-            <div className={cn(ROW, "pt-1")}>{discarded.map(card)}</div>
+            <div className={cn(ROW, "pt-1")}>{discarded.map((i) => card(i))}</div>
           </Disclosure>
         )}
       </div>
