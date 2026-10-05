@@ -3,7 +3,7 @@ import { apiFetch } from "@/lib/api";
 import { canonicalUrl, classifyIdeaFields, detectPlatform, findIdeaUrls } from "@/utils/ideas";
 import type { IdeaTextFields, PlaceIndex } from "@/utils/ideas";
 import { tiktokVideoId } from "@/utils/ideaMedia";
-import type { Idea, IdeaLink, IdeaPlanResult, IdeaSuggestion, RoomPayload } from "@/types";
+import type { Idea, IdeaLink, IdeaMoment, IdeaPlanResult, IdeaSuggestion, RoomPayload } from "@/types";
 
 function rulesSuggestion(fields: IdeaTextFields, index: PlaceIndex): IdeaSuggestion | undefined {
   const { place, cat } = classifyIdeaFields(fields, index);
@@ -102,6 +102,10 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
   }
   function setCatByHand(id: string, cat: string | undefined) {
     updateIdea(id, { cat, catManual: cat ? true : undefined, suggestion: undefined });
+  }
+  // The idea's moment in the plan, by hand; undefined goes back to the analysis.
+  function setMomentByHand(id: string, moment: IdeaMoment | undefined) {
+    updateIdea(id, { moment });
   }
 
   // Adds every new link found in `text`; returns how many were added.
@@ -221,6 +225,6 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
   return {
     ideas, loadingIds, customPlaces, setCustomPlaces, renamePlace,
     loadPayload, payload, planLinks, planLinksAt, planIdeaIds, savePlan,
-    updateIdea, removeIdea, toggleVote, applyClaude, setPlaceByHand, setCatByHand, acceptAllSuggestions, addFromText, refreshMetadata, setNote, reclassify,
+    updateIdea, removeIdea, toggleVote, applyClaude, setPlaceByHand, setCatByHand, setMomentByHand, acceptAllSuggestions, addFromText, refreshMetadata, setNote, reclassify,
   };
 }

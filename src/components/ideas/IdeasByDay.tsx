@@ -7,8 +7,6 @@ import DayStrip from "@/components/map/DayStrip";
 import { Disclosure } from "@/components/ui/disclosure";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { linkLabel } from "@/utils/linkify";
-import { matchIdeasToPlan } from "@/utils/ideaPlan";
-import type { TripPlace } from "@/utils/places";
 import { fmtHour } from "@/utils/time";
 import { cn } from "@/lib/utils";
 import type { Day, Idea, IdeaLink } from "@/types";
@@ -16,11 +14,8 @@ import type { Day, Idea, IdeaLink } from "@/types";
 interface IdeasByDayProps {
   ideas: Idea[];
   days: Day[];
-  places: TripPlace[];
   loadingIds: Set<string>;     // ideas whose video is still being read
-  planLinks?: IdeaLink[];
-  planLinksAt?: string;
-  planIdeaIds?: string[];      // ideas the last analysis read
+  links: IdeaLink[];           // where each idea fits (see ideaLinks)
   roomCode: string;
   // Where the trip is now: during it, the strip opens on today.
   phase?: "before" | "during" | "after";
@@ -33,7 +28,7 @@ type Pick = number | "before" | null;
 // Read-only view: the itinerary as it is, with the ideas that fit each activity,
 // free gap or day, and what to do before the trip, one day at a time (or all).
 // Nothing here changes the plan.
-export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks, planLinksAt, planIdeaIds, roomCode, phase, todayIdx, onOpen }: IdeasByDayProps) {
+export default function IdeasByDay({ ideas, days, loadingIds, links, roomCode, phase, todayIdx, onOpen }: IdeasByDayProps) {
   const chip = (idea: Idea, key: string, link?: IdeaLink, context?: string) => (
     <IdeaChip key={key} idea={idea} link={link} context={context} roomCode={roomCode} onOpen={() => onOpen(idea.id)} />
   );
@@ -43,21 +38,6 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
     [ideas, loadingIds],
   );
   const reading = ideas.filter((i) => loadingIds.has(i.id));
-  const rules = useMemo(() => matchIdeasToPlan(active, days, places), [active, days, places]);
-
-  // Claude's analysis covers the ideas it actually read; the rest use the free
-  // match. Analyses saved before the ids were recorded fall back to the linked ideas.
-  const analyzedIds = new Set(planIdeaIds ?? (planLinks ?? []).map((l) => l.ideaId));
-  const analyzed = (i: Idea) => !!planLinksAt && analyzedIds.has(i.id);
-  // Links to activities removed from the plan since the analysis are dropped.
-  const eventIds = new Set(days.flatMap((d) => d.events.map((e) => e.id)));
-  const dayIds = new Set(days.map((d) => d.id));
-  const links: IdeaLink[] = active.flatMap((i) => {
-    if (analyzed(i)) return (planLinks ?? []).filter((l) => l.ideaId === i.id && dayIds.has(l.dayId) && (!l.eventId || eventIds.has(l.eventId)));
-    const own = rules.filter((l) => l.ideaId === i.id);
-    const events = own.filter((l) => l.eventId);
-    return events.length ? events : own;
-  });
   const linkedIds = new Set(links.map((l) => l.ideaId));
   const loose = active.filter((i) => !linkedIds.has(i.id));
   const byId = new Map(active.map((i) => [i.id, i]));
@@ -104,7 +84,7 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
       <h2 className="flex items-center gap-1.5 text-[15px] font-semibold"><ClipboardList className="size-4 text-emerald-700" />Antes del viaje</h2>
       <p className="text-[13px] text-muted-foreground">Qué comprar, reservar o decidir antes de salir</p>
       <ul className="mt-3 flex flex-col gap-1.5">
-        {before.map((l) => chip(byId.get(l.ideaId)!, `${l.ideaId}-before`, l, `Para ${forWhat(l)}`))}
+        {before.map((l) => chip(byId.get(l.ideaId)!, `${l.ideaId}-before`, l, forWhat(l) ? `Para ${forWhat(l)}` : undefined))}
       </ul>
     </section>
   );
@@ -182,7 +162,7 @@ export default function IdeasByDay({ ideas, days, places, loadingIds, planLinks,
               {loose.length > 0 && (
                 <Disclosure title="Sin momento en el plan" hint={loose.length} className="border-b">
                   <p className="mb-2 text-xs text-muted-foreground">
-                    No encontramos dónde encajan en este viaje. Prueba &quot;Analizar con Claude&quot; o asígnales un lugar en &quot;Por lugar&quot;.
+                    No encontramos dónde encajan en este viaje. Prueba &quot;Analizar con Claude&quot;, o ábrelas y elige su momento en el plan.
                   </p>
                   <ul className="flex flex-col gap-1.5">
                     {loose.map((i) => chip(i, i.id))}
