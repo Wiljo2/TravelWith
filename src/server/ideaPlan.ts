@@ -41,7 +41,7 @@ Cómo decidir:
 - Un video sobre un destino que no visitan: place "none" y target "none".
 - No inventes datos: menciona solo lo que dicen la idea o el itinerario.
 
-En "reason" escribe en español, máximo 18 palabras, por qué encaja y qué hacer o probar ahí (ej. "El sábado van a Universal: con el contrato de Avis el parqueo prime es gratis"). Nombra los días por su fecha o día de la semana, nunca por etiqueta (D3, e12). Si no aplica, di por qué.`;
+En "reason" escribe en español, máximo 16 palabras, qué hacer, probar o saber ahí (ej. "Con el contrato de Avis o Budget, el parqueo prime de Universal es gratis"). La app ya muestra el día y la actividad junto a la razón: no repitas el día, la fecha ni la actividad, y nunca uses etiquetas (D3, e12). Si no aplica, di por qué.`;
 
 const SCHEMA = {
   type: "object",

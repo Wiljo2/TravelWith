@@ -195,3 +195,17 @@ export function placesOfDay(day: Day, places: TripPlace[]): string[] {
 }
 
 export { CRUISE_PLACE };
+
+// The wide area ("Orlando", "Miami", "Crucero") each place belongs to: a venue
+// goes to its area, and an area inside a wider one ("Universal Studios Orlando")
+// to the wider one.
+export function zonesOf(places: TripPlace[]): Map<string, string> {
+  const areas = places.filter((p) => !isVenue(p)).map((p) => p.name);
+  const pad = (s: string) => ` ${normalizeText(s).replace(/[^a-z0-9ñ]+/g, " ").trim()} `;
+  const widest = (area: string) =>
+    areas.filter((b) => b !== area && pad(area).includes(pad(b))).sort((x, y) => x.length - y.length)[0] ?? area;
+  return new Map(places.map((p) => {
+    const area = isVenue(p) ? [...p.parents].sort((x, y) => x.length - y.length)[0] : p.name;
+    return [p.name, area ? widest(area) : p.name];
+  }));
+}

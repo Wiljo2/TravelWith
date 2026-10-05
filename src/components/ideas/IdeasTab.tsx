@@ -5,6 +5,7 @@ import IdeasView from "@/components/ideas/IdeasView";
 import { useFreshThumbnails } from "@/hooks/useFreshThumbnails";
 import { CLASSIFIER_VERSION, placeIndex } from "@/utils/ideas";
 import { isVenue, tripPlaces } from "@/utils/places";
+import { tripPhase } from "@/utils/tripDays";
 import type { useIdeas } from "@/hooks/useIdeas";
 import { apiFetch } from "@/lib/api";
 import type { Day, IdeaLink, IdeaPlanResult, RoomPayload, TripInfo } from "@/types";
@@ -37,6 +38,7 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, acces
   useEffect(() => { reclassify(index, placesKey); }, [placesKey, api.ideas.length]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed by the place list
   // Expired TikTok covers are renewed in the background, for the whole group.
   useFreshThumbnails(roomCode, api.ideas, (id, thumbnail) => api.updateIdea(id, { thumbnail }));
+  const phase = trip ? tripPhase(trip.startDate, days.length) : null;
   const voter = user?.id ?? "local";
   const addedBy = user ? String(user.user_metadata?.full_name ?? user.email ?? "").split(" ")[0] || undefined : undefined;
 
@@ -89,6 +91,8 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, acces
       planIdeaIds={api.planIdeaIds}
       onAnalyze={analyze}
       onSavePlan={api.savePlan}
+      phase={phase?.phase}
+      todayIdx={phase?.phase === "during" ? phase.dayIdx : undefined}
     />
   );
 }
