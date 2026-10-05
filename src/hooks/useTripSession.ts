@@ -8,13 +8,11 @@ import { isOffline, lastSnapshotCode } from "@/lib/offline";
 export function useTripSession() {
   const [roomCode, setRoomCode] = useState<string | null>(null);
 
-  // Auto-resume: the user↔room relation (last_active_at) is persisted in
-  // Supabase (user_rooms), not localStorage, so this works across devices.
-  // Only auto-enters when there's a SINGLE trip — no ambiguity to resolve.
-  // With multiple trips, RoomGate's "Mis viajes" list is shown instead so the
-  // user can see and pick among all of them (auto-jumping to just one would
-  // hide the rest). A later explicit "leave" (onLeaveRoom) won't be undone by
-  // this, since resumeAttempted stays true afterward.
+  // Auto-resume: a signed-in user lands straight in their most recent trip
+  // (the list comes ordered by last_active_at, persisted in Supabase's
+  // user_rooms, so this works across devices). The other trips are one tap
+  // away in "Volver a mis viajes"; that explicit leave isn't undone by this,
+  // since resumeAttempted stays true afterward.
   const auth = useAuth();
   const { user, session, loading: authLoading } = auth;
   const userRooms = useUserRooms(user, session?.access_token);
@@ -27,7 +25,7 @@ export function useTripSession() {
     // Without network, reopen the last trip this device saved, signed in or not.
     const offlineRoom = isOffline() ? lastSnapshotCode() : null;
     if (offlineRoom) setRoomCode(offlineRoom);
-    else if (user && userRooms.rooms.length === 1) setRoomCode(userRooms.rooms[0].room_code);
+    else if (user && userRooms.rooms.length > 0) setRoomCode(userRooms.rooms[0].room_code);
   }, [resumeAttempted, authLoading, userRooms.roomsLoading, user, userRooms.rooms]);
 
   // `?local=1` boots straight into local mode, skipping sign-in and the
