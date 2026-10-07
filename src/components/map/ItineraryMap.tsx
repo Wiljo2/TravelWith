@@ -10,10 +10,22 @@ import { canStoreMap, needsRefresh, offlineMapState, storeMapOffline } from "@/l
 import { eventKey, inTripRegion, mapStops, missingPhotos, staleEvents, stopOrder, type LngLat } from "@/utils/tripGeo";
 import type { useTripGeo } from "@/hooks/useTripGeo";
 import { apiFetch } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type { Day, EventPlace, RoomPayload } from "@/types";
 
-// The map library only runs in the browser.
-const TripMap = dynamic(() => import("@/components/map/TripMap"), { ssr: false });
+// The map library only runs in the browser. Offline, its code may be missing
+// from the device (never stored since the last deploy).
+const TripMap = dynamic(() => import("@/components/map/TripMap").catch(() => MapUnavailable), { ssr: false });
+
+function MapUnavailable({ className }: { className: string }) {
+  return (
+    <div className={cn("relative min-h-[320px] overflow-hidden", className)}>
+      <div className="flex h-full items-center justify-center bg-secondary p-6 text-center text-[13px] text-muted-foreground">
+        El mapa no está guardado en este dispositivo. Ábrelo una vez con internet.
+      </div>
+    </div>
+  );
+}
 
 interface ItineraryMapProps {
   geo: ReturnType<typeof useTripGeo>;

@@ -2,9 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeolocateControl, Map as MapLibre, Marker } from "maplibre-gl";
-import { version as maplibreVersion } from "maplibre-gl/package.json";
 import { dayColor } from "@/constants/mapColors";
 import { MAP_STYLE } from "@/lib/mapOffline";
+import { MAPLIBRE_WORKER_URL } from "@/lib/maplibreFiles";
 import { googleMapsDirectionsUrl, googleMapsPlaceUrl } from "@/utils/googleMaps";
 import { boundsOf, inTripRegion, TRIP_REGION, type LngLat, type MapStop } from "@/utils/tripGeo";
 import { fmtHour } from "@/utils/time";
@@ -56,8 +56,7 @@ export default function TripMap({ className, touch, bottomInset, days, stops, or
       const maplibre = await import("maplibre-gl");
       if (cancelled || !box.current) return;
       lib.current = maplibre;
-      // Published by scripts/copy-maplibre-worker.mjs (the bundle can't serve it).
-      maplibre.setWorkerUrl(`/vendor/maplibre-${maplibreVersion}/maplibre-gl-worker.mjs`);
+      maplibre.setWorkerUrl(MAPLIBRE_WORKER_URL);
       instance = new maplibre.Map({
         container: box.current,
         style: MAP_STYLE,
