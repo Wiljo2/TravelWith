@@ -14,6 +14,8 @@ const current: TripEventRow = {
   title: "Museo",
   cat: DEFAULT_EVENT_CAT,
   note: null,
+  maps_url: null,
+  document_id: null,
   version: 3,
   updated_at: "2026-09-29T00:00:00Z",
   updated_by: null,

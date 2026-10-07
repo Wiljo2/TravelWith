@@ -253,3 +253,43 @@ describe("011_migrate_rooms", () => {
     }
   });
 });
+
+describe("018_main_features_tables", () => {
+  const m018 = readFileSync(join(process.cwd(), "supabase/migrations/018_main_features_tables.sql"), "utf8");
+  const tables = [...m018.matchAll(/create table if not exists public\.(\w+)/g)].map((m) => m[1]);
+
+  it("adds the documents, ideas and map places tables", () => {
+    expect(tables).toEqual(["trip_documents", "trip_ideas", "trip_event_places"]);
+  });
+
+  it.each(tables)("%s is locked down, audited, broadcast and versioned like the other trip tables", (table) => {
+    expect(m018).toContain(`primary key (room_code, id)`);
+    expect(m018).toContain(`alter table public.${table} enable row level security;`);
+    expect(m018).toMatch(new RegExp(`create policy "members only" on public\\.${table}\\s+as restrictive for all\\s+to anon, authenticated`));
+    expect(m018).toContain(`revoke all on table public.${table} from anon;`);
+    expect(m018).toContain(`revoke insert, update, delete, truncate, references, trigger on table public.${table} from authenticated;`);
+    for (const fn of ["record_trip_change", "broadcast_trip_change"]) {
+      expect(m018).toMatch(new RegExp(`after insert or update or delete on public\\.${table}\\s+for each row execute function private\\.${fn}\\(\\);`));
+    }
+    expect(m018).toMatch(new RegExp(`before update on public\\.${table}\\s+for each row execute function private\\.bump_trip_row_version\\(\\);`));
+    expect(m018).toContain(`'${table}'`);
+  });
+
+  it("documents mirror LIMITS and the Drive id format", () => {
+    expect(m018).toContain(`check (char_length(title) between 1 and ${LIMITS.documentTitle})`);
+    expect(m018).toContain("check (drive_file_id ~ '^[A-Za-z0-9_-]{10,100}$')");
+  });
+
+  it("unlinks activities and expenses when their document goes, and keeps the event version guard", () => {
+    expect(m018.match(/references public\.trip_documents \(room_code, id\)\s+on delete set null \(document_id\)/g)).toHaveLength(2);
+    expect(m018).toMatch(/foreign key \(room_code, id\) references public\.trip_events \(room_code, id\) on delete cascade/);
+    expect(m018).toContain("check (maps_url is null or (maps_url ~ '^https://'");
+  });
+
+  it("broadcasts the idea settings with the header but never the payload", () => {
+    const fn = m018.slice(m018.indexOf("create or replace function private.broadcast_room_change"));
+    expect(fn).toContain("'idea_places', new.idea_places, 'idea_plan', new.idea_plan");
+    expect(fn).not.toMatch(/'payload'|new\.payload|old\.payload/);
+    expect(fn).toContain("if current_setting('app.bulk_load', true) = 'on' then");
+  });
+});

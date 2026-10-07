@@ -51,6 +51,8 @@ type RoomRow = {
   start_date: string | null;
   end_date: string | null;
   exchange_rate: number | null;
+  idea_places: Json | null;
+  idea_plan: Json | null;
 };
 
 type UserRoomRow = {
@@ -85,6 +87,8 @@ type TripEventRow = Flat<RowMeta & {
   title: string;
   cat: string;
   note: string | null;
+  maps_url: string | null;
+  document_id: string | null;
 }>;
 
 type TripDaySpanRow = Flat<RowMeta & {
@@ -119,6 +123,7 @@ type TripExpenseRow = Flat<RowMeta & {
   linked_event_id: string | null;
   start_day_id: string | null;
   end_day_id: string | null;
+  document_id: string | null;
 }>;
 
 type TripTaskRow = Flat<RowMeta & {
@@ -148,6 +153,24 @@ type TripTravelerRow = Flat<RowMeta & {
   name: string;
 }>;
 
+type TripDocumentRow = Flat<RowMeta & {
+  position: number;
+  drive_file_id: string;
+  title: string;
+  kind: "flight" | "lodging" | "insurance" | "ticket" | "other" | null;
+}>;
+
+// data: the idea without its id (see Idea in src/types).
+type TripIdeaRow = Flat<RowMeta & {
+  position: number;
+  data: Json;
+}>;
+
+// id is the activity id; data: its EventPlace.
+type TripEventPlaceRow = Flat<RowMeta & {
+  data: Json;
+}>;
+
 type TripChangeRow = {
   id: number;
   room_code: string;
@@ -161,19 +184,20 @@ type TripChangeRow = {
 };
 
 type DayFk<T extends string, C extends string> = Relationship<`${T}_room_code_${C}_fkey`, ["room_code", C], "trip_days", ["room_code", "id"]>;
+type DocumentFk<T extends string> = Relationship<`${T}_document_fkey`, ["room_code", "document_id"], "trip_documents", ["room_code", "id"]>;
 type EventFk<T extends string, C extends string> = Relationship<`${T}_room_code_${C}_fkey`, ["room_code", C], "trip_events", ["room_code", "id"]>;
 
 export type Database = {
   public: {
     Tables: {
-      rooms: TableOf<RoomRow, "payload" | "updated_at" | "name" | "members" | "destination" | "start_date" | "end_date" | "exchange_rate", []>;
+      rooms: TableOf<RoomRow, "payload" | "updated_at" | "name" | "members" | "destination" | "start_date" | "end_date" | "exchange_rate" | "idea_places" | "idea_plan", []>;
       user_rooms: TableOf<UserRoomRow, "role" | "joined_at" | "last_active_at", [RoomFk<"user_rooms">]>;
       agent_usage: TableOf<AgentUsageRow, "id" | "input_tokens" | "output_tokens" | "created_at", []>;
       trip_days: TableOf<TripDayRow, MetaDefaults | "position" | "sub" | "flexible", [RoomFk<"trip_days">]>;
       trip_events: TableOf<
         TripEventRow,
-        MetaDefaults | "position" | "note",
-        [RoomFk<"trip_events">, DayFk<"trip_events", "day_id">]
+        MetaDefaults | "position" | "note" | "maps_url" | "document_id",
+        [RoomFk<"trip_events">, DayFk<"trip_events", "day_id">, DocumentFk<"trip_events">]
       >;
       trip_day_spans: TableOf<
         TripDaySpanRow,
@@ -192,12 +216,13 @@ export type Database = {
       >;
       trip_expenses: TableOf<
         TripExpenseRow,
-        MetaDefaults | "position" | "currency" | "split_mode" | "linked_event_id" | "start_day_id" | "end_day_id",
+        MetaDefaults | "position" | "currency" | "split_mode" | "linked_event_id" | "start_day_id" | "end_day_id" | "document_id",
         [
           RoomFk<"trip_expenses">,
           EventFk<"trip_expenses", "linked_event_id">,
           DayFk<"trip_expenses", "start_day_id">,
           DayFk<"trip_expenses", "end_day_id">,
+          DocumentFk<"trip_expenses">,
         ]
       >;
       trip_tasks: TableOf<
@@ -214,6 +239,13 @@ export type Database = {
         ]
       >;
       trip_travelers: TableOf<TripTravelerRow, MetaDefaults | "position", [RoomFk<"trip_travelers">]>;
+      trip_documents: TableOf<TripDocumentRow, MetaDefaults | "position" | "kind", [RoomFk<"trip_documents">]>;
+      trip_ideas: TableOf<TripIdeaRow, MetaDefaults | "position", [RoomFk<"trip_ideas">]>;
+      trip_event_places: TableOf<
+        TripEventPlaceRow,
+        MetaDefaults,
+        [RoomFk<"trip_event_places">, Relationship<"trip_event_places_room_code_id_fkey", ["room_code", "id"], "trip_events", ["room_code", "id"]>]
+      >;
       trip_changes: TableOf<TripChangeRow, "id" | "before" | "after" | "user_id" | "created_at", [RoomFk<"trip_changes">]>;
     };
     Views: { [_ in never]: never };
@@ -254,7 +286,10 @@ export type TripTable =
   | "trip_expenses"
   | "trip_tasks"
   | "trip_task_options"
-  | "trip_travelers";
+  | "trip_travelers"
+  | "trip_documents"
+  | "trip_ideas"
+  | "trip_event_places";
 
 export type {
   RoomRow,
@@ -266,5 +301,8 @@ export type {
   TripTaskRow,
   TripTaskOptionRow,
   TripTravelerRow,
+  TripDocumentRow,
+  TripIdeaRow,
+  TripEventPlaceRow,
   TripChangeRow,
 };
