@@ -5,7 +5,7 @@ describe("newExpenseRow", () => {
   it("applies USD / group defaults and keeps references", () => {
     expect(newExpenseRow({ id: "x1", label: " Hotel ", amount: 300, startDayId: "d0" }, 2)).toEqual({
       id: "x1", position: 2, label: "Hotel", amount: 300, currency: "USD", split_mode: "group",
-      linked_event_id: null, start_day_id: "d0", end_day_id: null,
+      linked_event_id: null, start_day_id: "d0", end_day_id: null, document_id: null,
     });
   });
 

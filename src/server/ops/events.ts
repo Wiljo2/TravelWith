@@ -3,7 +3,7 @@ import { DomainError, argId } from "@/server/domain/core";
 import { eventMovePatch, eventUpdatePatch, newEventRow } from "@/server/domain/eventRows";
 import { eventsRepo } from "@/server/repo/events";
 import { RowNotFoundError } from "@/server/repo/errors";
-import { requireDayRow } from "@/server/ops/shared";
+import { requireDayRow, requireDocumentRow } from "@/server/ops/shared";
 import type { OpContext, OpDefinition } from "@/server/ops/types";
 import type { TripEventRow } from "@/types/database";
 
@@ -27,7 +27,9 @@ export const EVENT_OPS: Record<string, OpDefinition> = {
       const dayId = (args as { dayId?: unknown } | null)?.dayId;
       if (typeof dayId !== "string") throw new DomainError("dayId is required");
       await requireDayRow(ctx.code, dayId);
-      const row = await eventsRepo.insert(ctx.code, newEventRow(args, await nextPositionInDay(ctx, dayId)), ctx.userId);
+      const newRow = newEventRow(args, await nextPositionInDay(ctx, dayId));
+      await requireDocumentRow(ctx.code, newRow.document_id);
+      const row = await eventsRepo.insert(ctx.code, newRow, ctx.userId);
       return { changed: [{ table: "trip_events", row }], deleted: [] };
     },
   },
@@ -37,6 +39,7 @@ export const EVENT_OPS: Record<string, OpDefinition> = {
       const id = argId(args);
       const current = await requireEventRow(ctx.code, id);
       const patch = eventUpdatePatch(current, args);
+      await requireDocumentRow(ctx.code, patch.document_id);
       const row = await eventsRepo.update(ctx.code, id, patch, expectedVersion, ctx.userId);
       return { changed: [{ table: "trip_events", row }], deleted: [] };
     },

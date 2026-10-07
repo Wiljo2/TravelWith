@@ -5,14 +5,15 @@ import { daysRepo } from "@/server/repo/days";
 import { RowNotFoundError } from "@/server/repo/errors";
 import { expensesRepo } from "@/server/repo/expenses";
 import { updateTripHeader } from "@/server/repo/trip";
-import { requireEventRows } from "@/server/ops/shared";
+import { requireDocumentRow, requireEventRows } from "@/server/ops/shared";
 import type { OpDefinition } from "@/server/ops/types";
 
 // Referenced days must exist and form a forward range; the linked event must exist.
 async function checkRefs(
   code: string,
-  row: { linked_event_id?: string | null; start_day_id?: string | null; end_day_id?: string | null },
+  row: { linked_event_id?: string | null; start_day_id?: string | null; end_day_id?: string | null; document_id?: string | null },
 ) {
+  await requireDocumentRow(code, row.document_id);
   const start = row.start_day_id ?? null;
   const end = row.end_day_id ?? null;
   await requireEventRows(code, [row.linked_event_id]);

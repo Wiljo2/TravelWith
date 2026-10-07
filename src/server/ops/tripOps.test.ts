@@ -14,6 +14,7 @@ const { OPS, runOp } = await import("@/server/ops");
 const ctx: OpContext = { code: "ABCD1234", userId: "u1", role: "member" };
 const header: RoomHeaderRow = {
   code: "ABCD1234", name: "Demo", destination: null, start_date: "2026-10-01", end_date: "2026-10-05", exchange_rate: 4000,
+  idea_places: null, idea_plan: null,
 };
 
 beforeEach(() => {
@@ -69,6 +70,8 @@ describe("op registry", () => {
       "task.create", "task.update", "task.toggle", "task.delete", "task.chooseOption",
       "taskOption.create", "taskOption.update", "taskOption.delete",
       "traveler.add", "traveler.remove", "trip.update",
+      "document.create", "document.update", "document.delete", "idea.create", "idea.update", "idea.delete",
+      "eventPlace.set", "trip.setIdeaSettings",
     ];
     expect(Object.keys(OPS).sort()).toEqual([...planned].sort());
   });

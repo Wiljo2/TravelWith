@@ -3,6 +3,7 @@ import { HttpError } from "@/server/http";
 import { repoError } from "@/server/repo/errors";
 import { DEFAULT_RATE } from "@/utils/currency";
 import type { RoomMember, RoomPayload } from "@/types";
+import type { Json } from "@/types/database";
 
 export interface TripSnapshot {
   code: string;
@@ -19,9 +20,11 @@ export interface RoomHeaderRow {
   start_date: string | null;
   end_date: string | null;
   exchange_rate: number | null;
+  idea_places: Json | null;
+  idea_plan: Json | null;
 }
 
-const HEADER_COLUMNS = "code, name, destination, start_date, end_date, exchange_rate";
+const HEADER_COLUMNS = "code, name, destination, start_date, end_date, exchange_rate, idea_places, idea_plan";
 
 export async function getTripHeader(code: string): Promise<RoomHeaderRow | null> {
   const { data, error } = await createServerClient().from("rooms").select(HEADER_COLUMNS).eq("code", code).maybeSingle();

@@ -1,5 +1,6 @@
 import { LIMITS } from "@/constants/limits";
 import { DomainError, checkArgs, checkClientId } from "@/server/domain/core";
+import { documentRefArg } from "@/server/domain/featureRows";
 import type { NewRow, RowPatch } from "@/server/repo/core";
 import type { TripExpenseRow } from "@/types/database";
 import { uid } from "@/utils/uid";
@@ -69,6 +70,7 @@ export function newExpenseRow(args: unknown, position: number): NewRow<"trip_exp
     linked_event_id: ref(a, "linkedEventId") ?? null,
     start_day_id: ref(a, "startDayId") ?? null,
     end_day_id: ref(a, "endDayId") ?? null,
+    document_id: documentRefArg(a.documentId) ?? null,
   };
 }
 
@@ -94,6 +96,8 @@ export function expensePatch(args: unknown): RowPatch<"trip_expenses"> {
   if (start !== undefined) patch.start_day_id = start;
   const end = ref(a, "endDayId");
   if (end !== undefined) patch.end_day_id = end;
+  const documentId = documentRefArg(a.documentId);
+  if (documentId !== undefined) patch.document_id = documentId;
   if (a.unlinkEvent) patch.linked_event_id = null;
   if (a.clearDayRange) {
     patch.start_day_id = null;
