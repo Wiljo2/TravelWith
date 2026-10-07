@@ -293,3 +293,43 @@ describe("018_main_features_tables", () => {
     expect(fn).toContain("if current_setting('app.bulk_load', true) = 'on' then");
   });
 });
+
+describe("019_main_features_migration", () => {
+  const m019 = readFileSync(join(process.cwd(), "supabase/migrations/019_main_features_migration.sql"), "utf8");
+
+  it("wraps migrate_room and verify_room instead of rewriting them", () => {
+    expect(m019).toContain("alter function private.migrate_room(text) rename to migrate_room_base;");
+    expect(m019).toContain("alter function private.verify_room(text) rename to verify_room_base;");
+    expect(m019).toContain("v_base := private.migrate_room_base(p_code);");
+    expect(m019).toContain("v_diffs := private.verify_room_base(p_code);");
+  });
+
+  it("migrates the new data as a bulk load", () => {
+    const extras = m019.slice(m019.indexOf("create or replace function private.migrate_room_extras"), m019.indexOf("create or replace function private.migrate_room(p_code"));
+    expect(extras).toContain("perform set_config('app.bulk_load', 'on', true);");
+    expect(extras).toContain("perform set_config('app.bulk_load', 'off', true);");
+    for (const table of ["trip_documents", "trip_ideas", "trip_event_places"]) expect(extras).toContain(`insert into public.${table}`);
+  });
+
+  it("verifies every new area", () => {
+    for (const area of ["documents", "ideas", "eventPlaces", "eventMapsUrls", "eventDocuments", "expenseDocuments", "ideaPlaces", "ideaPlan"]) {
+      expect(m019).toContain(`'${area}'`);
+    }
+  });
+
+  it("returns the new fields from trip_payload and get_trip", () => {
+    for (const fn of ["private.trip_payload", "public.get_trip"]) {
+      const body = m019.slice(m019.indexOf(`create or replace function ${fn}`));
+      for (const key of ["'mapsUrl', e.maps_url", "'documentId', e.document_id", "'documentId', x.document_id", "'documents'", "'ideas'", "'eventPlaces'", "r.idea_plan", "r.idea_places"]) {
+        expect(body).toContain(key);
+      }
+    }
+  });
+
+  it("keeps the functions locked down", () => {
+    for (const fn of ["private.migrate_room_extras(text)", "private.migrate_room(text)", "private.verify_room(text)"]) {
+      expect(m019).toContain(`revoke all on function ${fn} from public, anon, authenticated;`);
+    }
+    expect(m019.match(/set search_path = ''/g)!.length).toBe(5);
+  });
+});
