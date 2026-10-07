@@ -1,7 +1,7 @@
 # Relational + Broadcast progress
-- Iteration: 19
-- Last commit: (iteration 19 commit; the next iteration records its sha in the log)
-- Next step: 3.12
+- Iteration: 20
+- Last commit: (iteration 20 commit; the next iteration records its sha in the log)
+- Next step: 4.1 (waits for 2.3 done with 0 differences)
 - Human actions pending: 2.3 run the migration rehearsal (`docs/plans/migration-rehearsal.md`) on a staging copy of production and record the results here; 4.1 needs it done with 0 differences.
 
 ## Steps
@@ -24,7 +24,7 @@
 - [x] 3.9 Client hooks send ops; full-payload autosave removed
 - [x] 3.10 `useTripChannel` (private Broadcast channel)
 - [x] 3.11 Maintenance mode
-- [ ] 3.12 Remove full-payload write path; update `GUIDELINES.md` and `CLAUDE.md`
+- [x] 3.12 Remove full-payload write path; update `GUIDELINES.md` and `CLAUDE.md`
 - [ ] 4.1 HUMAN cut-over runbook
 - [ ] 5.1 Cleanup after cut-over
 - [ ] 6.1 Activity panel from `trip_changes`
@@ -86,4 +86,5 @@ Teardown: `teardown.sql` is run by hand in the staging SQL editor. The staging p
 | 17 | 2026-09-29 | 3.9 | ced0170 | Done | Client on ops: `src/lib/opQueue.ts` (per-item ordering, merge of queued updates, version chain, 409/failure/resync handling), `src/hooks/useTripOps.ts`, `src/utils/tripRows.ts` (row → state), hooks `useItinerary` (+trip spans), `useBudget`, new `useTasks`, new `useTripInfo`, `useRoom` (load + roster only, no PATCH/autosave), `SyncNotice` (Spanish), owner-only reset in `AppHeader`; `App.tsx` 394 → 377 lines. Guards: empty title/label/name and invalid hour ranges are not sent until valid; option creates wait for a label. Tests: `opQueue.test.ts` (10), `tripRows.test.ts` (8). tsc, lint (0 errors), 256 tests, `next build` green. Not verified in a browser (needs a Supabase project with 008–017); the two-account manual test is part of the phase 3 exit criteria on staging. |
 | 18 | 2026-09-29 | 3.11 | (this commit) | Done | `src/server/maintenance.ts` + `MaintenanceError` in `http.ts` (503, Spanish message, `Retry-After`); guard on ops, agent, legacy PATCH/DELETE and room creation; client queue retries 503s keeping and merging pending edits, `MaintenanceBanner`; `MAINTENANCE_MODE` in `.env.example`. Tests: `src/server/maintenance.test.ts` (3: all five write routes 503 with no DB access, reads available, only exact `on`), queue maintenance retry (1). tsc, lint (0 errors), 260 tests, `next build` green. 3.10 skipped: it waits for the 0.1 spike result (Broadcast payload shape, token refresh); 3.12 depends on 3.10. |
 | H | 2026-10-07 | 0.1 | (this commit) | Done | Spike run on staging `travelwith-staging`; results in "Spike result (0.1)" above. Member receives INSERT/UPDATE/DELETE and `realtime.send`, non-member gets `Unauthorized` and nothing else, subscription survives two forced token refreshes. Findings for 3.10: stop retrying on `Unauthorized`; one transient `MissingPartition` on a new project. |
-| 19 | 2026-10-07 | 3.10 | (this commit) | Done | `src/hooks/useTripChannel.ts` (private `trip:<code>`, `setAuth()` before subscribe, refetch on `SUBSCRIBED`/`visibilitychange`, stops on `Unauthorized`), `src/utils/tripChannel.ts` (`parseTripMessage`, `needsRefetch`, `isAccessDenied`, written against the 0.1 payloads), `OpQueue.acceptRemote`/`idle`, `useRoom` without `postgres_changes` (roster/header from the `rooms` broadcast, debounced refetch held while ops are pending, `onGone` back to the trip list). Tests: `tripChannel.test.ts` (6), queue remote changes (4). tsc, lint (0 errors), 270 tests, `next build` green. Not verified in a browser: needs staging with 008–017 (two-account test is part of the phase 3 exit criteria). |
+| 19 | 2026-10-07 | 3.10 | ba84c17 | Done | `src/hooks/useTripChannel.ts` (private `trip:<code>`, `setAuth()` before subscribe, refetch on `SUBSCRIBED`/`visibilitychange`, stops on `Unauthorized`), `src/utils/tripChannel.ts` (`parseTripMessage`, `needsRefetch`, `isAccessDenied`, written against the 0.1 payloads), `OpQueue.acceptRemote`/`idle`, `useRoom` without `postgres_changes` (roster/header from the `rooms` broadcast, debounced refetch held while ops are pending, `onGone` back to the trip list). Tests: `tripChannel.test.ts` (6), queue remote changes (4). tsc, lint (0 errors), 270 tests, `next build` green. Not verified in a browser: needs staging with 008–017 (two-account test is part of the phase 3 exit criteria). |
+| 20 | 2026-10-07 | 3.12 | (this commit) | Done | Removed `PATCH /api/rooms/[code]`, `trip-store.ts` (+ its test), payload-mutating domain functions and `domain/extras.ts`, `PAYLOAD_VALIDATION`, `LIMITS.bodyBytes`; `TripStoreError` checks → `HttpError`. Gap fixed: `POST /api/rooms` now writes the header columns and creates `trip_days` via `reset_itinerary` (it only wrote `payload`, so post-cut-over trips would have had no days); room deleted if `join_room` or the days fail. `scripts/check-payloads.ts` wrapped in `main()` (top-level await failed under tsx CJS). `GUIDELINES.md` and `CLAUDE.md` rewritten for tables + ops + Broadcast. Tests: room creation (2 updated/added), PATCH gone, domain validators + read views. tsc, lint (0 errors), 250 tests, `next build` green. Loop stops: 4.1 depends on 2.3 (HUMAN) being done. |

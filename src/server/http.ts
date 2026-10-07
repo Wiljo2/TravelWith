@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { normalizeRoomCode } from "@/lib/validate";
-import { TripStoreError } from "@/server/trip-store";
 
 const GENERIC_ERROR = "Ocurrió un error en el servidor. Intenta de nuevo.";
 
@@ -36,7 +35,7 @@ export function errorResponse(e: unknown, context: string): NextResponse {
       { status: 503, headers: { "Retry-After": String(MAINTENANCE_RETRY_SECONDS) } },
     );
   }
-  if ((e instanceof HttpError || e instanceof TripStoreError) && e.status < 500) {
+  if (e instanceof HttpError && e.status < 500) {
     return NextResponse.json({ error: e.message }, { status: e.status });
   }
   console.error(`[api] ${context}`, e);

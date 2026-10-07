@@ -7,7 +7,7 @@ import { TASK_OPS } from "@/server/ops/tasks";
 import { TRIP_OPS } from "@/server/ops/trip";
 import type { OpContext, OpDefinition, OpInput, OpResult } from "@/server/ops/types";
 
-// Every trip write goes through here: the ops route today, the agent tools next.
+// Every trip write goes through here: the ops route and the agent tools.
 export const OPS: Record<string, OpDefinition> = {
   ...EVENT_OPS,
   ...DAY_OPS,

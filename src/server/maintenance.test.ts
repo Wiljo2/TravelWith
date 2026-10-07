@@ -20,7 +20,6 @@ describe("MAINTENANCE_MODE=on", () => {
     const responses = [
       await opsRoute.POST(request("POST", "tok", { op: "event.delete", args: { id: "e1" } }), params("ABCD1234")),
       await agentRoute.POST(request("POST", "tok", { messages: [{ role: "user", content: "hola" }] }), params("ABCD1234")),
-      await roomRoute.PATCH(request("PATCH", "tok", { days: [], extras: [], exchangeRate: 4000, expectedUpdatedAt: "t" }), params("ABCD1234")),
       await roomRoute.DELETE(request("DELETE", "tok"), params("ABCD1234")),
       await roomsRoute.POST(request("POST", "tok", { name: "Viaje", startDate: "2026-10-01", endDate: "2026-10-02" })),
     ];

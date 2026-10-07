@@ -1,5 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { TripStoreError } from "@/server/trip-store";
 import { requireMember, type MemberRole } from "@/server/auth";
 import { assertWritable } from "@/server/maintenance";
 import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
@@ -189,7 +188,7 @@ function validateTurns(raw: unknown): ChatTurn[] {
 // Only messages meant for the user reach the client; provider and database
 // details are logged server-side.
 function friendlyError(e: unknown): string {
-  if (e instanceof TripStoreError && e.status < 500) return e.message;
+  if (e instanceof HttpError && e.status < 500) return e.message;
   if (e instanceof Anthropic.RateLimitError) {
     return "Se alcanzó el límite de peticiones a Claude. Intenta de nuevo en unos segundos.";
   }
