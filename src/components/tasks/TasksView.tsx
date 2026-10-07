@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import TaskOptions from "@/components/tasks/TaskOptions";
 import NoteLinks from "@/components/NoteLinks";
 import { LIMITS } from "@/constants/limits";
+import { useIsTouch } from "@/hooks/useMediaQuery";
 
 interface TasksViewProps {
   days: Day[];
@@ -56,7 +57,7 @@ export default function TasksView({ days, tasks, people, exchangeRate, onAdd, on
 
   function renderList(list: Task[]) {
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         {list.map((task) => (
           <TaskRow
             key={task.id}
@@ -83,9 +84,9 @@ export default function TasksView({ days, tasks, people, exchangeRate, onAdd, on
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden bg-secondary">
-      <div className="flex flex-1 flex-col items-center overflow-y-auto py-6">
-        <div className="w-full max-w-[640px] px-5">
+    <div>
+      <div>
+        <div className="mx-auto w-full max-w-[720px]">
 
           <div className="mb-3 flex gap-2">
             <Input
@@ -95,27 +96,27 @@ export default function TasksView({ days, tasks, people, exchangeRate, onAdd, on
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="Nueva tarea, cosa por decidir..."
-              className="flex-1 bg-card py-2.5 text-sm"
+              className="h-11 flex-1 rounded-xl bg-card text-sm shadow-[0_1px_2px_rgba(0,0,0,.04)]"
             />
-            <Button onClick={submit} disabled={!draft.trim()} className="font-semibold">
+            <Button onClick={submit} disabled={!draft.trim()} className="h-11 rounded-xl px-5 font-semibold">
               Añadir
             </Button>
           </div>
 
           <p className="mb-6 text-[11.5px] leading-normal text-muted-foreground">
-            Tip: en el calendario, haz clic en un hueco libre para agendar una tarea o discusión a una hora concreta.
+            Tip: en el calendario, toca o haz clic en un hueco libre para agendar una tarea o discusión a una hora concreta.
           </p>
 
           {pending.length > 0 && (
             <section className="mb-8">
-              <p className="mb-2.5 text-[11px] font-semibold tracking-[.07em] text-muted-foreground">POR HACER · {pending.length}</p>
+              <SectionLabel title="Por hacer" count={pending.length} />
               {renderList(pending)}
             </section>
           )}
 
           {done.length > 0 && (
             <section>
-              <p className="mb-2.5 text-[11px] font-semibold tracking-[.07em] text-muted-foreground">COMPLETADAS · {done.length}</p>
+              <SectionLabel title="Completadas" count={done.length} />
               {renderList(done)}
             </section>
           )}
@@ -130,6 +131,15 @@ export default function TasksView({ days, tasks, people, exchangeRate, onAdd, on
         </div>
       </div>
     </div>
+  );
+}
+
+function SectionLabel({ title, count }: { title: string; count: number }) {
+  return (
+    <h2 className="mb-3 flex items-center gap-2 text-[15px] font-semibold">
+      {title}
+      <span className="rounded-full bg-muted px-2 py-px text-xs font-medium text-muted-foreground">{count}</span>
+    </h2>
   );
 }
 
@@ -158,6 +168,7 @@ function TaskRow({
   onEditChange, onCommitEdit, onCancelEdit, onUpdate, onChoose, onDelete,
 }: TaskRowProps) {
   const noteRef = useRef<HTMLTextAreaElement>(null);
+  const touch = useIsTouch();
   const c = TASK_CATEGORIES[task.cat ?? DEFAULT_TASK_CAT] ?? TASK_CATEGORIES[DEFAULT_TASK_CAT];
   const pr = task.priority ? PRIORITIES[task.priority] : null;
   const options = task.options ?? [];
@@ -176,8 +187,8 @@ function TaskRow({
   }, [expanded, task.note]);
 
   return (
-    <div className={cn("overflow-hidden rounded-[10px] border border-border bg-card transition-opacity", task.done && "opacity-60")}>
-      <div className="flex items-center gap-2.5 px-3.5 py-3">
+    <div className={cn("overflow-hidden rounded-2xl bg-card shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-border/70 transition-opacity", task.done && "opacity-60")}>
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 px-3.5 py-3">
         <Checkbox
           checked={task.done}
           onCheckedChange={onToggleDone}
@@ -197,6 +208,7 @@ function TaskRow({
         ) : (
           <span
             onDoubleClick={onStartEdit}
+            onClick={touch ? onStartEdit : undefined}
             className={cn("flex min-w-0 flex-1 cursor-text select-none items-center gap-[7px] text-sm text-foreground", task.done && "line-through")}
           >
             <span title={c.label} className="shrink-0">{c.icon}</span>
@@ -204,6 +216,8 @@ function TaskRow({
           </span>
         )}
 
+        {(scheduledLabel || optionRange || pr) && (
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 max-md:order-last max-md:w-full max-md:pl-[30px]">
         {scheduledLabel && (
           <span
             onClick={() => onUpdate({ dayId: undefined, start: undefined, end: undefined })}
@@ -220,19 +234,21 @@ function TaskRow({
             title="Decisión pendiente: elige una opción para confirmarla"
           >
             🔀 {options.length} opc · {optionRange.low === optionRange.high
-              ? `$${fmtUSDNum(optionRange.low)}`
-              : `$${fmtUSDNum(optionRange.low)}–${fmtUSDNum(optionRange.high)}`}
+              ? fmtUSDNum(optionRange.low)
+              : `${fmtUSDNum(optionRange.low)}–${fmtUSDNum(optionRange.high)}`}
           </span>
         )}
         {pr && (
           <span className="shrink-0 rounded px-1.5 py-px text-[9.5px] font-bold" style={{ color: pr.color, background: pr.bg }}>{pr.label}</span>
+        )}
+        </div>
         )}
 
         <button
           onClick={onToggleExpand}
           title="Detalle"
           className={cn(
-            "cursor-pointer rounded px-1.5 py-0.5 text-[13px]",
+            "flex cursor-pointer items-center justify-center rounded px-1.5 py-0.5 text-[13px] max-md:h-9 max-md:w-8",
             task.note ? "text-secondary-foreground" : "text-muted-foreground",
             expanded || task.note ? "opacity-100" : "opacity-40",
           )}
@@ -242,7 +258,7 @@ function TaskRow({
 
         <button
           onClick={onDelete}
-          className="cursor-pointer rounded px-1 py-0.5 text-base text-muted-foreground opacity-50 hover:opacity-100"
+          className="flex cursor-pointer items-center justify-center rounded px-1 py-0.5 text-base text-muted-foreground opacity-50 hover:opacity-100 max-md:h-9 max-md:w-8"
           title="Eliminar"
         >
           ×
@@ -250,7 +266,7 @@ function TaskRow({
       </div>
 
       {expanded && (
-        <div className="flex flex-col gap-2.5 pb-3.5 pl-11 pr-3.5">
+        <div className="flex flex-col gap-2.5 pb-3.5 pl-3.5 pr-3.5 md:pl-11">
           <div className="flex flex-wrap gap-[5px]">
             {Object.entries(TASK_CATEGORIES).map(([key, cc]) => {
               const active = (task.cat ?? DEFAULT_TASK_CAT) === key;

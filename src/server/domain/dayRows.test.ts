@@ -38,7 +38,7 @@ describe("span rows", () => {
     expect(row).toMatchObject({ id: "s2", day_id: "d0", position: 3, start_hour: 9, end_hour: 12, z_index: 2, label: null });
     expect(() => newDaySpanRow({ dayId: "d0", bg: "url(x)", border: "#000" }, 0)).toThrow(/bg must be/);
     expect(() => newDaySpanRow({ dayId: "d0", bg: "#fff", border: "#000", startHour: 12, endHour: 9 }, 0)).toThrow(/after/);
-    expect(() => newDaySpanRow({ dayId: "d0", bg: "#fff", border: "#000", startHour: 3 }, 0)).toThrow(/decimal hour/);
+    expect(() => newDaySpanRow({ dayId: "d0", bg: "#fff", border: "#000", startHour: -1 }, 0)).toThrow(/decimal hour/);
   });
 
   it("daySpanPatch clears fields with null and checks merged hours", () => {

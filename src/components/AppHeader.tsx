@@ -1,85 +1,124 @@
 "use client";
+import { useState } from "react";
+import { Menu } from "@base-ui/react/menu";
+import { Copy, Ellipsis, FileDown, LogOut, RotateCcw } from "lucide-react";
 import AuthButton from "@/components/auth/AuthButton";
-import PriceChip from "@/components/budget/PriceChip";
-import { usdToCop, fmtUSD, fmtCOP } from "@/utils/currency";
 import { fmtTripDates } from "@/utils/tripDays";
 import { cn } from "@/lib/utils";
 import type { SyncState } from "@/hooks/useTripOps";
 import type { TripInfo } from "@/types";
+import type { ReportKind } from "@/utils/tripReport";
 
 interface AppHeaderProps {
   roomCode: string;
   connected: boolean;
   saveState: SyncState;
   trip: TripInfo | null;
-  grandTotal: number;
-  exchangeRate: number;
-  // Owner only; the button is hidden without it.
+  // Owner only; the menu item is hidden without it.
   onReset?: () => void;
   onLeaveRoom: () => void;
+  onDownloadPdf: (kind: ReportKind) => Promise<void>;
 }
 
 // Shown while the trip loads and for legacy rooms saved without trip metadata
 const FALLBACK = {
-  eyebrow: "Viaje en grupo",
-  title: "Tu viaje",
+  name: "Tu viaje",
+  subtitle: "Viaje en grupo",
 };
 
-const SAVE_LABEL: Record<SyncState, string> = {
-  idle: "",
-  saving: "guardando…",
-  saved: "guardado ✓",
-  error: "error ⚠",
+const SYNC: Record<SyncState, { label: string; dot: string }> = {
+  idle:   { label: "Al día",          dot: "bg-primary" },
+  saving: { label: "Guardando…",      dot: "bg-amber-400 animate-pulse" },
+  saved:  { label: "Guardado",        dot: "bg-primary" },
+  error:  { label: "Error al guardar", dot: "bg-destructive" },
 };
 
-export default function AppHeader({
-  roomCode, connected, saveState, trip, grandTotal, exchangeRate, onReset, onLeaveRoom,
-}: AppHeaderProps) {
-  const eyebrow = trip ? (trip.destination ?? FALLBACK.eyebrow) : FALLBACK.eyebrow;
-  const title = trip
-    ? `${trip.name} · ${fmtTripDates(trip.startDate, trip.endDate)}`
-    : FALLBACK.title;
+const ITEM = "flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-foreground outline-none data-highlighted:bg-secondary";
+
+export default function AppHeader({ roomCode, connected, saveState, trip, onReset, onLeaveRoom, onDownloadPdf }: AppHeaderProps) {
+  const local = roomCode === "LOCAL";
+  const sync = connected ? SYNC[saveState] : { label: "Conectando…", dot: "bg-muted-foreground animate-pulse" };
+  const [copied, setCopied] = useState(false);
+
+  function download(kind: ReportKind) {
+    onDownloadPdf(kind).catch(() => alert("No se pudo generar el PDF. Intenta de nuevo con internet."));
+  }
+
+  function copyCode() {
+    navigator.clipboard?.writeText(roomCode).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
 
   return (
-    <div className="mb-3.5 flex flex-wrap items-end justify-between gap-3.5">
-      <div>
-        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#D85A30]">
-          {eyebrow}
-        </div>
-        <h1 className="mt-0.5 text-2xl font-semibold text-foreground">
-          {title}
-        </h1>
-        <div className="mt-1 text-[13px] text-secondary-foreground">
-          Arrastra cualquier bloque para reorganizar el plan · clic para editar horas
-        </div>
+    <header className="mb-4 flex items-center justify-between gap-3 md:mb-5">
+      <div className="min-w-0">
+        <h1 className="truncate text-xl font-semibold tracking-tight text-foreground md:text-2xl">{trip?.name ?? FALLBACK.name}</h1>
+        <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
+          {trip ? (
+            <>
+              {fmtTripDates(trip.startDate, trip.endDate)}
+              {trip.destination && <> · {trip.destination}</>}
+            </>
+          ) : FALLBACK.subtitle}
+        </p>
       </div>
-      <div className="flex items-center gap-3">
-        {roomCode !== "LOCAL" && (
-          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs">
-            <span className={cn("h-[7px] w-[7px] shrink-0 rounded-full", connected ? "bg-primary" : "bg-gray-500")} />
-            <span className="text-muted-foreground">Sala</span>
-            <span className="font-mono font-bold tracking-wider">{roomCode}</span>
-            <span className={cn("min-w-[52px] text-left text-[10px]", saveState === "error" ? "text-destructive" : "text-muted-foreground")}>
-              {SAVE_LABEL[saveState]}
-            </span>
-            {onReset && (
-              <button
-                title="Restablecer itinerario al default"
-                onClick={onReset}
-                className="cursor-pointer pl-1 text-xs text-muted-foreground hover:text-foreground"
-              >↺</button>
-            )}
-            <button
-              onClick={onLeaveRoom}
-              className="cursor-pointer pl-1 text-[13px] text-muted-foreground hover:text-foreground"
-            >×</button>
-          </div>
+
+      <div className="flex shrink-0 items-center gap-1.5 md:gap-2.5">
+        {!local && (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground" title={sync.label}>
+            <span className={cn("h-2 w-2 rounded-full", sync.dot)} />
+            <span className="hidden md:inline">{sync.label}</span>
+          </span>
         )}
-        <div className="flex flex-wrap gap-2.5">
-          <PriceChip label="Total estimado" value={fmtUSD(grandTotal)} sub={fmtCOP(usdToCop(grandTotal, exchangeRate))} strong />
-        </div>
+
+        <Menu.Root>
+          <Menu.Trigger
+            aria-label="Opciones del viaje"
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground data-popup-open:bg-secondary"
+          >
+            <Ellipsis className="size-5" />
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Positioner sideOffset={6} align="end" className="z-50 outline-none">
+              <Menu.Popup className="min-w-52 origin-[var(--transform-origin)] rounded-xl border border-border bg-popover p-1 shadow-[0_10px_30px_rgba(0,0,0,.12)] outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+                {!local && (
+                  <Menu.Item className={ITEM} onClick={copyCode} closeOnClick={false}>
+                    <Copy className="size-4 text-muted-foreground" />
+                    <span className="flex-1">{copied ? "¡Código copiado!" : "Copiar código"}</span>
+                    <span className="font-mono text-xs font-semibold tracking-wider text-muted-foreground">{roomCode}</span>
+                  </Menu.Item>
+                )}
+                <Menu.Item className={ITEM} onClick={() => download("migration")}>
+                  <FileDown className="size-4 text-muted-foreground" />
+                  PDF para migración
+                </Menu.Item>
+                <Menu.Item className={ITEM} onClick={() => download("full")}>
+                  <FileDown className="size-4 text-muted-foreground" />
+                  PDF del itinerario completo
+                </Menu.Item>
+                {onReset && (
+                  <>
+                    <Menu.Separator className="mx-1 my-1 h-px bg-border" />
+                    <Menu.Item className={ITEM} onClick={onReset}>
+                      <RotateCcw className="size-4 text-muted-foreground" />
+                      Restablecer itinerario
+                    </Menu.Item>
+                  </>
+                )}
+                <Menu.Separator className="mx-1 my-1 h-px bg-border" />
+                <Menu.Item className={ITEM} onClick={onLeaveRoom}>
+                  <LogOut className="size-4 text-muted-foreground" />
+                  {local ? "Salir del modo local" : "Volver a mis viajes"}
+                </Menu.Item>
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
+
         <AuthButton />
       </div>
-    </div>
+    </header>
   );
 }

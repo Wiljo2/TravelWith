@@ -57,13 +57,15 @@ rooms (code PK, name, destination, start_date, end_date, exchange_rate, members 
    └── trip_changes       (audit log: table, row, op, before, after, user)
 
 Every item row has version (int), updated_at and updated_by.
+Not in tables yet (step 3.13 of docs/plans/relational-broadcast.md): ideas, ideaPlaces,
+ideaLinks*, eventPlaces, documents, event mapsUrl/documentId, expense documentId.
 ```
 
 Notes and known trade-offs:
 - **Membership is stored twice**: `rooms.members` (JSONB — display cache with name/avatar) and `user_rooms` (relational — source of truth for access and "my trips"). Both change only through the SQL functions `join_room` / `leave_room` / `delete_room` (`006_membership_functions.sql`, called via `src/server/members.ts`), which update them in one transaction; do not write either directly, and do not add a third representation. Roles are assigned by the server: the creator is `owner` (in `POST /api/rooms`), everyone who joins is `member`.
 - The trip header (`name`, `destination`, dates, `exchange_rate`) is written only by the `trip.update` / `trip.setExchangeRate` ops; it has no row version (last write wins).
 - References between items are **foreign keys** (`008_trip_tables.sql`): deleting an event nulls `linked_event_id` and day-span event ids and deletes the trip spans that start or end on it; deleting a day deletes its events and day spans and nulls expense and task day ids. New data has no dangling ids. Consumers still handle a missing reference gracefully (`find(...) ?? null`).
-- New rooms are **built server-side** in `POST /api/rooms`: header columns plus empty days in `trip_days` (via `reset_itinerary`). Client hooks start empty; the fictional demo trip (`src/data/mockRoom.ts`) is loaded with a dynamic import only in the `LOCAL` room in development builds, so it never ships to production. Never put real trip data in the repo.
+- New rooms are **built server-side** in `POST /api/rooms`: header columns plus empty days in `trip_days` (via `reset_itinerary`). Client hooks start empty; the fictional demo trip (`src/data/mockRoom.ts`) is loaded with a dynamic import only in the `LOCAL` room in development builds, so it never ships to production. Never put real trip data in app code or anything the client bundle imports (the idea-matching tests use the fixture `src/test/fixtures/initialDays.ts`, test-only).
 - `rooms.payload` is the backup from before the cut-over: never write it from the app. `private.rebuild_payload(code)` regenerates it from the tables for a rollback; `validateRoomPayload` / `payloadIssues` (`lib/validate.ts`, `lib/schemas.ts`) only read it (`scripts/check-payloads.ts`).
 - Event categories: new events use `DEFAULT_EVENT_CAT`; pickers, the legend and the agent list `EVENT_CATEGORY_KEYS`. Legacy keys (`barco`, `puerto`, `miami`) stay in `CATEGORIES` so stored events render — never remove a category key.
 

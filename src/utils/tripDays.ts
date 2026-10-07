@@ -1,4 +1,5 @@
 import type { Day } from "@/types";
+import { HOUR_END } from "@/constants/time";
 
 const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -43,6 +44,41 @@ export function generateDays(startDate: string, endDate: string): Day[] | null {
     i++;
   }
   return days;
+}
+
+// Next free slot for a quick "+ Actividad": right after the day's last activity.
+export function nextFreeHour(day: Day): number {
+  const lastEnd = Math.max(0, ...day.events.map((e) => e.end));
+  return lastEnd ? Math.min(Math.ceil(lastEnd), HOUR_END - 1) : 9;
+}
+
+export type TripPhase =
+  | { phase: "before"; daysLeft: number }
+  | { phase: "during"; dayIdx: number; hour: number }
+  | { phase: "after" };
+
+// Where `now` falls relative to the trip. `dayCount` is the itinerary length.
+// Itinerary days run past midnight up to HOUR_END, so 1:00 am still belongs to
+// the previous day, at hour 25.
+export function tripPhase(startDate: string, dayCount: number, now: Date = new Date()): TripPhase | null {
+  const start = parseISODate(startDate);
+  if (!start) return null;
+  let hour = now.getHours() + now.getMinutes() / 60;
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (hour < HOUR_END - 24) {
+    hour += 24;
+    date.setDate(date.getDate() - 1);
+  }
+  const offset = Math.round((date.getTime() - start.getTime()) / 86_400_000);
+  if (offset < 0) return { phase: "before", daysLeft: -offset };
+  if (offset < dayCount) return { phase: "during", dayIdx: offset, hour };
+  return { phase: "after" };
+}
+
+// Index of today within the trip, or undefined when the trip isn't underway.
+export function tripDayIndex(startDate: string, dayCount: number): number | undefined {
+  const p = tripPhase(startDate, dayCount);
+  return p?.phase === "during" ? p.dayIdx : undefined;
 }
 
 export function fmtTripDates(startDate: string, endDate: string): string {

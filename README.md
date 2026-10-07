@@ -22,6 +22,15 @@ npm install
 npm run dev
 ```
 
+Or with `scripts/dev.mjs` (macOS, Windows, Linux), which checks Node, installs
+dependencies if needed, checks `.env.local` and opens the browser:
+
+```bash
+npm run local        # against Supabase (needs .env.local)
+npm run local:mock   # local mode with demo data
+node scripts/dev.mjs --port 3001 --open
+```
+
 ### Local mode (no account, no database)
 
 Open `http://localhost:3000/?local=1` (or the "Modo local" link on the entry screen). It boots with the fictional demo trip in `src/data/mockRoom.ts` and saves nothing. Development builds only.

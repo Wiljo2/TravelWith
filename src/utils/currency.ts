@@ -41,6 +41,11 @@ export function fmtCOP(cop: number): string {
   return `$${Math.round(cop).toLocaleString("es-CO")} COP`;
 }
 
+// Bare number (no currency symbol), for cells that render their own "$" or "COP".
+export function fmtNum(n: number): string {
+  return Math.round(n).toLocaleString("es-CO");
+}
+
 export function fmtUSDNum(usd: number): string {
   return `$${Math.round(usd).toLocaleString("es-CO")}`;
 }

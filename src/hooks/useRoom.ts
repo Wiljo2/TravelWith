@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
 import { useTripChannel } from "@/hooks/useTripChannel";
 import { needsRefetch, type TripMessage } from "@/utils/tripChannel";
+import { loadSnapshot, saveSnapshot } from "@/lib/offline";
 import type { RoomMember, RoomPayload } from "@/types";
 import type { Row, TripTable } from "@/utils/tripRows";
 
@@ -19,6 +20,9 @@ export interface RoomHandlers {
 
 interface UseRoomResult {
   connected: boolean;
+  // Set while the room couldn't be reached and the device's last copy is shown:
+  // when that copy was taken (ISO).
+  offlineSince: string | null;
   members: RoomMember[];
   reload: () => void;
 }
@@ -32,6 +36,7 @@ const RESYNC_RETRY_MS = 1000;
 export function useRoom(code: string | null, accessToken: string | undefined, handlers: RoomHandlers): UseRoomResult {
   const [loaded, setLoaded] = useState(false);
   const [members, setMembers] = useState<RoomMember[]>([]);
+  const [offlineSince, setOfflineSince] = useState<string | null>(null);
   // Tokens refresh about hourly; refs keep requests current without resubscribing.
   const token = useRef(accessToken);
   const h = useRef(handlers);
@@ -50,11 +55,25 @@ export function useRoom(code: string | null, accessToken: string | undefined, ha
       })
       .then((data) => {
         const p = data?.payload as RoomPayload | undefined;
-        if (p?.days && Array.isArray(p.days)) h.current.onLoad(p);
-        if (Array.isArray(data?.members)) setMembers(data.members);
+        const roster = Array.isArray(data?.members) ? (data.members as RoomMember[]) : [];
+        if (p?.days && Array.isArray(p.days)) {
+          h.current.onLoad(p);
+          saveSnapshot(code, { payload: p, members: roster });
+        }
+        setMembers(roster);
+        setOfflineSince(null);
         setLoaded(true);
       })
-      .catch(() => setLoaded(false));
+      .catch(() => {
+        // No network: show this device's last copy and load the room again
+        // once the network is back.
+        setLoaded(false);
+        const snap = loadSnapshot(code);
+        if (!snap) return;
+        h.current.onLoad(snap.payload);
+        setMembers(snap.members);
+        setOfflineSince(snap.savedAt);
+      });
   }, [code]);
 
   const resyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,6 +98,12 @@ export function useRoom(code: string | null, accessToken: string | undefined, ha
     };
   }, [code, hasToken, reload]);
 
+  useEffect(() => {
+    if (!offlineSince) return;
+    window.addEventListener("online", reload);
+    return () => window.removeEventListener("online", reload);
+  }, [offlineSince, reload]);
+
   const onMessage = useCallback((m: TripMessage) => {
     if (m.kind === "roomDeleted") return h.current.onGone();
     if (m.kind === "room") {
@@ -95,5 +120,5 @@ export function useRoom(code: string | null, accessToken: string | undefined, ha
     onDenied: () => h.current.onGone(),
   });
 
-  return { connected: loaded && subscribed, members, reload };
+  return { connected: loaded && subscribed, offlineSince, members, reload };
 }

@@ -14,13 +14,26 @@ function supabaseOrigins(): string {
   return `https://${host} wss://${host}`;
 }
 
+// Images load from any https origin: their URLs come from external APIs
+// (Wikipedia place photos, TikTok/YouTube covers, Google avatars) that pick
+// and change their own hosts. Scripts, connections and frames stay locked down.
+// Third parties the app connects to or embeds directly in the browser:
+// - trip map: OpenFreeMap style/tiles/glyphs, and Wikimedia place photos
+//   fetched for offline use (service worker and mapOffline)
+// - the TikTok/YouTube players embedded in the idea viewer
+const MAP_TILES = "https://tiles.openfreemap.org";
+const PLACE_PHOTOS = "https://*.wikimedia.org";
+const PLAYERS = "https://www.tiktok.com https://www.youtube.com";
+
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://lh3.googleusercontent.com",
+  "img-src 'self' data: blob: https:",
   "font-src 'self'",
-  `connect-src 'self' ${supabaseOrigins()}`,
+  `connect-src 'self' ${supabaseOrigins()} ${MAP_TILES} ${PLACE_PHOTOS}`,
+  "worker-src 'self' blob:",
+  `frame-src ${PLAYERS}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -32,7 +45,7 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), payment=()" },
 ];
 
 const nextConfig: NextConfig = {

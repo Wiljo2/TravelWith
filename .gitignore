@@ -25,7 +25,13 @@ dist-ssr
 .next
 
 .vercel
+/claude
+/public/vendor
+/public/local-snapshot.json
 
 # Build artifacts and personal tool settings
 *.tsbuildinfo
 .claude/settings.local.json
+
+# Working notes with real trip data
+/docs/plans/drive-documents.md

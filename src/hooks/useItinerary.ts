@@ -69,8 +69,9 @@ export function useItinerary(send: SendOp) {
     send("event.delete", { id });
   }
 
-  function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = DEFAULT_EVENT_CAT, id = uid()) {
-    const nev: CalendarEvent = { id, start, end, title, cat, note };
+  // mapsUrl stays client-side until the trip tables store it (relational plan, step 3.13).
+  function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = DEFAULT_EVENT_CAT, mapsUrl?: string, id = uid()) {
+    const nev: CalendarEvent = { id, start, end, title, cat, note, ...(mapsUrl ? { mapsUrl } : {}) };
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: [...d.events, nev] } : d)));
     setSelectedId(nev.id);
     send("event.create", { id, dayId, title, start, end, note, cat });
@@ -86,12 +87,24 @@ export function useItinerary(send: SendOp) {
       const b = prev.find((d) => d.id === bId);
       if (!a || !b) return prev;
       return prev.map((d) => {
-        if (d.id === aId) return { ...d, events: b.events, spans: b.spans };
-        if (d.id === bId) return { ...d, events: a.events, spans: a.spans };
+        if (d.id === aId) return { ...d, sub: b.sub, events: b.events, spans: b.spans };
+        if (d.id === bId) return { ...d, sub: a.sub, events: a.events, spans: a.spans };
         return d;
       });
     });
     send("day.swap", { a: aId, b: bId });
+    // The subtitle describes the contents, so it moves with them.
+    const a = days.find((d) => d.id === aId);
+    const b = days.find((d) => d.id === bId);
+    if (a && b && a.sub !== b.sub) {
+      send("day.update", { id: aId, sub: b.sub ?? "" });
+      send("day.update", { id: bId, sub: a.sub ?? "" });
+    }
+  }
+
+  function setDaySub(dayId: string, sub: string) {
+    setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, sub } : d)));
+    send("day.update", { id: dayId, sub });
   }
 
   // newStart is already snapped and clamped by the caller
@@ -164,7 +177,7 @@ export function useItinerary(send: SendOp) {
 
   return {
     days, tripSpans, selectedId, selectedEvent, setSelectedId,
-    updateEvent, deleteEvent, addEvent, moveEvent, swapDays, loadItinerary, resetItinerary,
+    updateEvent, deleteEvent, addEvent, moveEvent, swapDays, setDaySub, loadItinerary, resetItinerary,
     addDaySpan, removeDaySpan, updateDaySpan, addTripSpan, removeTripSpan, updateTripSpan, applyRow,
   };
 }

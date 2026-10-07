@@ -21,7 +21,7 @@
   --accent: #E1F5EE;
   --accent-foreground: #04342C;
   --destructive: #EF4444;
-  --border: #E5E3DC;
+  --border: #ECEAE3;
   --input: #D3D1C7;
   --ring: #059669;
   --chart-1: #1D9E75;
@@ -98,14 +98,40 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Global UI scale. Kept as a variable (utils/zoom.ts reads it) in case a
+     denser layout is wanted again; 1 keeps text readable everywhere. */
   :root {
-    --app-zoom: 0.85;
+    --app-zoom: 1;
   }
   body {
-    @apply bg-background text-foreground m-0 p-2.5 antialiased;
+    @apply bg-background text-foreground m-0 p-0 antialiased;
     zoom: var(--app-zoom);
   }
   html {
     @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  /* iOS zooms the page when focusing a field under 16px. */
+  @media (pointer: coarse) {
+    input,
+    textarea,
+    select {
+      font-size: max(16px, 1em) !important;
+    }
+  }
+}
+
+/* Trip map controls and popup close: finger-sized on touch screens. */
+@media (pointer: coarse) {
+  .maplibregl-ctrl-group button {
+    width: 44px;
+    height: 44px;
+  }
+  .maplibregl-popup-close-button {
+    width: 36px;
+    height: 36px;
+    font-size: 22px;
   }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateDays, parseISODate, fmtTripDates, MAX_TRIP_DAYS } from "./tripDays";
+import { generateDays, parseISODate, fmtTripDates, tripPhase, MAX_TRIP_DAYS } from "./tripDays";
 
 describe("parseISODate", () => {
   it("parses valid ISO dates as local dates", () => {
@@ -47,6 +47,34 @@ describe("generateDays", () => {
     expect(generateDays("2026-01-01", "2026-12-31")).toBeNull();
     const max = generateDays("2026-01-01", "2026-03-01");
     expect(max === null || max.length <= MAX_TRIP_DAYS).toBe(true);
+  });
+});
+
+describe("tripPhase", () => {
+  const at = (y: number, m: number, d: number, h = 12, min = 0) => new Date(y, m - 1, d, h, min);
+
+  it("counts days left before the trip", () => {
+    expect(tripPhase("2026-11-26", 9, at(2026, 11, 20))).toEqual({ phase: "before", daysLeft: 6 });
+    expect(tripPhase("2026-11-26", 9, at(2026, 11, 25))).toEqual({ phase: "before", daysLeft: 1 });
+  });
+
+  it("returns the day index and decimal hour during the trip", () => {
+    expect(tripPhase("2026-11-26", 9, at(2026, 11, 26, 6))).toEqual({ phase: "during", dayIdx: 0, hour: 6 });
+    expect(tripPhase("2026-11-26", 9, at(2026, 11, 28, 14, 30))).toEqual({ phase: "during", dayIdx: 2, hour: 14.5 });
+  });
+
+  it("keeps small hours on the previous itinerary day", () => {
+    expect(tripPhase("2026-11-26", 9, at(2026, 11, 29, 1, 30))).toEqual({ phase: "during", dayIdx: 2, hour: 25.5 });
+    expect(tripPhase("2026-11-26", 9, at(2026, 11, 26, 1))).toEqual({ phase: "before", daysLeft: 1 });
+    expect(tripPhase("2026-11-26", 9, at(2026, 12, 5, 1))).toEqual({ phase: "during", dayIdx: 8, hour: 25 });
+  });
+
+  it("is over once the last itinerary day ends", () => {
+    expect(tripPhase("2026-11-26", 9, at(2026, 12, 5, 9))).toEqual({ phase: "after" });
+  });
+
+  it("returns null for invalid dates", () => {
+    expect(tripPhase("bad", 9)).toBeNull();
   });
 });
 

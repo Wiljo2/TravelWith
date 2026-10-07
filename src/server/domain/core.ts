@@ -1,4 +1,4 @@
-import type { RoomPayload, Day } from "@/types";
+import type { RoomPayload, CalendarEvent, Day } from "@/types";
 import { LIMITS } from "@/constants/limits";
 
 // Validation failure with a message the agent (or an API consumer) can act on.
@@ -39,7 +39,21 @@ export function requireDay(payload: RoomPayload, dayId: string): Day {
   return day;
 }
 
-const CLIENT_ID_RE = /^[A-Za-z0-9_-]+$/;
+export function findEvent(payload: RoomPayload, eventId: string): { day: Day; event: CalendarEvent } | null {
+  for (const day of payload.days) {
+    const event = day.events.find((e) => e.id === eventId);
+    if (event) return { day, event };
+  }
+  return null;
+}
+
+export function requireEvent(payload: RoomPayload, eventId: string): { day: Day; event: CalendarEvent } {
+  const found = findEvent(payload, eventId);
+  if (!found) throw new DomainError(`Event "${eventId}" not found. Use get_day_detail to list current event ids.`);
+  return found;
+}
+
+const CLIENT_ID_RE =/^[A-Za-z0-9_-]+$/;
 
 // Ids chosen by the client (so an optimistic insert keeps its id) share the
 // format of utils/uid; anything else would end up in URLs, logs and channels.

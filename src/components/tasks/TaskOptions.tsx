@@ -80,7 +80,7 @@ export default function TaskOptions({ options, people, exchangeRate, scheduled, 
 
             <div className="flex items-center justify-between">
               <span className="font-mono text-[10px] text-muted-foreground">
-                ${fmtUSDNum(optionGroupUSD(o, people, exchangeRate))} grupo · ${fmtUSDNum(perPerson)}/persona
+                {fmtUSDNum(optionGroupUSD(o, people, exchangeRate))} grupo · {fmtUSDNum(perPerson)}/persona
               </span>
               <button
                 onClick={() => onChoose(o.id)}

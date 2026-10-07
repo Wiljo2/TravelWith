@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { loadSnapshot } from "@/lib/offline";
 
 interface RoomGateProps {
   onEnter: (code: string) => void;
@@ -45,9 +46,15 @@ export default function RoomGate({
     if (!c) return;
     setLoading(true);
     setError("");
-    const res = await apiFetch(`/api/rooms/${c}/members`, session?.access_token, { method: "POST" });
-    if (!res.ok) {
-      setError(res.status === 404 ? "Sala no encontrada." : "No se pudo entrar al viaje.");
+    const res = await apiFetch(`/api/rooms/${c}/members`, session?.access_token, { method: "POST" }).catch(() => null);
+    // Offline: open this device's last copy of the trip, if it has one.
+    if (!res && loadSnapshot(c)) {
+      setLoading(false);
+      onEnter(c);
+      return;
+    }
+    if (!res?.ok) {
+      setError(res?.status === 404 ? "Sala no encontrada." : "No se pudo entrar al viaje.");
       setLoading(false);
       return;
     }
@@ -93,8 +100,8 @@ export default function RoomGate({
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-secondary px-4 py-5">
-      <div className="mb-9 text-center">
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-secondary px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))]">
+      <div className="mb-7 text-center md:mb-9">
         <div className="mb-2 text-[40px]">🧳</div>
         <h1 className="mb-1 text-[22px] font-bold">TravelWith</h1>
         <p className="text-[13px] text-secondary-foreground">
@@ -177,7 +184,7 @@ export default function RoomGate({
                       <button
                         onClick={() => setDeleteTarget({ code: r.room_code, name: r.name })}
                         title="Quitar de mi lista"
-                        className="flex h-full cursor-pointer items-center self-stretch border-l border-border px-3.5 text-base text-muted-foreground hover:bg-secondary"
+                        className="flex h-full min-w-12 cursor-pointer items-center justify-center self-stretch border-l border-border px-3.5 text-base text-muted-foreground hover:bg-secondary"
                       >
                         🗑
                       </button>

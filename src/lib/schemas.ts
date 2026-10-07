@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { LIMITS } from "@/constants/limits";
+import { DOCUMENT_KIND_KEYS } from "@/constants/documentKinds";
+import { DRIVE_ID_RE } from "@/utils/driveLinks";
 
 // Full shape of a persisted RoomPayload. Objects are loose (unknown keys are
 // kept) so fields added later survive older validators, and optional fields
@@ -24,6 +26,8 @@ const calendarEvent = z.looseObject({
   title: text(LIMITS.title),
   cat: text(LIMITS.id),
   note: text(LIMITS.note).nullish(),
+  mapsUrl: text(LIMITS.note).regex(/^https:\/\//).nullish(),
+  documentId: optId,
 });
 
 const daySpan = z.looseObject({
@@ -56,6 +60,7 @@ const extra = z.looseObject({
   linkedEventId: optId,
   startDayId: optId,
   endDayId: optId,
+  documentId: optId,
 });
 
 const taskOption = z.looseObject({
@@ -90,6 +95,13 @@ const tripSpan = z.looseObject({
   zIndex: z.number().nullish(),
 });
 
+const tripDocument = z.looseObject({
+  id,
+  driveFileId: z.string().regex(DRIVE_ID_RE),
+  title: z.string().trim().min(1).max(LIMITS.documentTitle),
+  kind: z.enum(DOCUMENT_KIND_KEYS).nullish(),
+});
+
 const mockPerson = z.looseObject({
   id,
   name: text(LIMITS.name),
@@ -103,6 +115,7 @@ export const roomPayloadSchema = z.looseObject({
   mockPeople: z.array(mockPerson).max(LIMITS.travelers).nullish(),
   tripSpans: z.array(tripSpan).max(LIMITS.tripSpans).nullish(),
   tasks: z.array(task).max(LIMITS.tasks).nullish(),
+  documents: z.array(tripDocument).max(LIMITS.documents).nullish(),
 });
 
 // Human-readable list of schema violations ("days.0.events.2.title: ..."), empty when valid.
