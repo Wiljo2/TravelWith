@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import type { Extra, Day } from "@/types";
+import type { Extra, Day, TripDocument } from "@/types";
+import DocumentPicker from "@/components/documents/DocumentPicker";
 import { fmtNum, fmtUSDNum, fmtCOPNum } from "@/utils/currency";
 import {
   toUSD, toCOP, parse, CELL_CLASS, CALC_NUM_CLASS, SUB_LINE_CLASS,
@@ -16,13 +17,14 @@ interface GlobalExtraRowProps {
   exchangeRate: number;
   people: number;
   days: Day[];
+  documents: TripDocument[];
   onCommit: (p: Partial<Extra>) => void;
   onRemove: () => void;
   onLinkExtra: (id: string | undefined) => void;
 }
 
 export default function GlobalExtraRow({
-  extra, exchangeRate, people, days, onCommit, onRemove, onLinkExtra,
+  extra, exchangeRate, people, days, documents, onCommit, onRemove, onLinkExtra,
 }: GlobalExtraRowProps) {
   const [label, setLabel]       = useState(extra.label);
   const [amount, setAmount]     = useState(extra.amount);
@@ -63,6 +65,7 @@ export default function GlobalExtraRow({
         <input value={label} maxLength={LIMITS.label} onChange={(e) => { setLabel(e.target.value); setDirty(true); }}
           className="w-full border-none bg-transparent text-[13px] text-foreground outline-none" />
         <ModeToggle mode={liveMode} onChange={changeMode} />
+        <DocumentPicker documents={documents} value={extra.documentId} onChange={(documentId) => onCommit({ documentId })} className="mt-1.5" />
       </td>
       <td className={cn(CELL_CLASS, CELL_FULL_CLASS, CELL_LABEL_CLASS)} data-label="ACTIVIDAD"><EventLinkCell extra={extra} days={days} onLink={onLinkExtra} /></td>
       <td className={cn(CELL_CLASS, CELL_LABEL_CLASS, "text-right")} data-label="TOTAL GRUPO">

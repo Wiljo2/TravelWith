@@ -1,5 +1,6 @@
 import type { RoomPayload } from "@/types";
 import { extraGroupUSD, extraPerPersonUSD } from "@/utils/currency";
+import { DEFAULT_DOCUMENT_KIND } from "@/constants/documentKinds";
 import { requireDay } from "./core";
 
 // Compact, token-efficient views of the trip for the agent. No styling fields.
@@ -21,6 +22,8 @@ export function tripOverview(payload: RoomPayload, people: number) {
       .filter((t) => !t.dayId)
       .map((t) => ({ taskId: t.id, title: t.title, done: t.done, cat: t.cat, priority: t.priority })),
     expenseCount: payload.extras.length,
+    // Titles only: the Drive id and the file's contents never reach the model.
+    documents: (payload.documents ?? []).map((d) => ({ documentId: d.id, title: d.title, kind: d.kind ?? DEFAULT_DOCUMENT_KIND })),
   };
 }
 
@@ -41,6 +44,7 @@ export function dayDetail(payload: RoomPayload, dayId: string) {
         cat: e.cat,
         note: e.note || undefined,
         linkedExpenseIds: payload.extras.filter((x) => x.linkedEventId === e.id).map((x) => x.id),
+        documentId: e.documentId,
       })),
     scheduledTasks: tasks.map((t) => ({
       taskId: t.id,
@@ -71,6 +75,7 @@ export function budgetDetail(payload: RoomPayload, people: number) {
       linkedEventId: x.linkedEventId,
       startDayId: x.startDayId,
       endDayId: x.endDayId,
+      documentId: x.documentId,
     })),
     totalGroupUSD: round2(payload.extras.reduce((s, e) => s + extraGroupUSD(e, people, rate), 0)),
     totalPerPersonUSD: round2(

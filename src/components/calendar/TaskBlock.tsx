@@ -1,7 +1,8 @@
 "use client";
 import type { Task } from "@/types";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT, PRIORITIES } from "@/constants/taskCategories";
-import { HOUR_START, PX_PER_HOUR } from "@/constants/time";
+import { PX_PER_HOUR } from "@/constants/time";
+import { useGridStart } from "./gridStart";
 import { fmtHour } from "@/utils/time";
 import { cn } from "@/lib/utils";
 
@@ -13,9 +14,10 @@ interface TaskBlockProps {
 
 export default function TaskBlock({ task, onToggle, onEdit }: TaskBlockProps) {
   const c = TASK_CATEGORIES[task.cat ?? DEFAULT_TASK_CAT] ?? TASK_CATEGORIES[DEFAULT_TASK_CAT];
-  const start = task.start ?? HOUR_START;
+  const gridStart = useGridStart();
+  const start = task.start ?? gridStart;
   const end = task.end ?? start + 1;
-  const top = (start - HOUR_START) * PX_PER_HOUR;
+  const top = (start - gridStart) * PX_PER_HOUR;
   const height = Math.max((end - start) * PX_PER_HOUR, 24);
   const pr = task.priority ? PRIORITIES[task.priority] : null;
 

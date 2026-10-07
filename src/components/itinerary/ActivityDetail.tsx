@@ -3,9 +3,10 @@ import EventEditor from "@/components/editor/EventEditor";
 import LinkedExtrasSection from "@/components/itinerary/LinkedExtrasSection";
 import LocationSection from "@/components/itinerary/LocationSection";
 import RangesSection from "@/components/itinerary/RangesSection";
+import DocumentPicker from "@/components/documents/DocumentPicker";
 import { Disclosure } from "@/components/ui/disclosure";
 import { extraGroupUSD, fmtUSD } from "@/utils/currency";
-import type { CalendarEvent, Day, EventPlace, Extra, TripSpan } from "@/types";
+import type { CalendarEvent, Day, EventPlace, Extra, TripDocument, TripSpan } from "@/types";
 
 interface ActivityDetailProps {
   selected: { ev: CalendarEvent; dayId: string };
@@ -13,6 +14,7 @@ interface ActivityDetailProps {
   days: Day[];
   extras: Extra[];
   tripSpans: TripSpan[];
+  documents: TripDocument[];
   people: number;
   exchangeRate: number;
   onUpdate: (patch: Partial<CalendarEvent>) => void;
@@ -27,7 +29,7 @@ interface ActivityDetailProps {
 
 // Everything about one activity: the essentials up front, money and ranges folded away.
 export default function ActivityDetail({
-  selected, place, days, extras, tripSpans, people, exchangeRate,
+  selected, place, days, extras, tripSpans, documents, people, exchangeRate,
   onUpdate, onDelete, onMoveDay, onLinkExtra, onAddExtra, onRemoveExtra, onAddTripSpan, onRemoveTripSpan,
 }: ActivityDetailProps) {
   const linked = extras.filter((x) => x.linkedEventId === selected.ev.id);
@@ -45,6 +47,13 @@ export default function ActivityDetail({
       />
 
       <LocationSection ev={selected.ev} place={place} onSetLink={(mapsUrl) => onUpdate({ mapsUrl })} />
+
+      {documents.length > 0 && (
+        <section className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-border p-3">
+          <h3 className="text-[13px] font-semibold">Documento</h3>
+          <DocumentPicker documents={documents} value={selected.ev.documentId} onChange={(documentId) => onUpdate({ documentId })} />
+        </section>
+      )}
 
       <div className="mt-4">
         <Disclosure

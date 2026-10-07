@@ -44,4 +44,12 @@ describe("validateRoomPayload", () => {
     expect(validateRoomPayload({ ...base, exchangeRate: 0 })).toBeNull();
     expect(validateRoomPayload({ ...base, tasks: "x" })).toBeNull();
   });
+
+  it("accepts document references and rejects malformed collections", () => {
+    const doc = { id: "doc1", driveFileId: "1AbC_dEf-123456789xyz", title: "Vuelo ida", kind: "flight" };
+    expect(validateRoomPayload({ ...base, documents: [doc] })).not.toBeNull();
+    expect(validateRoomPayload({ ...base, documents: {} })).toBeNull();
+    expect(validateRoomPayload({ ...base, documents: [null] })).toBeNull();
+    expect(validateRoomPayload({ ...base, documents: ["1AbC_dEf-123456789xyz"] })).toBeNull();
+  });
 });

@@ -1,10 +1,14 @@
 import { fmtHour } from "@/utils/time";
 import { parseISODate } from "@/utils/tripDays";
-import type { CalendarEvent, Day, TripInfo } from "@/types";
+import { documentKind } from "@/constants/documentKinds";
+import { driveFileUrl } from "@/utils/driveLinks";
+import type { CalendarEvent, Day, TripDocument, TripInfo } from "@/types";
 
 // What goes into the trip PDFs, independent of how they're drawn (lib/tripPdf.ts):
 // - "migration": 1–2 pages to show an immigration officer — travelers, dates,
-//   flights, lodging and the cruise, and where the group is each day. No prices.
+//   flights, lodging, the cruise and anything backed by a linked document, the
+//   supporting documents with their Drive links (they open only for people the
+//   folder is shared with), and where the group is each day. No prices.
 // - "full": the whole itinerary, day by day, for the group.
 
 export type ReportKind = "migration" | "full";
@@ -13,10 +17,11 @@ export interface ReportInput {
   trip: TripInfo | null;
   days: Day[];
   travelers: string[];
+  documents?: TripDocument[];
   now?: Date;
 }
 
-export interface ReportRow { when: string; text: string; detail?: string }
+export interface ReportRow { when: string; text: string; detail?: string; link?: string }
 export interface ReportSection { title: string; subtitle?: string; rows: ReportRow[] }
 
 export interface TripReport {
@@ -65,7 +70,7 @@ const shortDate = (d: Date) => d.toLocaleDateString("es-CO", { weekday: "short",
 const timeRange = (ev: CalendarEvent) => (ev.end > ev.start ? `${fmtHour(ev.start)} - ${fmtHour(ev.end)}` : fmtHour(ev.start));
 const byStart = (a: CalendarEvent, b: CalendarEvent) => a.start - b.start;
 
-export function buildTripReport(kind: ReportKind, { trip, days, travelers, now = new Date() }: ReportInput): TripReport {
+export function buildTripReport(kind: ReportKind, { trip, days, travelers, documents = [], now = new Date() }: ReportInput): TripReport {
   const first = dayDate(trip, 0);
   const last = dayDate(trip, days.length - 1);
   const label = (idx: number, long = false) => {
@@ -77,14 +82,34 @@ export function buildTripReport(kind: ReportKind, { trip, days, travelers, now =
     `${days.length} ${days.length === 1 ? "día" : "días"}`,
   ].filter(Boolean).join(" · ");
 
+  const docs = new Map(documents.map((d) => [d.id, d]));
+  const docOf = (ev: CalendarEvent) => (ev.documentId ? docs.get(ev.documentId) : undefined);
+  const supported = (doc: TripDocument) => days.flatMap((day, i) =>
+    day.events.filter((ev) => ev.documentId === doc.id).sort(byStart).map((ev) => `${label(i)}: ${pdfText(ev.title)}`));
+  const supportSection: ReportSection[] = documents.length === 0 ? [] : [{
+    title: "Documentos de soporte",
+    subtitle: "Originales disponibles para presentar",
+    rows: documents.map((doc) => ({
+      when: documentKind(doc.kind).label,
+      text: pdfText(doc.title),
+      detail: supported(doc).join(" · ") || undefined,
+      link: driveFileUrl(doc.driveFileId),
+    })),
+  }];
+
   const sections: ReportSection[] = kind === "migration"
     ? [
       {
         title: "Vuelos, hospedaje y crucero",
         rows: days.flatMap((day, i) => [...day.events].sort(byStart)
-          .filter((ev) => ev.cat === "logist" && LOGISTICS_RE.test(ev.title))
-          .map((ev) => ({ when: `${label(i)} · ${fmtHour(ev.start)}`, text: pdfText(ev.title), detail: pdfText(withoutMoney(pdfText(ev.note))) || undefined }))),
+          .filter((ev) => (ev.cat === "logist" && LOGISTICS_RE.test(ev.title)) || docOf(ev))
+          .map((ev) => {
+            const doc = docOf(ev);
+            const detail = [pdfText(withoutMoney(pdfText(ev.note))), doc ? `Soporte: ${pdfText(doc.title)}` : ""].filter(Boolean).join(" · ");
+            return { when: `${label(i)} · ${fmtHour(ev.start)}`, text: pdfText(ev.title), detail: detail || undefined };
+          })),
       },
+      ...supportSection,
       {
         title: "Itinerario por día",
         rows: days.map((day, i) => ({ when: label(i), text: pdfText(day.sub) || "-" })),

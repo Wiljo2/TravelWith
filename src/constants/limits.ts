@@ -11,6 +11,8 @@ export const LIMITS = {
   extras: 500,
   tasks: 500,
   optionsPerTask: 20,
+  documents: 100,
+  documentTitle: 120,
   travelers: 50,
   title: 200,
   label: 200,

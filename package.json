@@ -6,6 +6,7 @@
     "dev": "next dev",
     "local": "node scripts/dev.mjs --open",
     "local:mock": "node scripts/dev.mjs --local --open",
+    "snapshot": "node --env-file=.env.local scripts/snapshot-room.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "oxlint",

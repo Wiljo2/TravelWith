@@ -51,6 +51,7 @@ rooms (code PK, name, payload JSONB, members JSONB, updated_at)
         ├── tripSpans: TripSpan[]  (startEventId/endEventId → CalendarEvent, cross-day)
         ├── tasks: Task[]          (dayId → Day when scheduled on the calendar)
         ├── mockPeople: MockPerson[]
+        ├── documents?: TripDocument[] (Drive file id + title only; events/extras point back via documentId)
         └── exchangeRate: number
 ```
 

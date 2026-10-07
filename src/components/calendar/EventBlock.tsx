@@ -2,7 +2,8 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { CATEGORIES } from "@/constants/categories";
-import { HOUR_START, PX_PER_HOUR } from "@/constants/time";
+import { PX_PER_HOUR } from "@/constants/time";
+import { useGridStart } from "./gridStart";
 import { fmtHour, durLabel } from "@/utils/time";
 import { cssZoom } from "@/utils/zoom";
 import { cn } from "@/lib/utils";
@@ -105,8 +106,9 @@ export default function EventBlock({
   onMouseEnter, onMouseLeave, onTouchPress, touchDragging,
 }: EventBlockProps) {
   const [dragging, setDragging] = useState(false);
+  const gridStart = useGridStart();
   const cat    = CATEGORIES[ev.cat] ?? CATEGORIES.logist;
-  const top    = (ev.start - HOUR_START) * PX_PER_HOUR;
+  const top    = (ev.start - gridStart) * PX_PER_HOUR;
   const rawH   = (ev.end - ev.start) * PX_PER_HOUR;
   const height = Math.max(rawH, 26);
 

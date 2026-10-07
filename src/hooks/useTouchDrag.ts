@@ -29,7 +29,8 @@ function locate(x: number, y: number, edges: { left: number; right: number } | n
   const grid = document.elementFromPoint(cx, y)?.closest<HTMLElement>("[data-day-grid]");
   if (!grid?.dataset.dayGrid) return null;
   const rect = grid.getBoundingClientRect();
-  return { dayId: grid.dataset.dayGrid, hour: HOUR_START + (y - rect.top) / (PX_PER_HOUR * cssZoom(grid)) };
+  const gridStart = Number(grid.dataset.gridStart ?? HOUR_START);
+  return { dayId: grid.dataset.dayGrid, hour: gridStart + (y - rect.top) / (PX_PER_HOUR * cssZoom(grid)) };
 }
 
 // Long-press drag for touch screens, where HTML5 drag and drop doesn't work.

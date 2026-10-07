@@ -4,6 +4,7 @@ import { DomainError } from "./core";
 import { addEvent, updateEvent, deleteEvent } from "./events";
 import { addTask, updateTask, deleteTask } from "./tasks";
 import { addExtra, updateExtra, removeExtra, setExchangeRate } from "./extras";
+import { addDocument, updateDocument, removeDocument, linkDocument } from "./documents";
 import { tripOverview, dayDetail, budgetDetail } from "./read";
 
 function basePayload(): RoomPayload {
@@ -33,7 +34,7 @@ describe("events", () => {
     expect(() => addEvent(basePayload(), { dayId: "nope", title: "X", start: 10, end: 11 })).toThrow(DomainError);
     expect(() => addEvent(basePayload(), { dayId: "d0", title: "  ", start: 10, end: 11 })).toThrow(DomainError);
     expect(() => addEvent(basePayload(), { dayId: "d0", title: "X", start: 11, end: 10 })).toThrow(DomainError);
-    expect(() => addEvent(basePayload(), { dayId: "d0", title: "X", start: 2, end: 3 })).toThrow(DomainError);
+    expect(() => addEvent(basePayload(), { dayId: "d0", title: "X", start: 25, end: 27 })).toThrow(DomainError);
     expect(() => addEvent(basePayload(), { dayId: "d0", title: "X", start: 10, end: 11, cat: "zzz" })).toThrow(DomainError);
   });
 
@@ -162,5 +163,58 @@ describe("input checks (untyped tool input)", () => {
     const { payload, extra } = addExtra(basePayload(), { label: "Hotel", amount: 100, startDayId: "d0", endDayId: "d1" });
     expect(() => updateExtra(payload, extra.id, { startDayId: "d1", endDayId: "d0" })).toThrow(DomainError);
     expect(() => updateExtra(payload, extra.id, { endDayId: "d0" })).not.toThrow();
+  });
+});
+
+describe("documents", () => {
+  const DRIVE_ID = "1AbC_dEf-123456789xyz";
+
+  it("adds a document reference with a default kind", () => {
+    const { payload, document } = addDocument(basePayload(), { driveFileId: DRIVE_ID, title: " Vuelo ida " });
+    expect(payload.documents).toHaveLength(1);
+    expect(document).toMatchObject({ driveFileId: DRIVE_ID, title: "Vuelo ida", kind: "other" });
+  });
+
+  it("rejects links, bad kinds, empty titles and duplicates", () => {
+    expect(() => addDocument(basePayload(), { driveFileId: `https://drive.google.com/file/d/${DRIVE_ID}/view`, title: "X" })).toThrow(DomainError);
+    expect(() => addDocument(basePayload(), { driveFileId: DRIVE_ID, title: "X", kind: "passport" })).toThrow(DomainError);
+    expect(() => addDocument(basePayload(), { driveFileId: DRIVE_ID, title: "  " })).toThrow(DomainError);
+    expect(() => addDocument(basePayload(), { driveFileId: DRIVE_ID, title: "t".repeat(121) })).toThrow(DomainError);
+    const { payload } = addDocument(basePayload(), { driveFileId: DRIVE_ID, title: "X" });
+    expect(() => addDocument(payload, { driveFileId: DRIVE_ID, title: "Y" })).toThrow(DomainError);
+  });
+
+  it("renames and re-kinds a document", () => {
+    const created = addDocument(basePayload(), { driveFileId: DRIVE_ID, title: "Hotel" });
+    const { document } = updateDocument(created.payload, created.document.id, { title: "Hotel Madrid", kind: "lodging" });
+    expect(document).toMatchObject({ title: "Hotel Madrid", kind: "lodging" });
+    expect(() => updateDocument(created.payload, "missing", { title: "X" })).toThrow(DomainError);
+  });
+
+  it("links events and expenses, and removing the document unlinks them", () => {
+    let p = addDocument(basePayload(), { driveFileId: DRIVE_ID, title: "Vuelo" }).payload;
+    const docId = p.documents![0].id;
+    const ev = addEvent(p, { dayId: "d0", title: "Vuelo", start: 6, end: 10 });
+    const ex = addExtra(ev.payload, { label: "Tiquete", amount: 300, splitMode: "perPerson" });
+    p = linkDocument(ex.payload, { eventId: ev.event.id }, docId).payload;
+    p = linkDocument(p, { extraId: ex.extra.id }, docId).payload;
+    expect(p.days[0].events[0].documentId).toBe(docId);
+    expect(dayDetail(p, "d0").events[0].documentId).toBe(docId);
+    expect(budgetDetail(p, 2).expenses[0].documentId).toBe(docId);
+
+    expect(() => linkDocument(p, { eventId: "nope" }, docId)).toThrow(DomainError);
+    expect(() => linkDocument(p, { extraId: ex.extra.id }, "nope")).toThrow(DomainError);
+
+    const removed = removeDocument(p, docId).payload;
+    expect(removed.documents).toHaveLength(0);
+    expect(removed.days[0].events[0].documentId).toBeUndefined();
+    expect(removed.extras[0].documentId).toBeUndefined();
+  });
+
+  it("exposes only titles and kinds in the overview", () => {
+    const { payload } = addDocument(basePayload(), { driveFileId: DRIVE_ID, title: "Seguro", kind: "insurance" });
+    const docs = tripOverview(payload, 1).documents;
+    expect(docs).toEqual([{ documentId: payload.documents![0].id, title: "Seguro", kind: "insurance" }]);
+    expect(JSON.stringify(docs)).not.toContain(DRIVE_ID);
   });
 });

@@ -9,6 +9,7 @@ const WHEN_W = 44;            // left column (date / time)
 const INK: [number, number, number] = [28, 28, 26];
 const MUTED: [number, number, number] = [110, 110, 104];
 const RULE: [number, number, number] = [220, 218, 210];
+const LINK: [number, number, number] = [30, 90, 170];
 
 export function renderTripPdf(report: TripReport, Doc: typeof JsPDF): JsPDF {
   const doc = new Doc({ unit: "mm", format: "a4" });
@@ -66,7 +67,8 @@ export function renderTripPdf(report: TripReport, Doc: typeof JsPDF): JsPDF {
       const text = doc.splitTextToSize(row.text, width - WHEN_W) as string[];
       style(9);
       const detail = row.detail ? (doc.splitTextToSize(row.detail, width - WHEN_W) as string[]) : [];
-      const h = text.length * lineH(10.5) + detail.length * lineH(9) + 2.5;
+      const linkH = row.link ? lineH(8.5) : 0;
+      const h = text.length * lineH(10.5) + detail.length * lineH(9) + linkH + 2.5;
       ensure(h);
       style(9, false, MUTED);
       doc.text(doc.splitTextToSize(row.when, WHEN_W - 3) as string[], M, y + 0.4, { baseline: "top" });
@@ -75,6 +77,10 @@ export function renderTripPdf(report: TripReport, Doc: typeof JsPDF): JsPDF {
       if (detail.length) {
         style(9, false, MUTED);
         doc.text(detail, M + WHEN_W, y + text.length * lineH(10.5), { baseline: "top" });
+      }
+      if (row.link) {
+        style(8.5, false, LINK);
+        doc.textWithLink(row.link, M + WHEN_W, y + text.length * lineH(10.5) + detail.length * lineH(9), { url: row.link, baseline: "top" });
       }
       y += h;
     }
