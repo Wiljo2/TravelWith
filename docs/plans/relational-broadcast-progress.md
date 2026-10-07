@@ -1,11 +1,11 @@
 # Relational + Broadcast progress
 - Iteration: 18
 - Last commit: (iteration 18 commit; the next iteration records its sha in the log)
-- Next step: 3.10 (blocked on the 0.1 spike result); 3.12 after it
-- Human actions pending: 0.1 run the spike on staging (`docs/plans/spike/README.md`) and record the `broadcast_changes` payload shape and token-refresh behavior here; 3.10 waits for it. 2.3 run the migration rehearsal (`docs/plans/migration-rehearsal.md`) on a staging copy of production and record the results here; 4.1 needs it done with 0 differences.
+- Next step: 3.10 (spike result recorded below); 3.12 after it
+- Human actions pending: 2.3 run the migration rehearsal (`docs/plans/migration-rehearsal.md`) on a staging copy of production and record the results here; 4.1 needs it done with 0 differences.
 
 ## Steps
-- [H] 0.1 Spike kit (HUMAN: run on staging, record payload shape and token refresh)
+- [x] 0.1 Spike kit (HUMAN: run on staging, record payload shape and token refresh)
 - [x] 1.1 Migration: `rooms` header columns and trip tables
 - [x] 1.2 Migration: RLS and grants on trip tables
 - [x] 1.3 Migration: `private` schema, audit + broadcast triggers, `realtime.messages` policy
@@ -30,6 +30,40 @@
 - [ ] 6.1 Activity panel from `trip_changes`
 - [ ] 6.2 Per-change undo and owner restore
 
+## Spike result (0.1, 2026-10-07)
+Staging project `travelwith-staging` (`ddxxpcrgudllkgkyqqzw`, free plan, Postgres 17), migrations 001–005 and 007 applied (006 not needed for the spike), `spike.sql` applied, room `SPIKE01` with user A as owner and user B not a member. `@supabase/supabase-js` client from this repo, private channel `trip:SPIKE01`, `on("broadcast", { event: "*" })`.
+
+1. **Message shape.** `realtime.broadcast_changes` and `realtime.send` arrive with the same envelope. `message.event` is the operation (`INSERT` / `UPDATE` / `DELETE`), so `event: "*"` plus a switch on `payload.operation` works:
+   ```json
+   {
+     "type": "broadcast",
+     "event": "UPDATE",
+     "payload": {
+       "id": "<uuid>",
+       "table": "spike_events",
+       "schema": "public",
+       "operation": "UPDATE",
+       "record": { "id": "e1", "title": "Museo del Oro", "version": 2, "room_code": "SPIKE01", "start_hour": 9, "updated_at": "2026-10-07T15:17:06.534338+00:00" },
+       "old_record": { "id": "e1", "title": "Museo", "version": 1, "room_code": "SPIKE01", "start_hour": 9, "updated_at": "2026-10-07T15:17:03.363829+00:00" }
+     },
+     "meta": { "id": "<same uuid>" }
+   }
+   ```
+   - INSERT: `record` = new row, `old_record: null`.
+   - UPDATE: `record` = new row, `old_record` = full previous row.
+   - DELETE: `record: null`, `old_record` = full deleted row (the primary key is always there to remove the item).
+   - Rows are snake_case column names; `numeric` arrives as a JSON number (`start_hour: 9`); `timestamptz` as an ISO string with `+00:00` and microseconds.
+   - `payload.id` equals `meta.id` and is unique per message: usable to drop duplicates.
+2. **Size.** INSERT with a 200-character title: 554 bytes. Small row INSERT 360 bytes; UPDATE (both rows) 488–502 bytes; DELETE 374 / 554 bytes.
+3. **Non-member B.** Never received a message. Its subscribe returns `CHANNEL_ERROR` with `Unauthorized: You do not have permissions to read from this Channel topic: trip:SPIKE01`, and supabase-js keeps rejoining automatically (31 errors in ~7 minutes). `useTripChannel` must stop retrying on `Unauthorized` (remove the channel and treat it as lost membership) instead of looping.
+4. **Token refresh.** With a forced `refreshSession()` every 60 s and `realtime.setAuth(access_token)` in `onAuthStateChange("TOKEN_REFRESHED")`, A stayed subscribed through two refreshes and kept receiving changes afterwards; no `CHANNEL_ERROR` / `CLOSED`. Natural JWT expiry (1 h) was not tested.
+5. **`realtime.send`** (`private = true`, event `UPDATE`, topic `trip:SPIKE01`): A received it with the same envelope (`payload` = the jsonb sent, plus `id`; `meta.id`), 268 bytes; B received nothing.
+6. **Differences from the plan.**
+   - On a brand-new project the very first subscribe failed with `CHANNEL_ERROR MissingPartition: Realtime was unable to find the expected messages partition`, then supabase-js rejoined and got `SUBSCRIBED` about 1 s later. Transient; `useTripChannel` should treat `CHANNEL_ERROR` other than `Unauthorized` as retryable (the library already rejoins) and resync after a successful re-subscribe.
+   - Otherwise as planned: event names are `INSERT` / `UPDATE` / `DELETE`; rows under `payload.record` / `payload.old_record`; `payload.operation`, `payload.table`, `payload.schema`.
+
+Teardown: `teardown.sql` is run by hand in the staging SQL editor. The staging project stays for the 2.3 rehearsal.
+
 ## Log
 | Iter | Date | Step | Commit | Result | Notes / blockers |
 |---|---|---|---|---|---|
@@ -51,3 +85,4 @@
 | 16 | 2026-09-29 | 3.8 | d721173 | Done | Agent executor rewritten on `runOp` (`executeTool(ctx, name, input)`; route passes `{ code, userId, role }`); reads via `getTrip`; `mutateRoom`/`loadRoom` no longer used outside `trip-store.ts`. System prompt untouched; `update_event`/`delete_event` descriptions updated (static). `src/server/agent/tools.test.ts` (5): reads hit only `get_trip`, create maps to `event.create` with the owner as author and hides row metadata, update with `dayId` = move + update, domain/404/409 → `is_error`, DB errors still throw. tsc, lint (0 errors), 238 tests, `next build` green. |
 | 17 | 2026-09-29 | 3.9 | ced0170 | Done | Client on ops: `src/lib/opQueue.ts` (per-item ordering, merge of queued updates, version chain, 409/failure/resync handling), `src/hooks/useTripOps.ts`, `src/utils/tripRows.ts` (row → state), hooks `useItinerary` (+trip spans), `useBudget`, new `useTasks`, new `useTripInfo`, `useRoom` (load + roster only, no PATCH/autosave), `SyncNotice` (Spanish), owner-only reset in `AppHeader`; `App.tsx` 394 → 377 lines. Guards: empty title/label/name and invalid hour ranges are not sent until valid; option creates wait for a label. Tests: `opQueue.test.ts` (10), `tripRows.test.ts` (8). tsc, lint (0 errors), 256 tests, `next build` green. Not verified in a browser (needs a Supabase project with 008–017); the two-account manual test is part of the phase 3 exit criteria on staging. |
 | 18 | 2026-09-29 | 3.11 | (this commit) | Done | `src/server/maintenance.ts` + `MaintenanceError` in `http.ts` (503, Spanish message, `Retry-After`); guard on ops, agent, legacy PATCH/DELETE and room creation; client queue retries 503s keeping and merging pending edits, `MaintenanceBanner`; `MAINTENANCE_MODE` in `.env.example`. Tests: `src/server/maintenance.test.ts` (3: all five write routes 503 with no DB access, reads available, only exact `on`), queue maintenance retry (1). tsc, lint (0 errors), 260 tests, `next build` green. 3.10 skipped: it waits for the 0.1 spike result (Broadcast payload shape, token refresh); 3.12 depends on 3.10. |
+| H | 2026-10-07 | 0.1 | (this commit) | Done | Spike run on staging `travelwith-staging`; results in "Spike result (0.1)" above. Member receives INSERT/UPDATE/DELETE and `realtime.send`, non-member gets `Unauthorized` and nothing else, subscription survives two forced token refreshes. Findings for 3.10: stop retrying on `Unauthorized`; one transient `MissingPartition` on a new project. |
