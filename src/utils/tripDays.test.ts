@@ -65,7 +65,7 @@ describe("tripPhase", () => {
 
   it("keeps small hours on the previous itinerary day", () => {
     expect(tripPhase("2026-11-26", 9, at(2026, 11, 29, 1, 30))).toEqual({ phase: "during", dayIdx: 2, hour: 25.5 });
-    expect(tripPhase("2026-11-26", 9, at(2026, 11, 26, 3))).toEqual({ phase: "before", daysLeft: 1 });
+    expect(tripPhase("2026-11-26", 9, at(2026, 11, 26, 1))).toEqual({ phase: "before", daysLeft: 1 });
     expect(tripPhase("2026-11-26", 9, at(2026, 12, 5, 1))).toEqual({ phase: "during", dayIdx: 8, hour: 25 });
   });
 

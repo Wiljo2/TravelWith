@@ -1,11 +1,12 @@
 import { useRef, useState } from "react";
-import { HOUR_START, HOUR_END, PX_PER_HOUR } from "@/constants/time";
+import { HOUR_END, PX_PER_HOUR } from "@/constants/time";
 import { CATEGORIES } from "@/constants/categories";
 import { snapHour, fmtHour } from "@/utils/time";
 import { cssZoom } from "@/utils/zoom";
 import { EventCard } from "./EventBlock";
 import EventBlock from "./EventBlock";
 import TaskBlock from "./TaskBlock";
+import { useGridStart } from "./gridStart";
 import DaySubtitle from "@/components/itinerary/DaySubtitle";
 import { cn } from "@/lib/utils";
 import type { Day, CalendarEvent, DragPreview, DaySpan, Task } from "@/types";
@@ -57,9 +58,9 @@ function computeLayout(events: CalendarEvent[]): Map<string, { col: number; tota
   return layout;
 }
 
-// Resolves a span's actual start/end hours, falling back to explicit hours or HOUR_START/END
-function resolveSpan(span: DaySpan, events: CalendarEvent[]) {
-  let start = span.startHour ?? HOUR_START;
+// Resolves a span's actual start/end hours, falling back to explicit hours or the grid's edges
+function resolveSpan(span: DaySpan, events: CalendarEvent[], gridStart: number) {
+  let start = span.startHour ?? gridStart;
   let end   = span.endHour   ?? HOUR_END + 1;
   if (span.startEventId) {
     const ev = events.find((e) => e.id === span.startEventId);
@@ -74,8 +75,9 @@ function resolveSpan(span: DaySpan, events: CalendarEvent[]) {
 
 function GhostBlock({ preview }: { preview: DragPreview }) {
   const { ev, newStart, newEnd } = preview;
+  const gridStart = useGridStart();
   const cat    = CATEGORIES[ev.cat] ?? CATEGORIES.logist;
-  const top    = (newStart - HOUR_START) * PX_PER_HOUR;
+  const top    = (newStart - gridStart) * PX_PER_HOUR;
   const height = Math.max((newEnd - newStart) * PX_PER_HOUR, 26);
   return (
     <div className="pointer-events-none absolute inset-x-1.5 rounded-lg shadow-[0_4px_16px_rgba(0,0,0,.18)]" style={{ top, height }}>
@@ -114,7 +116,8 @@ export default function DayColumn({
   onTouchPress, touchDraggingId,
 }: DayColumnProps) {
   const touch = !!onTouchPress;
-  const totalHeight = (HOUR_END - HOUR_START + 1) * PX_PER_HOUR;
+  const gridStart = useGridStart();
+  const totalHeight = (HOUR_END - gridStart + 1) * PX_PER_HOUR;
   const colRef  = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const [hoverY, setHoverY] = useState<number | null>(null);
@@ -125,10 +128,10 @@ export default function DayColumn({
   function getHour(clientY: number) {
     const el = colRef.current!;
     const rect = el.getBoundingClientRect();
-    return HOUR_START + (clientY - rect.top) / (PX_PER_HOUR * cssZoom(el));
+    return gridStart + (clientY - rect.top) / (PX_PER_HOUR * cssZoom(el));
   }
 
-  const hoverHour = hoverY !== null ? snapHour(hoverY, 1, HOUR_START, HOUR_END) : null;
+  const hoverHour = hoverY !== null ? snapHour(hoverY, 1, gridStart, HOUR_END) : null;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -173,6 +176,7 @@ export default function DayColumn({
       <div
         ref={colRef}
         data-day-grid={day.id}
+        data-grid-start={gridStart}
         onDragOver={(e) => { e.preventDefault(); dragging.current = true; onDragMove(day.id, getHour(e.clientY)); }}
         onDragEnter={() => onDragEnter(day.id)}
         onDrop={(e) => { e.preventDefault(); dragging.current = false; onDrop(day.id, getHour(e.clientY)); }}
@@ -180,23 +184,23 @@ export default function DayColumn({
         onPointerLeave={() => setHoverY(null)}
         onClick={(e) => {
           if (dragging.current) { dragging.current = false; return; }
-          const h = snapHour(getHour(e.clientY), 1, HOUR_START, HOUR_END - 1);
+          const h = snapHour(getHour(e.clientY), 1, gridStart, HOUR_END - 1);
           onAddEvent(day.id, h, e.clientX, e.clientY);
         }}
         className={cn("relative cursor-crosshair border-x border-border", isDragTarget ? "bg-[rgba(213,90,48,.04)]" : "bg-transparent")}
         style={{ height: totalHeight }}
       >
         {/* Hour lines */}
-        {Array.from({ length: HOUR_END - HOUR_START + 1 }).map((_, i) => (
+        {Array.from({ length: HOUR_END - gridStart + 1 }).map((_, i) => (
           <div key={i} className="absolute inset-x-0 h-px bg-border" style={{ top: i * PX_PER_HOUR }} />
         ))}
 
         {/* Dynamic spans — sorted by zIndex (lower = painted first = further back).
             No explicit CSS z-index set: DOM order ensures spans stay behind events. */}
         {[...(day.spans ?? [])].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0)).map((span) => {
-          const { start, end } = resolveSpan(span, day.events);
-          const top    = (Math.max(start, HOUR_START) - HOUR_START) * PX_PER_HOUR;
-          const bottom = (Math.min(end, HOUR_END + 1) - HOUR_START) * PX_PER_HOUR;
+          const { start, end } = resolveSpan(span, day.events, gridStart);
+          const top    = (Math.max(start, gridStart) - gridStart) * PX_PER_HOUR;
+          const bottom = (Math.min(end, HOUR_END + 1) - gridStart) * PX_PER_HOUR;
           const height = Math.max(0, bottom - top);
           const hasBorder = span.border && span.border !== "transparent";
           return (
@@ -217,7 +221,7 @@ export default function DayColumn({
 
         {/* Hover indicator — shows where a click would add an event */}
         {hoverHour !== null && (
-          <div className="pointer-events-none absolute inset-x-1 z-[5]" style={{ top: (hoverHour - HOUR_START) * PX_PER_HOUR }}>
+          <div className="pointer-events-none absolute inset-x-1 z-[5]" style={{ top: (hoverHour - gridStart) * PX_PER_HOUR }}>
             <div className="h-0.5 rounded-[1px] bg-primary opacity-70" />
             <span className="pointer-events-none absolute left-1 top-[3px] rounded-[3px] bg-background px-[3px] text-[10px] tabular-nums text-emerald-600">
               {fmtHour(hoverHour)}
@@ -227,7 +231,7 @@ export default function DayColumn({
 
         {/* Pending new event ghost */}
         {pendingHour !== null && (
-          <div className="pointer-events-none absolute left-[7.5%] z-[4] w-[85%]" style={{ top: (pendingHour - HOUR_START) * PX_PER_HOUR, height: PX_PER_HOUR }}>
+          <div className="pointer-events-none absolute left-[7.5%] z-[4] w-[85%]" style={{ top: (pendingHour - gridStart) * PX_PER_HOUR, height: PX_PER_HOUR }}>
             <div className="flex h-full items-center justify-center gap-[5px] rounded-[7px] border-[1.5px] border-dashed border-[rgba(5,150,105,.55)] bg-[rgba(5,150,105,.06)]">
               <span className="text-[13px] font-light leading-none text-[rgba(5,150,105,.6)]">+</span>
               <span className="text-[10.5px] font-medium tracking-[.03em] text-[rgba(5,150,105,.55)]">nueva actividad</span>

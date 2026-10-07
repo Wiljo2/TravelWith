@@ -1,5 +1,5 @@
 "use client";
-import type { Extra, Day, RoomMember, Task } from "@/types";
+import type { Extra, Day, RoomMember, Task, TripDocument } from "@/types";
 import type { MockPerson } from "@/types";
 import { usdToCop, fmtUSD, fmtCOP, fmtUSDNum, extraGroupUSD, optionGroupUSD } from "@/utils/currency";
 import { TH_CLASS, TABLE_CLASS, THEAD_CLASS, TBODY_CLASS, TFOOT_CLASS, SectionHeader } from "@/components/budget/shared";
@@ -19,6 +19,7 @@ interface BudgetViewProps {
   mockPeople: MockPerson[];
   days: Day[];
   tasks: Task[];
+  documents: TripDocument[];
   onSetExchangeRate: (rate: number) => void;
   onUpdateExtra: (id: string, patch: Partial<Extra>) => void;
   onLinkExtra: (extraId: string, eventId: string | undefined) => void;
@@ -34,7 +35,7 @@ const TABLE_PANEL = cn(PANEL, "overflow-hidden p-0 md:p-0");
 const TABLE_HEAD = "px-4 pt-4 md:px-5 md:pt-5";
 
 export default function BudgetView({
-  extras, grandTotal, exchangeRate, members, mockPeople, days, tasks,
+  extras, grandTotal, exchangeRate, members, mockPeople, days, tasks, documents,
   onSetExchangeRate, onUpdateExtra, onLinkExtra, onAddExtra, onRemoveExtra,
   onAddMockPerson, onRemoveMockPerson,
 }: BudgetViewProps) {
@@ -127,7 +128,7 @@ export default function BudgetView({
               </thead>
               <tbody className={TBODY_CLASS}>
                 {[...globalExtras, ...linkedExtras].map((e) => (
-                  <GlobalExtraRow key={e.id} extra={e} exchangeRate={exchangeRate} people={people} days={days}
+                  <GlobalExtraRow key={e.id} extra={e} exchangeRate={exchangeRate} people={people} days={days} documents={documents}
                     onCommit={(p) => onUpdateExtra(e.id, p)} onRemove={() => onRemoveExtra(e.id)} onLinkExtra={(eid) => onLinkExtra(e.id, eid)} />
                 ))}
               </tbody>
@@ -168,7 +169,7 @@ export default function BudgetView({
                 </thead>
                 <tbody className={TBODY_CLASS}>
                   {dayExtras.map((e) => (
-                    <DayExtraRow key={e.id} extra={e} exchangeRate={exchangeRate} people={people} days={days}
+                    <DayExtraRow key={e.id} extra={e} exchangeRate={exchangeRate} people={people} days={days} documents={documents}
                       onCommit={(p) => onUpdateExtra(e.id, p)} onRemove={() => onRemoveExtra(e.id)} onLinkExtra={(eid) => onLinkExtra(e.id, eid)} />
                   ))}
                 </tbody>

@@ -9,7 +9,7 @@ import { tripOverview, dayDetail, budgetDetail } from "@/server/domain/read";
 import { DEFAULT_EVENT_CAT, EVENT_CATEGORY_KEYS } from "@/constants/categories";
 import { TASK_CATEGORIES } from "@/constants/taskCategories";
 
-const HOURS_DESC = "Decimal hour between 6 and 26 (e.g. 19.5 = 7:30pm, 25 = 1:00am next day)";
+const HOURS_DESC = "Decimal hour between 0 and 26 (e.g. 5.5 = 5:30am, 19.5 = 7:30pm, 25 = 1:00am next day)";
 const EVENT_CATS = EVENT_CATEGORY_KEYS.join(" | ");
 const TASK_CATS = Object.keys(TASK_CATEGORIES).join(" | ");
 

@@ -46,4 +46,23 @@ describe("payloadIssues", () => {
     expect(payloadIssues(span("#FAECE7"))).toEqual([]);
     expect(payloadIssues(span("url(https://tracker.example/p.gif)"))).not.toEqual([]);
   });
+
+  it("only stores plain Drive ids and short titles as documents", () => {
+    const withDoc = (doc: Record<string, unknown>) =>
+      payloadIssues({ ...base(), documents: [{ id: "doc1", driveFileId: "1AbC_dEf-123456789xyz", title: "Vuelo ida", ...doc }] });
+    expect(withDoc({})).toEqual([]);
+    expect(withDoc({ kind: "lodging" })).toEqual([]);
+    expect(withDoc({ driveFileId: "https://drive.google.com/file/d/1AbC_dEf-123456789xyz/view" })).not.toEqual([]);
+    expect(withDoc({ driveFileId: "short" })).not.toEqual([]);
+    expect(withDoc({ driveFileId: "1AbC/../../etc/passwd" })).not.toEqual([]);
+    expect(withDoc({ title: "t".repeat(121) })).not.toEqual([]);
+    expect(withDoc({ title: "  " })).not.toEqual([]);
+    expect(withDoc({ kind: "passport" })).not.toEqual([]);
+  });
+
+  it("accepts documentId on events and expenses", () => {
+    const p = base();
+    p.days[0].events.push({ id: "e1", start: 9, end: 10, title: "X", cat: "comida", note: "", documentId: "doc1" });
+    expect(payloadIssues({ ...p, extras: [{ id: "x1", label: "Hotel", amount: 1, documentId: "doc1" }] })).toEqual([]);
+  });
 });

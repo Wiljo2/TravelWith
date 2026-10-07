@@ -1,5 +1,5 @@
 import type { Day } from "@/types";
-import { HOUR_START, HOUR_END } from "@/constants/time";
+import { HOUR_END } from "@/constants/time";
 
 const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -58,14 +58,14 @@ export type TripPhase =
   | { phase: "after" };
 
 // Where `now` falls relative to the trip. `dayCount` is the itinerary length.
-// Itinerary days run HOUR_START..HOUR_END (past midnight), so 1:00 am still
-// belongs to the previous day, at hour 25.
+// Itinerary days run past midnight up to HOUR_END, so 1:00 am still belongs to
+// the previous day, at hour 25.
 export function tripPhase(startDate: string, dayCount: number, now: Date = new Date()): TripPhase | null {
   const start = parseISODate(startDate);
   if (!start) return null;
   let hour = now.getHours() + now.getMinutes() / 60;
   const date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (hour < HOUR_START) {
+  if (hour < HOUR_END - 24) {
     hour += 24;
     date.setDate(date.getDate() - 1);
   }

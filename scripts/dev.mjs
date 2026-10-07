@@ -2,7 +2,7 @@
 // Runs TravelWith locally. Works on macOS, Linux and Windows.
 //
 //   node scripts/dev.mjs                  against real Supabase data (needs .env.local)
-//   node scripts/dev.mjs --local          mock data, no login, no database
+//   node scripts/dev.mjs --local          mock data (or public/local-snapshot.json, see snapshot-room.mjs), no login, no database
 //   node scripts/dev.mjs --port 3001 --open
 
 import { spawn, spawnSync } from "node:child_process";

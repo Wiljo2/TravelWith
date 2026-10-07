@@ -1,8 +1,9 @@
 "use client";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import HourGutter from "./HourGutter";
 import DayColumn from "./DayColumn";
 import DateStrip from "./DateStrip";
+import { GridStartContext, calendarStartHour } from "./gridStart";
 import { cn } from "@/lib/utils";
 import type { Day, CalendarEvent, DragPreview, TripSpan, Task } from "@/types";
 import { cssZoom } from "@/utils/zoom";
@@ -76,6 +77,7 @@ export default function CalendarGrid({
     setStartIdx(initialDayIdx);
   }, [initialDayIdx]);
 
+  const gridStart = useMemo(() => calendarStartHour(days, tasks), [days, tasks]);
   const gutterW  = mobile ? GUTTER_W_MOBILE : GUTTER_W;
   const visible  = mobile ? 1 : calcVisible(containerW);
   const maxStart = Math.max(0, days.length - visible);
@@ -158,6 +160,7 @@ export default function CalendarGrid({
   });
 
   return (
+    <GridStartContext.Provider value={gridStart}>
     <div
       ref={containerRef}
       className="flex min-w-0 flex-1 flex-col overflow-clip rounded-2xl bg-card shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-border/70"
@@ -214,6 +217,7 @@ export default function CalendarGrid({
         ) : columns}
       </div>
     </div>
+    </GridStartContext.Provider>
   );
 }
 

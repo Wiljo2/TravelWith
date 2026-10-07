@@ -1,10 +1,12 @@
 "use client";
-import { HOUR_START, HOUR_END, PX_PER_HOUR } from "@/constants/time";
+import { HOUR_END, PX_PER_HOUR } from "@/constants/time";
+import { useGridStart } from "./gridStart";
 import { fmtHourShort } from "@/utils/time";
 
 export default function HourGutter({ width = 56 }: { width?: number }) {
+  const gridStart = useGridStart();
   const hours: number[] = [];
-  for (let h = HOUR_START; h <= HOUR_END; h++) hours.push(h);
+  for (let h = gridStart; h <= HOUR_END; h++) hours.push(h);
 
   return (
     <div className="relative shrink-0" style={{ width }}>

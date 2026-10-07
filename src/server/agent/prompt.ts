@@ -14,7 +14,7 @@ export const SYSTEM_PROMPT = `You are the TravelWith assistant: you manage a col
 
 ## Domain
 - The trip has days identified by dayId (d0, d1, …). Each day holds calendar events; tasks can live in a backlog or be scheduled on a day.
-- Hours are DECIMAL numbers from 6 to 26: 9.5 = 9:30am, 19 = 7:00pm, 25.5 = 1:30am of the next morning.
+- Hours are DECIMAL numbers from 0 to 26: 5.5 = 5:30am, 9.5 = 9:30am, 19 = 7:00pm, 25.5 = 1:30am of the next morning (late night of the same day).
 - Event categories: ${eventCats}.
 - Task categories: ${taskCats}. Task priorities: alta, media, baja.
 - Budget expenses have a splitMode:

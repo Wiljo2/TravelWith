@@ -7,6 +7,8 @@ import { useTripSession } from "@/hooks/useTripSession";
 import { useTasks } from "@/hooks/useTasks";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTripGeo } from "@/hooks/useTripGeo";
+import { useDocuments } from "@/hooks/useDocuments";
+import DocumentsPanel from "@/components/documents/DocumentsPanel";
 import { chooseOption } from "@/utils/taskDecision";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { snapHour } from "@/utils/time";
@@ -59,6 +61,7 @@ export default function App() {
   const { ideas, loadPayload: loadIdeasPayload, payload: ideasPayload, customPlaces, planLinks, planLinksAt, planIdeaIds } = ideasApi;
   const [trip, setTrip] = useState<TripInfo | null>(null);
   const geoApi = useTripGeo();
+  const { documents, addDocument, updateDocument, removeDocument, loadPayload: loadDocuments } = useDocuments();
 
   function addTripSpan(span: TripSpan) { setTripSpans((p) => [...p, span]); }
   function removeTripSpan(id: string)  { setTripSpans((p) => p.filter((s) => s.id !== id)); }
@@ -92,7 +95,8 @@ export default function App() {
     if (Array.isArray(payload.tasks))      setTasks(payload.tasks);
     loadIdeasPayload(payload);
     geoApi.loadPayload(payload);
-  }, [loadDays, loadBudget, loadIdeasPayload, geoApi.loadPayload]);
+    loadDocuments(payload);
+  }, [loadDays, loadBudget, loadIdeasPayload, geoApi.loadPayload, loadDocuments]);
 
   const { connected, offlineSince, members, saveState, save } = useRoom(roomCode, session?.access_token, onRemoteUpdate);
 
@@ -104,7 +108,7 @@ export default function App() {
     // Inline NODE_ENV check (not LOCAL_MODE_ENABLED) so the bundler can drop the import.
     if (process.env.NODE_ENV === "production" || !localMode || localSeeded.current) return;
     localSeeded.current = true;
-    import("@/data/mockRoom").then(({ mockRoomPayload }) => onRemoteUpdate(mockRoomPayload));
+    import("@/data/localPayload").then(({ loadLocalPayload }) => loadLocalPayload()).then(onRemoteUpdate);
   }, [localMode, onRemoteUpdate]);
 
   const people = Math.max(1, members.length + mockPeople.length);
@@ -120,7 +124,7 @@ export default function App() {
   }, [updateExtra]);
 
   // The whole trip as stored in the room, right now.
-  const payloadNow = (): RoomPayload => ({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, ...ideasPayload, ...geoApi.payload });
+  const payloadNow = (): RoomPayload => ({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, documents, ...ideasPayload, ...geoApi.payload });
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -132,7 +136,7 @@ export default function App() {
     saveTimer.current = setTimeout(() => save(payloadNow()), 600);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, planLinks, planLinksAt, planIdeaIds, geoApi.eventPlaces, roomCode, connected]);
+  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, planLinks, planLinksAt, planIdeaIds, geoApi.eventPlaces, documents, roomCode, connected]);
 
   function handleSelect(id: string | null) {
     setSelectedId(id);
@@ -197,6 +201,7 @@ export default function App() {
       days={days}
       extras={extras}
       tripSpans={tripSpans}
+      documents={documents}
       people={people}
       exchangeRate={exchangeRate}
       onUpdate={updateEvent}
@@ -251,6 +256,7 @@ export default function App() {
           people={people}
           exchangeRate={exchangeRate}
           onNavigate={setActiveTab}
+          documents={<DocumentsPanel documents={documents} onAdd={addDocument} onUpdate={updateDocument} onRemove={removeDocument} />}
         />
       )}
 
@@ -354,6 +360,7 @@ export default function App() {
             mockPeople={mockPeople}
             days={days}
             tasks={tasks}
+            documents={documents}
             onSetExchangeRate={setExchangeRate}
             onUpdateExtra={updateExtra}
             onLinkExtra={linkExtra}

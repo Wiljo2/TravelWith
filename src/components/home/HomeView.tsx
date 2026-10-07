@@ -1,4 +1,5 @@
 "use client";
+import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import DayAgenda from "@/components/itinerary/DayAgenda";
 import TodayCard from "@/components/home/TodayCard";
@@ -22,6 +23,7 @@ interface HomeViewProps {
   people: number;
   exchangeRate: number;
   onNavigate: (tab: Tab) => void;
+  documents?: ReactNode;
 }
 
 function heroCopy(phase: TripPhase | null, dayCount: number) {
@@ -36,7 +38,7 @@ function heroCopy(phase: TripPhase | null, dayCount: number) {
 
 // Adapts to the moment: countdown and decisions before the trip, "now / next"
 // while it's underway, and a wrap-up once it's over.
-export default function HomeView({ trip, days, tasks, ideas, grandTotal, people, exchangeRate, onNavigate }: HomeViewProps) {
+export default function HomeView({ trip, days, tasks, ideas, grandTotal, people, exchangeRate, onNavigate, documents }: HomeViewProps) {
   const now = useNow();
   const phase = trip ? tripPhase(trip.startDate, days.length, now) : null;
   const during = phase?.phase === "during" ? phase : null;
@@ -133,6 +135,8 @@ export default function HomeView({ trip, days, tasks, ideas, grandTotal, people,
             {fmtUSD(grandTotal)} en total entre {people} {people === 1 ? "viajero" : "viajeros"}
           </div>
         </section>
+
+        {documents}
       </div>
     </div>
   );

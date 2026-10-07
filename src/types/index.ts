@@ -14,6 +14,7 @@ export interface CalendarEvent {
   cat: string;
   note: string;
   mapsUrl?: string;       // Google Maps link: pins the activity's exact spot on the trip map
+  documentId?: string;    // TripDocument it comes from
 }
 
 // A span defined at the trip level that can cross multiple days.
@@ -78,6 +79,7 @@ export interface Extra {
   // amount is divided across the days in the range for the per-day display.
   startDayId?: string;
   endDayId?: string;      // if omitted, defaults to startDayId (single day)
+  documentId?: string;    // TripDocument it comes from
 }
 
 export type TaskPriority = "alta" | "media" | "baja";
@@ -192,6 +194,18 @@ export interface IdeaPlanResult {
   ideaIds: string[];
 }
 
+export type DocumentKind = "flight" | "lodging" | "insurance" | "ticket" | "other";
+
+// A reference to a file kept in Google Drive. Only the id and a short neutral
+// title are stored: the contents and any personal data stay in Drive, and
+// Drive's own sharing decides who can open it.
+export interface TripDocument {
+  id: string;
+  driveFileId: string;
+  title: string;
+  kind?: DocumentKind;    // default "other"
+}
+
 // A traveler without an account, counted in per-person math.
 export interface MockPerson {
   id: string;
@@ -214,6 +228,7 @@ export interface RoomPayload {
   ideaLinksAt?: string;    // ISO time of that analysis
   ideaLinksIds?: string[]; // ideas that analysis read (the others are "new")
   eventPlaces?: Record<string, EventPlace>; // trip map: where each activity happens, by event id
+  documents?: TripDocument[];
 }
 
 export interface RoomMember {
