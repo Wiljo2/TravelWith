@@ -45,20 +45,25 @@ auth.users (Supabase Auth)
 user_rooms (user_id, room_code, role owner|member, joined_at)   ← relational membership
    │ N:1
 rooms (code PK, name, destination, start_date, end_date, exchange_rate, members JSONB,
+       idea_places JSONB, idea_plan JSONB  ← idea settings, last write wins
        payload JSONB ← frozen pre-cut-over backup, never written by the app)
    ├── trip_days          (id, position, label, sub, flexible)
-   │     ├── trip_events      (day_id → trip_days)
+   │     ├── trip_events      (day_id → trip_days; maps_url; document_id → trip_documents)
+   │     │     └── trip_event_places (id = event id; data = EventPlace)
    │     └── trip_day_spans   (day_id; start/end_event_id → trip_events)
    ├── trip_spans         (start/end_event_id → trip_events, cross-day)
-   ├── trip_expenses      (linked_event_id → trip_events, start/end_day_id → trip_days)
+   ├── trip_expenses      (linked_event_id → trip_events, start/end_day_id → trip_days, document_id)
    ├── trip_tasks         (day_id → trip_days when scheduled)
    │     └── trip_task_options
    ├── trip_travelers     (mockPeople in the client)
+   ├── trip_documents     (drive_file_id, title, kind)
+   ├── trip_ideas         (data = the Idea without its id)
    └── trip_changes       (audit log: table, row, op, before, after, user)
 
 Every item row has version (int), updated_at and updated_by.
-Not in tables yet (step 3.13 of docs/plans/relational-broadcast.md): ideas, ideaPlaces,
-ideaLinks*, eventPlaces, documents, event mapsUrl/documentId, expense documentId.
+Ideas, documents, map places and the idea settings are sent by diffing each
+collection against what the server last confirmed (useFeatureSync), not by an
+op per function.
 ```
 
 Notes and known trade-offs:

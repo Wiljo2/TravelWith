@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useTripSession } from "@/hooks/useTripSession";
 import { useTripData } from "@/hooks/useTripData";
@@ -25,7 +25,7 @@ import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
 import IdeasTab from "@/components/ideas/IdeasTab";
 import ItineraryMap from "@/components/map/ItineraryMap";
-import type { RoomPayload, Task, ToastAction } from "@/types";
+import type { Task, ToastAction } from "@/types";
 import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
 import { generateDays, tripDayIndex } from "@/utils/tripDays";
 import { useIsMobile } from "@/hooks/useMediaQuery";
@@ -64,10 +64,7 @@ export default function App() {
   const chooseTaskOption = (taskId: string, optionId: string) =>
     localMode ? chooseOption(tasks, taskId, optionId, { addEvent, addExtra, deleteTask }) : taskState.chooseOption(taskId, optionId);
 
-  // Ideas, map places and documents are not in the trip tables yet (relational
-  // plan, step 3.14): until then the map and ideas tabs keep their changes in
-  // memory and report the save as failed.
-  const save = async (_payload: RoomPayload, _opts?: { force?: boolean }) => false;
+  const { save } = data;
 
   // Swap the whole contents of two days (events + spans) and their scheduled tasks.
   function swapDaysWithTasks(aId: string, bId: string) {

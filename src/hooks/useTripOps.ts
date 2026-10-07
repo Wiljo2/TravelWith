@@ -79,7 +79,8 @@ export function useTripOps(code: string | null, accessToken: string | undefined,
     return queueRef.current?.acceptRemote(table, id, version, deleted) ?? true;
   }, []);
   const idle = useCallback(() => queueRef.current?.idle() ?? true, []);
+  const flush = useCallback(() => queueRef.current?.flush() ?? Promise.resolve(true), []);
   const dismissNotice = useCallback(() => setNotice(null), []);
 
-  return { send, isKnown, seedVersions, noteVersion, acceptRemote, idle, syncState, notice, dismissNotice, maintenance };
+  return { send, isKnown, seedVersions, noteVersion, acceptRemote, idle, flush, syncState, notice, dismissNotice, maintenance };
 }

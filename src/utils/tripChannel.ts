@@ -19,6 +19,9 @@ const TRIP_TABLES = new Set<string>([
   "trip_tasks",
   "trip_task_options",
   "trip_travelers",
+  "trip_documents",
+  "trip_ideas",
+  "trip_event_places",
 ]);
 
 const OPERATIONS = new Set(["INSERT", "UPDATE", "DELETE"]);

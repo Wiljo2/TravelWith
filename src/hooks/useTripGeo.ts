@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import type { RoomPayload } from "@/hooks/useRoom";
 import type { Day, EventPlace } from "@/types";
+import { rowToEventPlace, type Row } from "@/utils/tripRows";
 
 // Where each activity happens (trip map), in and out of the room payload.
 export function useTripGeo() {
@@ -18,5 +19,18 @@ export function useTripGeo() {
     setEventPlaces((prev) => Object.fromEntries(Object.entries({ ...prev, ...found }).filter(([id]) => ids.has(id))));
   }
 
-  return { eventPlaces, loadPayload, payload: { eventPlaces }, merge };
+  // One place as the server has it; null removes it. Older versions are ignored.
+  const applyRow = useCallback((id: string, row: Row | null) => {
+    setEventPlaces((prev) => {
+      if (!row) {
+        if (!(id in prev)) return prev;
+        const { [id]: _gone, ...rest } = prev;
+        return rest;
+      }
+      if ((prev[id]?.version ?? 0) >= row.version) return prev;
+      return { ...prev, [id]: rowToEventPlace(row) };
+    });
+  }, []);
+
+  return { eventPlaces, loadPayload, payload: { eventPlaces }, merge, applyRow };
 }

@@ -4,6 +4,7 @@ import { canonicalUrl, classifyIdeaFields, detectPlatform, findIdeaUrls } from "
 import type { IdeaTextFields, PlaceIndex } from "@/utils/ideas";
 import { tiktokVideoId } from "@/utils/ideaMedia";
 import type { Idea, IdeaLink, IdeaMoment, IdeaPlanResult, IdeaSuggestion, RoomPayload } from "@/types";
+import { applyToList, rowToIdea, type Row } from "@/utils/tripRows";
 
 function rulesSuggestion(fields: IdeaTextFields, index: PlaceIndex): IdeaSuggestion | undefined {
   const { place, cat } = classifyIdeaFields(fields, index);
@@ -60,6 +61,21 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
     setPlanIdeaIds(Array.isArray(p.ideaLinksIds) ? p.ideaLinksIds : undefined);
   }, []);
   const payload = { ideas, ideaPlaces: customPlaces, ideaLinks: planLinks, ideaLinksAt: planLinksAt, ideaLinksIds: planIdeaIds };
+
+  // One idea as the server has it (trip channel or a lost conflict); null removes it.
+  const applyRow = useCallback((id: string, row: Row | null) => {
+    setIdeas((prev) => applyToList(prev, id, row, rowToIdea));
+  }, []);
+
+  // The idea settings from the trip header (rooms.idea_places / idea_plan).
+  const applySettings = useCallback((header: Record<string, unknown>) => {
+    if ("idea_places" in header) setCustomPlaces(Array.isArray(header.idea_places) ? (header.idea_places as string[]) : undefined);
+    if (!("idea_plan" in header)) return;
+    const plan = (header.idea_plan ?? {}) as Partial<RoomPayload>;
+    setPlanLinks(Array.isArray(plan.ideaLinks) ? plan.ideaLinks : undefined);
+    setPlanLinksAt(plan.ideaLinksAt || undefined);
+    setPlanIdeaIds(Array.isArray(plan.ideaLinksIds) ? plan.ideaLinksIds : undefined);
+  }, []);
 
   function savePlan(links: IdeaLink[], at: string, ideaIds: string[]) {
     setPlanLinks(links);
@@ -224,7 +240,7 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
 
   return {
     ideas, loadingIds, customPlaces, setCustomPlaces, renamePlace,
-    loadPayload, payload, planLinks, planLinksAt, planIdeaIds, savePlan,
+    loadPayload, payload, planLinks, planLinksAt, planIdeaIds, savePlan, applyRow, applySettings,
     updateIdea, removeIdea, toggleVote, applyClaude, setPlaceByHand, setCatByHand, setMomentByHand, acceptAllSuggestions, addFromText, refreshMetadata, setNote, reclassify,
   };
 }

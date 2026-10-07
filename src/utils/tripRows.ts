@@ -1,4 +1,4 @@
-import type { CalendarEvent, Day, DaySpan, Extra, MockPerson, Task, TaskOption, TripSpan } from "@/types";
+import type { CalendarEvent, Day, DaySpan, EventPlace, Extra, Idea, MockPerson, Task, TaskOption, TripDocument, TripSpan } from "@/types";
 
 // Pure helpers that apply one database row (as returned by the ops endpoint or
 // broadcast on the trip channel) to the client's trip state. `row = null`
@@ -13,7 +13,10 @@ export type TripTable =
   | "trip_expenses"
   | "trip_tasks"
   | "trip_task_options"
-  | "trip_travelers";
+  | "trip_travelers"
+  | "trip_documents"
+  | "trip_ideas"
+  | "trip_event_places";
 
 export type Row = Record<string, unknown> & { id: string; version: number };
 
@@ -26,7 +29,10 @@ function isStale(current: { version?: number } | undefined, row: Row): boolean {
 }
 
 export function rowToEvent(r: Row): CalendarEvent {
-  return { id: r.id, start: num(r.start_hour), end: num(r.end_hour), title: String(r.title), cat: String(r.cat), note: String(r.note ?? ""), version: r.version };
+  return {
+    id: r.id, start: num(r.start_hour), end: num(r.end_hour), title: String(r.title), cat: String(r.cat), note: String(r.note ?? ""),
+    mapsUrl: optStr(r.maps_url), documentId: optStr(r.document_id), version: r.version,
+  };
 }
 
 export function rowToDaySpan(r: Row): DaySpan {
@@ -50,7 +56,7 @@ export function rowToExtra(r: Row): Extra {
     currency: (optStr(r.currency) as Extra["currency"]) ?? "USD",
     splitMode: (optStr(r.split_mode) as Extra["splitMode"]) ?? "group",
     linkedEventId: optStr(r.linked_event_id), startDayId: optStr(r.start_day_id), endDayId: optStr(r.end_day_id),
-    version: r.version,
+    documentId: optStr(r.document_id), version: r.version,
   };
 }
 
@@ -68,6 +74,18 @@ export function rowToTask(r: Row, options: TaskOption[] = []): Task {
     start: r.day_id == null ? undefined : optNum(r.start_hour), end: r.day_id == null ? undefined : optNum(r.end_hour),
     cat: optStr(r.cat), priority: optStr(r.priority) as Task["priority"], options, version: r.version,
   };
+}
+
+export function rowToDocument(r: Row): TripDocument {
+  return { id: r.id, driveFileId: String(r.drive_file_id), title: String(r.title), kind: optStr(r.kind) as TripDocument["kind"], version: r.version };
+}
+
+export function rowToIdea(r: Row): Idea {
+  return { ...(r.data as Omit<Idea, "id">), id: r.id, version: r.version };
+}
+
+export function rowToEventPlace(r: Row): EventPlace {
+  return { ...(r.data as EventPlace), version: r.version };
 }
 
 export function rowToTraveler(r: Row): MockPerson {
@@ -139,4 +157,7 @@ export const OP_TABLES: Record<string, TripTable> = {
   task: "trip_tasks",
   taskOption: "trip_task_options",
   traveler: "trip_travelers",
+  document: "trip_documents",
+  idea: "trip_ideas",
+  eventPlace: "trip_event_places",
 };

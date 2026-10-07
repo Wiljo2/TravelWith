@@ -44,7 +44,8 @@ interface ChangeBody {
 // Ops whose rows the client did not create optimistically: apply the response.
 const APPLY_RESPONSE = new Set(["task.chooseOption"]);
 
-const MERGEABLE = (op: string) => op.endsWith(".update") || op === "event.move" || op === "trip.setExchangeRate";
+const MERGEABLE = (op: string) =>
+  op.endsWith(".update") || op === "event.move" || op === "trip.setExchangeRate" || op === "trip.setIdeaSettings";
 const GUARDED = (op: string) =>
   op.endsWith(".update") || op.endsWith(".delete") || op === "event.move" || op === "task.toggle" ||
   op === "task.chooseOption" || op === "traveler.remove";
@@ -67,6 +68,7 @@ export class OpQueue {
   private pendingCreates = new Set<string>();
   private failed = false;
   private maintenance = false;
+  private idleWaiters: ((ok: boolean) => void)[] = [];
 
   constructor(
     private post: PostOp,
@@ -132,7 +134,16 @@ export class OpQueue {
   }
 
   private emitState() {
-    this.handlers.onState(this.pending() > 0 ? "saving" : this.failed ? "error" : "saved");
+    const pending = this.pending();
+    this.handlers.onState(pending > 0 ? "saving" : this.failed ? "error" : "saved");
+    if (pending === 0) for (const resolve of this.idleWaiters.splice(0)) resolve(!this.failed);
+  }
+
+  // Resolves once every queued op has been answered: true when the last
+  // answers were successful (the server holds what the client shows).
+  flush(): Promise<boolean> {
+    if (this.pending() === 0) return Promise.resolve(!this.failed);
+    return new Promise((resolve) => this.idleWaiters.push(resolve));
   }
 
   private async pump(key: string) {
@@ -206,6 +217,9 @@ export function versionEntries(payload: {
   tripSpans?: { id: string; version?: number }[];
   tasks?: { id: string; version?: number; options?: { id: string; version?: number }[] }[];
   mockPeople?: { id: string; version?: number }[];
+  documents?: { id: string; version?: number }[];
+  ideas?: { id: string; version?: number }[];
+  eventPlaces?: Record<string, { version?: number }>;
 }): [string, number][] {
   const out: [string, number][] = [];
   const add = (table: TripTable, items: { id: string; version?: number }[] | undefined) => {
@@ -221,6 +235,9 @@ export function versionEntries(payload: {
   add("trip_tasks", payload.tasks);
   for (const t of payload.tasks ?? []) add("trip_task_options", t.options);
   add("trip_travelers", payload.mockPeople);
+  add("trip_documents", payload.documents);
+  add("trip_ideas", payload.ideas);
+  add("trip_event_places", Object.entries(payload.eventPlaces ?? {}).map(([id, p]) => ({ id, version: p.version })));
   return out;
 }
 

@@ -153,6 +153,7 @@ export interface Idea {
   placeManual?: boolean;    // place set by hand: "Analizar con Claude" leaves it alone
   catManual?: boolean;      // type set by hand: likewise
   moment?: IdeaMoment;      // moment in the plan set by hand: wins over the analysis and the rules
+  version?: number;
 }
 
 // Where a member put an idea on the plan: an activity (eventId), a whole day,
@@ -190,6 +191,7 @@ export interface EventPlace {
   source?: "link" | "geocoder" | "claude";
   photo?: string;                // Wikipedia photo of the place; "" = searched, none found
   photoPage?: string;            // the Wikipedia article it comes from (credit)
+  version?: number;
 }
 
 // One "Analizar con Claude" run: its links and the ideas it actually read.
@@ -211,6 +213,7 @@ export interface TripDocument {
   driveFileId: string;
   title: string;
   kind?: DocumentKind;    // default "other"
+  version?: number;
 }
 
 // A traveler without an account, counted in per-person math.

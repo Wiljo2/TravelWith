@@ -194,3 +194,32 @@ describe("helpers", () => {
     ]);
   });
 });
+
+describe("OpQueue flush", () => {
+  it("resolves when every op is answered, false after a failure", async () => {
+    const { queue, calls } = setup();
+    await expect(queue.flush()).resolves.toBe(true);
+    queue.send("idea.create", { id: "i1", idea: { url: "https://x" } });
+    queue.send("eventPlace.set", { places: { e1: null } });
+    let done: boolean | undefined;
+    void queue.flush().then((ok) => { done = ok; });
+    calls[0].resolve(ok([{ table: "trip_ideas", row: { id: "i1", version: 1 } }]));
+    await flush();
+    expect(done).toBeUndefined();
+    calls[1].resolve({ status: 500, body: null });
+    await flush();
+    expect(done).toBe(false);
+    expect(queue.isKnown("trip_ideas", "i1")).toBe(true);
+  });
+
+  it("merges queued idea settings and seeds versions of the new collections", () => {
+    const { queue, calls } = setup();
+    queue.send("trip.setIdeaSettings", { ideaPlaces: ["A"] });
+    queue.send("trip.setIdeaSettings", { ideaPlaces: ["A", "B"] });
+    queue.send("trip.setIdeaSettings", { ideaPlan: null });
+    expect(calls).toHaveLength(1);
+    expect(versionEntries({ documents: [{ id: "d", version: 2 }], ideas: [{ id: "i", version: 3 }], eventPlaces: { e1: { version: 4 } } })).toEqual([
+      ["trip_documents:d", 2], ["trip_ideas:i", 3], ["trip_event_places:e1", 4],
+    ]);
+  });
+});
