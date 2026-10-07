@@ -24,6 +24,26 @@ describe("buildTripReport", () => {
     expect(r.fileName).toBe("itinerario-migracion-orlando-miami-wonder-of-the-seas.pdf");
   });
 
+  it("migration: lists linked documents, the activities they back and their Drive links", () => {
+    const days = initialDays.map((d, i) => i !== 2 ? d : {
+      ...d, events: [...d.events, { id: "park", start: 8, end: 20, title: "Universal", cat: "actividad", note: "Llevar ID", documentId: "doc-park" }],
+    });
+    const documents = [
+      { id: "doc-park", driveFileId: "abcdefghij1234", title: "Entradas Universal", kind: "ticket" as const },
+      { id: "doc-car", driveFileId: "abcdefghij5678", title: "Alquiler carro" },
+    ];
+    const r = buildTripReport("migration", { ...input, days, documents });
+    const [logistics, support, byDay] = r.sections;
+    expect(logistics.rows.find((row) => row.text === "Universal")?.detail).toBe("Llevar ID · Soporte: Entradas Universal");
+    expect(support.title).toBe("Documentos de soporte");
+    expect(support.rows).toEqual([
+      { when: "Entrada", text: "Entradas Universal", detail: expect.stringContaining("Universal"), link: "https://drive.google.com/file/d/abcdefghij1234/view" },
+      { when: "Otro", text: "Alquiler carro", detail: undefined, link: "https://drive.google.com/file/d/abcdefghij5678/view" },
+    ]);
+    expect(JSON.stringify([logistics, byDay])).not.toContain("abcdefghij");
+    expect(byDay.rows).toHaveLength(initialDays.length);
+  });
+
   it("full: one section per day with every activity", () => {
     const r = buildTripReport("full", input);
     expect(r.sections).toHaveLength(initialDays.length);

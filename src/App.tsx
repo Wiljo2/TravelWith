@@ -240,7 +240,7 @@ export default function App() {
           }
         }}
         onLeaveRoom={() => { localSeeded.current = false; setRoomCode(null); }}
-        onDownloadPdf={(kind) => downloadTripPdf(kind, { trip, days, travelers: [...members, ...mockPeople].map((p) => p.name) })}
+        onDownloadPdf={(kind) => downloadTripPdf(kind, { trip, days, documents, travelers: [...members, ...mockPeople].map((p) => p.name) })}
       />
       {offlineSince && <OfflineBanner since={offlineSince} />}
 
