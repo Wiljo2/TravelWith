@@ -75,7 +75,11 @@ export function useTripOps(code: string | null, accessToken: string | undefined,
   const noteVersion = useCallback((table: TripTable, id: string, version: number | null) => {
     queueRef.current?.setVersion(table, id, version);
   }, []);
+  const acceptRemote = useCallback((table: TripTable, id: string, version: number, deleted: boolean) => {
+    return queueRef.current?.acceptRemote(table, id, version, deleted) ?? true;
+  }, []);
+  const idle = useCallback(() => queueRef.current?.idle() ?? true, []);
   const dismissNotice = useCallback(() => setNotice(null), []);
 
-  return { send, isKnown, seedVersions, noteVersion, syncState, notice, dismissNotice, maintenance };
+  return { send, isKnown, seedVersions, noteVersion, acceptRemote, idle, syncState, notice, dismissNotice, maintenance };
 }

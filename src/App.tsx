@@ -74,10 +74,7 @@ export default function App() {
 
   const ops = useTripOps(roomCode, session?.access_token, {
     adoptRow: (table, id, row) => adoptRow(table, id, row),
-    applyHeader: (header) => {
-      tripInfo.applyHeader(header);
-      if (header.exchange_rate != null) budget.setRate(Number(header.exchange_rate));
-    },
+    applyHeader: (header) => applyHeader(header),
     resync: () => reload(),
   });
   const itinerary = useItinerary(ops.send);
@@ -88,6 +85,11 @@ export default function App() {
   const { extras, exchangeRate, setExchangeRate, updateExtra, addExtra, removeExtra } = budget;
   const { tasks, addTask, toggleTask, updateTask, deleteTask } = taskState;
   const { trip, mockPeople } = tripInfo;
+
+  function applyHeader(header: Record<string, unknown>) {
+    tripInfo.applyHeader(header);
+    if (header.exchange_rate != null) budget.setRate(Number(header.exchange_rate));
+  }
 
   function adoptRow(table: TripTable, id: string, row: Row | null) {
     if (table === "trip_expenses") budget.applyRow(id, row);
@@ -142,7 +144,15 @@ export default function App() {
     loadTasks(payload.tasks);
   }, [seedVersions, loadItinerary, loadBudget, loadTripInfo, loadTasks]);
 
-  const { connected, members, reload } = useRoom(roomCode, session?.access_token, onLoad);
+  const { connected, members, reload } = useRoom(roomCode, session?.access_token, {
+    onLoad,
+    onRow: (table, id, row, version) => {
+      if (ops.acceptRemote(table, id, version, row === null)) adoptRow(table, id, row);
+    },
+    onHeader: applyHeader,
+    onGone: () => setRoomCode(null),
+    canResync: ops.idle,
+  });
 
   // useRoom fetches nothing for LOCAL, so the mock payload is seeded here.
   // The demo is imported lazily and never in production builds.

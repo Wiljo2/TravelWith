@@ -4,7 +4,7 @@ import { OP_TABLES, type Row, type TripTable } from "@/utils/tripRows";
 // a time, in order, so each one carries the version the previous response
 // returned; queued updates of the same item are merged (typing in a field
 // sends one request per round trip, not per keystroke). Versions come from
-// the loaded trip, from op responses and, later, from Broadcast.
+// the loaded trip, from op responses and from the trip channel.
 
 export interface OpResponse {
   status: number;
@@ -90,6 +90,27 @@ export class OpQueue {
   isKnown(table: TripTable, id: string): boolean {
     const key = `${table}:${id}`;
     return this.versions.has(key) || this.pendingCreates.has(key);
+  }
+
+  // A row change from the trip channel. Returns whether to apply it: not
+  // while this item has ops queued or in flight (the version guard settles
+  // that race with a 409), and not when the version is already known (the
+  // echo of our own write, or a stale message).
+  acceptRemote(table: TripTable, id: string, version: number, deleted: boolean): boolean {
+    const key = `${table}:${id}`;
+    if (this.busy.has(key) || (this.queues.get(key)?.length ?? 0) > 0) return false;
+    const known = this.versions.get(key);
+    if (deleted) {
+      this.versions.delete(key);
+      return true;
+    }
+    if (known !== undefined && known >= version) return false;
+    this.versions.set(key, version);
+    return true;
+  }
+
+  idle(): boolean {
+    return this.pending() === 0;
   }
 
   send(op: string, args: Record<string, unknown>) {

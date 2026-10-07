@@ -1,9 +1,21 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
+import { useTripChannel } from "@/hooks/useTripChannel";
+import { needsRefetch, type TripMessage } from "@/utils/tripChannel";
 import type { RoomMember, RoomPayload } from "@/types";
+import type { Row, TripTable } from "@/utils/tripRows";
 
 export type { MockPerson, RoomPayload } from "@/types";
+
+export interface RoomHandlers {
+  onLoad: (payload: RoomPayload) => void;
+  onRow: (table: TripTable, id: string, row: Row | null, version: number) => void;
+  onHeader: (header: Record<string, unknown>) => void;
+  // The room was deleted or we were removed from it.
+  onGone: () => void;
+  // Refetching replaces local state, so it waits while writes are pending.
+  canResync: () => boolean;
+}
 
 interface UseRoomResult {
   connected: boolean;
@@ -11,22 +23,21 @@ interface UseRoomResult {
   reload: () => void;
 }
 
-// Loads the trip (assembled from the trip tables by GET /api/rooms/[code]).
-// Writes go through useTripOps; rooms.payload is a frozen backup, so the
-// realtime subscription only keeps the members roster current.
-export function useRoom(
-  code: string | null,
-  accessToken: string | undefined,
-  onLoad: (payload: RoomPayload) => void,
-): UseRoomResult {
-  const [connected, setConnected] = useState(false);
+const RESYNC_DEBOUNCE_MS = 250;
+const RESYNC_RETRY_MS = 1000;
+
+// Loads the trip (assembled from the trip tables by GET /api/rooms/[code])
+// and applies live changes from the private trip channel. Writes go through
+// useTripOps.
+export function useRoom(code: string | null, accessToken: string | undefined, handlers: RoomHandlers): UseRoomResult {
+  const [loaded, setLoaded] = useState(false);
   const [members, setMembers] = useState<RoomMember[]>([]);
   // Tokens refresh about hourly; refs keep requests current without resubscribing.
   const token = useRef(accessToken);
-  const onLoadRef = useRef(onLoad);
+  const h = useRef(handlers);
   useEffect(() => {
     token.current = accessToken;
-    onLoadRef.current = onLoad;
+    h.current = handlers;
   });
   const hasToken = !!accessToken;
 
@@ -39,35 +50,50 @@ export function useRoom(
       })
       .then((data) => {
         const p = data?.payload as RoomPayload | undefined;
-        if (p?.days && Array.isArray(p.days)) onLoadRef.current(p);
+        if (p?.days && Array.isArray(p.days)) h.current.onLoad(p);
         if (Array.isArray(data?.members)) setMembers(data.members);
-        setConnected(true);
+        setLoaded(true);
       })
-      .catch(() => setConnected(false));
+      .catch(() => setLoaded(false));
   }, [code]);
+
+  const resyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleResync = useCallback(() => {
+    const schedule = (delay: number) => {
+      if (resyncTimer.current) clearTimeout(resyncTimer.current);
+      resyncTimer.current = setTimeout(() => {
+        resyncTimer.current = null;
+        if (h.current.canResync()) reload();
+        else schedule(RESYNC_RETRY_MS);
+      }, delay);
+    };
+    schedule(RESYNC_DEBOUNCE_MS);
+  }, [reload]);
 
   useEffect(() => {
     if (!code || code === "LOCAL" || !hasToken) return;
     reload();
-    if (!supabase) return;
-
-    const channel = supabase
-      .channel(`room-${code}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${code}` },
-        ({ new: row }) => {
-          const r = row as { members?: RoomMember[] };
-          if (Array.isArray(r.members)) setMembers(r.members);
-        },
-      )
-      .subscribe();
-
     return () => {
-      supabase!.removeChannel(channel);
-      setConnected(false);
+      if (resyncTimer.current) clearTimeout(resyncTimer.current);
+      setLoaded(false);
     };
   }, [code, hasToken, reload]);
 
-  return { connected, members, reload };
+  const onMessage = useCallback((m: TripMessage) => {
+    if (m.kind === "roomDeleted") return h.current.onGone();
+    if (m.kind === "room") {
+      if (Array.isArray(m.record.members)) setMembers(m.record.members as RoomMember[]);
+      return h.current.onHeader(m.record);
+    }
+    if (needsRefetch(m)) return scheduleResync();
+    h.current.onRow(m.table, m.id, m.row, m.version);
+  }, [scheduleResync]);
+
+  const { subscribed } = useTripChannel(code, hasToken, {
+    onMessage,
+    onResync: () => scheduleResync(),
+    onDenied: () => h.current.onGone(),
+  });
+
+  return { connected: loaded && subscribed, members, reload };
 }

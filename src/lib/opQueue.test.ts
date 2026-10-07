@@ -129,6 +129,47 @@ describe("OpQueue during maintenance", () => {
   });
 });
 
+describe("OpQueue remote changes", () => {
+  it("skips the echo of our own write and stale messages", async () => {
+    const { queue, calls } = setup();
+    queue.seed([["trip_events:e1", 2]]);
+    queue.send("event.update", { id: "e1", title: "a" });
+    expect(queue.acceptRemote("trip_events", "e1", 3, false)).toBe(false);
+    calls[0].resolve(ok([{ table: "trip_events", row: { id: "e1", version: 3 } }]));
+    await flush();
+    expect(queue.acceptRemote("trip_events", "e1", 3, false)).toBe(false);
+    expect(queue.acceptRemote("trip_events", "e1", 2, false)).toBe(false);
+  });
+
+  it("applies newer rows from others and uses their version for the next op", () => {
+    const { queue, calls } = setup();
+    queue.seed([["trip_events:e1", 2]]);
+    expect(queue.acceptRemote("trip_events", "e1", 4, false)).toBe(true);
+    expect(queue.acceptRemote("trip_events", "e9", 1, false)).toBe(true);
+    queue.send("event.update", { id: "e1", title: "a" });
+    expect(calls[0].expectedVersion).toBe(4);
+    expect(queue.isKnown("trip_events", "e9")).toBe(true);
+  });
+
+  it("holds remote changes while the item has queued ops", () => {
+    const { queue } = setup();
+    queue.seed([["trip_expenses:x1", 1]]);
+    queue.send("expense.update", { id: "x1", amount: 5 });
+    queue.send("expense.update", { id: "x1", amount: 6 });
+    expect(queue.acceptRemote("trip_expenses", "x1", 5, false)).toBe(false);
+    expect(queue.acceptRemote("trip_expenses", "x1", 5, true)).toBe(false);
+    expect(queue.idle()).toBe(false);
+  });
+
+  it("applies remote deletes and forgets the item", () => {
+    const { queue } = setup();
+    queue.seed([["trip_tasks:t1", 3]]);
+    expect(queue.acceptRemote("trip_tasks", "t1", 3, true)).toBe(true);
+    expect(queue.isKnown("trip_tasks", "t1")).toBe(false);
+    expect(queue.idle()).toBe(true);
+  });
+});
+
 describe("helpers", () => {
   it("opTarget keys ops by item, days or trip", () => {
     expect(opTarget("event.move", { id: "e1" }).key).toBe("trip_events:e1");
