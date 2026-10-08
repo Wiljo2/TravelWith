@@ -13,7 +13,7 @@ Production is only **read** here: one read-only script and one data dump. Every 
   export PROD_DB_URL='postgresql://...'      # production, used read-only
   export STAGING_DB_URL='postgresql://...'   # staging
   ```
-- This branch checked out (`feature/relational-broadcast`), which has migrations `008`–`017`.
+- This branch checked out (`feature/relational-broadcast`), which has migrations `008`–`019`.
 
 The dump contains real trip data. Keep it in a temporary folder outside the repo and delete it at the end (step 9).
 
@@ -51,7 +51,7 @@ If the restore fails on the `rooms_code_format` check, a room has a code the API
 ## 4. Apply the new migrations to staging
 
 ```
-for f in supabase/migrations/0{08,09,10,11,12,13,14,15,16,17}_*.sql; do psql "$STAGING_DB_URL" -v ON_ERROR_STOP=1 -f "$f" || break; done
+for f in supabase/migrations/0{08,09,10,11,12,13,14,15,16,17,18,19}_*.sql; do psql "$STAGING_DB_URL" -v ON_ERROR_STOP=1 -f "$f" || break; done
 ```
 
 Then run Dashboard → Advisors (Security and Performance) on staging and record any new warning about the `trip_*` tables, the `private` schema or `realtime.messages`.
