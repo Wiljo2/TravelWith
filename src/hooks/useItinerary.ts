@@ -69,12 +69,11 @@ export function useItinerary(send: SendOp) {
     send("event.delete", { id });
   }
 
-  // mapsUrl stays client-side until the trip tables store it (relational plan, step 3.13).
   function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = DEFAULT_EVENT_CAT, mapsUrl?: string, id = uid()) {
     const nev: CalendarEvent = { id, start, end, title, cat, note, ...(mapsUrl ? { mapsUrl } : {}) };
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: [...d.events, nev] } : d)));
     setSelectedId(nev.id);
-    send("event.create", { id, dayId, title, start, end, note, cat });
+    send("event.create", { id, dayId, title, start, end, note, cat, ...(mapsUrl ? { mapsUrl } : {}) });
     return nev.id;
   }
 

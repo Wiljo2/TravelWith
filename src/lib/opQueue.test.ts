@@ -66,7 +66,7 @@ describe("OpQueue", () => {
     expect(queue.isKnown("trip_task_options", "o2")).toBe(false);
   });
 
-  it("on 409 adopts the current row and continues with its version", async () => {
+  it("on 409 adopts the current row and drops the edits queued behind it", async () => {
     const { queue, calls, handlers } = setup();
     queue.seed([["trip_events:e1", 2]]);
     queue.send("event.update", { id: "e1", title: "mine" });
@@ -75,6 +75,8 @@ describe("OpQueue", () => {
     calls[0].resolve({ status: 409, body: { error: "conflict", table: "trip_events", current } });
     await flush();
     expect(handlers.onConflict).toHaveBeenCalledWith("trip_events", "e1", current);
+    expect(calls).toHaveLength(1);
+    queue.send("event.update", { id: "e1", note: "later" });
     expect(calls[1].expectedVersion).toBe(7);
   });
 

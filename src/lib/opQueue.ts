@@ -181,14 +181,14 @@ export class OpQueue {
       this.handlers.onMaintenance(false);
     }
     this.pendingCreates.delete(key);
-    this.handle(next.op, table, id, res);
+    if (this.handle(next.op, table, id, res)) this.queues.delete(key);
 
     this.busy.delete(key);
     this.emitState();
     void this.pump(key);
   }
 
-  private handle(op: string, table: TripTable | undefined, id: string | undefined, res: OpResponse) {
+  private handle(op: string, table: TripTable | undefined, id: string | undefined, res: OpResponse): boolean {
     const body = (res.body ?? {}) as ChangeBody;
     if (res.status === 200) {
       this.failed = false;
@@ -197,16 +197,18 @@ export class OpQueue {
       if (body.trip) this.handlers.onTrip(body.trip);
       if (APPLY_RESPONSE.has(op)) this.handlers.onRows(body.changed ?? []);
       if (op === "itinerary.reset") this.handlers.onResync();
-      return;
+      return false;
     }
     if (res.status === 409 && table && id) {
       const current = body.current ?? null;
       this.setVersion(body.table ?? table, id, current ? current.version : null);
       this.handlers.onConflict(body.table ?? table, id, current);
-      return;
+      // The edits queued behind it were made on the losing version: sending them would overwrite the winner.
+      return true;
     }
     this.failed = true;
     this.handlers.onFailure(op, res.status);
+    return false;
   }
 }
 
