@@ -1,11 +1,11 @@
 # UX wave 1 progress
-- Iteration: 0
-- Last commit: (plan commit)
-- Next step: L.1
+- Iteration: 1
+- Last commit: (iteration 1 commit; see log)
+- Next step: L.2
 - Human actions pending: none
 
 ## Steps
-- [ ] L.1 Entry split: server `page.tsx` + `EntryGate` + `shouldEnterApp()`
+- [x] L.1 Entry split: server `page.tsx` + `EntryGate` + `shouldEnterApp()`
 - [ ] L.2 Landing sections (`src/components/landing/*`)
 - [ ] L.3 SEO: metadata, OG image, robots, sitemap
 - [ ] L.V Verify landing (desktop + 375px, no flash for signed-in / `?local=1`)
@@ -28,3 +28,4 @@
 ## Log
 | Iter | Date | Step | Commit | Result | Notes / blockers |
 |---|---|---|---|---|---|
+| 1 | 2026-10-09 | L.1 | (this commit) | tsc ok, 402 tests ok, lint 0 errors, build ok | Inline pre-paint script (`entryScript.ts`) hides the landing for likely app users; EntryGate clears the flag when the landing stays (fixes blank page for `?local=1` in production). CTA links to `/?app=1`; installed PWA always enters the app. Not yet checked in a browser (L.V). |

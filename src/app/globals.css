@@ -135,3 +135,7 @@
     font-size: 22px;
   }
 }
+
+html[data-entry="app"] [data-landing] {
+  display: none;
+}

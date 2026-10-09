@@ -3,6 +3,7 @@ import "./globals.css";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 import RegisterServiceWorker from "@/components/RegisterServiceWorker";
+import { ENTRY_SCRIPT } from "@/components/landing/entryScript";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -31,6 +32,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // attributes on <html>/<body> before hydration. This only silences attribute
     // diffs on these two elements, not on their children.
     <html lang="es" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: ENTRY_SCRIPT }} />
+      </head>
       <body suppressHydrationWarning>
         {children}
         <RegisterServiceWorker />

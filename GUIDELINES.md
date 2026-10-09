@@ -11,13 +11,15 @@ Language rule: **code, comments, identifiers, commit messages, and docs are alwa
 ```
 src/
 ├── app/                  Next.js App Router
-│   ├── page.tsx          Only mounts <App /> (client). No logic here.
+│   ├── page.tsx          Renders `EntryGate`: the server-rendered landing for anonymous visitors, `<App />` otherwise
+│                         (decision in `components/landing/entry.ts`).
 │   └── api/rooms/...     Route handlers (backend). The only place that touches Supabase with the service key.
 ├── App.tsx               Root composition: wires domain hooks to views. Global state lives here.
 ├── hooks/                One hook per domain: useItinerary (days/events/spans), useBudget (expenses),
 │                         useTasks, useTripInfo (header/travelers), useTripOps (writes),
 │                         useRoom (load + live changes via useTripChannel), useDragDrop, useAuth.
 ├── components/
+│   ├── landing/          Public landing page and the EntryGate (landing vs app)
 │   ├── calendar/         Grid, day columns, blocks, slot-create modal
 │   ├── budget/           Budget view and side panel
 │   ├── tasks/            Tasks view
