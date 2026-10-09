@@ -1,7 +1,7 @@
 # Relational + Broadcast progress
 - Iteration: 26
 - Last commit: (iteration 25 commit; the next iteration records its sha in the log)
-- Next step: 6.1 (activity panel from `trip_changes`)
+- Next step: 6.2 (per-change undo and owner restore)
 - Human actions pending: (1) smoke test with the real travelers on production; (2) drop `public.import_room_tmp` on staging; (3) drop the production backups `private.rooms_backup_20261009` / `private.user_rooms_backup_20261009` when the rollback window ends.
 
 ## Steps
@@ -32,7 +32,7 @@
 - [x] 3.14d Client: ideas, map places and documents hooks on ops + `applyRow`, channel tables; replace the `save` stub in the map and ideas tabs
 - [x] 4.1 HUMAN cut-over runbook (`docs/plans/cutover-runbook.md`; run 2026-10-09)
 - [x] 5.1 Cleanup after cut-over
-- [ ] 6.1 Activity panel from `trip_changes`
+- [x] 6.1 Activity panel from `trip_changes`
 - [ ] 6.2 Per-change undo and owner restore
 
 ## Spike result (0.1, 2026-10-07)
@@ -105,3 +105,4 @@ Teardown: `teardown.sql` is run by hand in the staging SQL editor. The staging p
 | H | 2026-10-08 | 3 exit | (this commit) | Browser pass done on staging | Two sessions in Chrome (A on `localhost:3001`, B on `b.localhost:3001`: Next dev blocks `127.0.0.1`). Same-activity conflict with A's ops held: A got one 409, sent nothing after it, showed the notice and B's note; server and both screens kept B's note after reload (fix `861905a` confirmed). Non-member: B on `SPIKE01` gets 403 on GET and ops, 200 on `NVHPCI`. `MAINTENANCE_MODE=on`: 503, banner, edit kept; with a simulated 503 the queue retried after 15 s, saved the merged edit, banner cleared, B received it live. Restarting `next dev` reloads the page and drops pending edits (dev-only; pending edits live in memory). Earlier browser pass (Cowork) OK except the 409 bug; open UI item: new global expense added at the top, out of view. NVHPCI restored (54 events, 7 documents, 17 ideas, 9 tasks, 6 expenses, rate 3100). |
 | H | 2026-10-09 | 4.1 | (this commit) | Cut-over done | Production `lpjnwatcwmtnubvodcyp`: 1 room (`NVHPCI`), 7 memberships. Free plan has no downloadable backups, so `private.rooms_backup_20261009` and `private.user_rooms_backup_20261009` were created in the database (payload md5 identical, grants revoked). 008–019 applied in one SQL Editor run (12 `trip_*` tables, all RLS on; advisors: only INFO `trip_changes` RLS without policies, intended). PR #13 merged with `MAINTENANCE_MODE=on` set first; deploy `dpl_JDbrr1NqN4Ah5qjT4nq4g6tRrYYC` answered 503 on ops and 405 on the old PATCH. Payload unchanged since the backup; `migrate_all_rooms`: ok, nothing skipped or nulled (9 days, 54 events, 6 expenses, 9 tasks, 3 trip spans, 18 ideas, 7 documents, 54 map places); `verify_all_rooms`: 0 differences; `trip_changes` empty; `get_trip` returns 9 days, 18 ideas, 7 members. Maintenance off + redeploy: ops answer 401 without a session. Realtime "Allow public access" turned off. Rollback deployment: `dpl_FPLkx1u1L9Tn2GQbtSJN6MVbNkBe` (`e1a8686`). Vercel and Supabase settings were changed by the person (the Vercel connector lacks write permission for production env vars). Smoke test with the travelers pending. |
 | 27 | 2026-10-09 | 5.1 | (this commit) | Done | Kept `MAINTENANCE_MODE` (future data migrations; plan updated). Removed dead JSON-model code: document payload mutators + `findEvent`/`requireEvent`, `scripts/check-payloads.ts`, `lib/schemas.ts` (+ test) and `zod`; span color regex moved to `spanRows.ts`. `scripts/snapshot-room.mjs` reads `get_trip` (it read the frozen payload). Budget: global expenses in creation order (new one shows by the add button). Docs: GUIDELINES data-model lines, runbooks marked historical. Branch `chore/post-cutover` (the feature branch is merged). tsc, lint (0 errors), 389 tests, `next build` green. |
+| 28 | 2026-10-09 | 6.1 | (this commit) | Done | `GET /api/rooms/[code]/changes?before=<id>` (`requireMember`, 50 per page, newest first) via `src/server/activity.ts` (labels from title/label/name/idea data, changed fields without version/position bookkeeping, version-only updates hidden, author names from the roster). Client: `ActivityDialog` ("Actividad" in the trip menu, grouped Hoy/Ayer/fecha, "Ver más"), Spanish sentences in `utils/activityText.ts`. Tests: route (3), text (2). tsc, lint (0 errors) and tests green; not tried in a browser (owner asked to stop testing). |

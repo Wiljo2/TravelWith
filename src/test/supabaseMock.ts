@@ -40,6 +40,7 @@ function builder(table: string, handler: QueryHandler, log: RecordedQuery[]) {
     eq(column: string, value: unknown) { q.filters.push({ column, op: "eq", value }); return chain; },
     in(column: string, value: unknown) { q.filters.push({ column, op: "in", value }); return chain; },
     gte(column: string, value: unknown) { q.filters.push({ column, op: "gte", value }); return chain; },
+    lt(column: string, value: unknown) { q.filters.push({ column, op: "lt", value }); return chain; },
     order() { return chain; },
     limit() { return chain; },
     maybeSingle() { q.single = true; return Promise.resolve(run()); },

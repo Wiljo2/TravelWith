@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Menu } from "@base-ui/react/menu";
-import { Copy, Ellipsis, FileDown, LogOut, RotateCcw } from "lucide-react";
+import { Copy, Ellipsis, FileDown, History, LogOut, RotateCcw } from "lucide-react";
 import AuthButton from "@/components/auth/AuthButton";
 import { fmtTripDates } from "@/utils/tripDays";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,8 @@ interface AppHeaderProps {
   // Owner only; the menu item is hidden without it.
   onReset?: () => void;
   onLeaveRoom: () => void;
+  // Hidden without it (local mode has no history).
+  onOpenActivity?: () => void;
   onDownloadPdf: (kind: ReportKind) => Promise<void>;
 }
 
@@ -35,7 +37,7 @@ const SYNC: Record<SyncState, { label: string; dot: string }> = {
 
 const ITEM = "flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-foreground outline-none data-highlighted:bg-secondary";
 
-export default function AppHeader({ roomCode, connected, saveState, trip, onReset, onLeaveRoom, onDownloadPdf }: AppHeaderProps) {
+export default function AppHeader({ roomCode, connected, saveState, trip, onReset, onLeaveRoom, onOpenActivity, onDownloadPdf }: AppHeaderProps) {
   const local = roomCode === "LOCAL";
   const sync = connected ? SYNC[saveState] : { label: "Conectando…", dot: "bg-muted-foreground animate-pulse" };
   const [copied, setCopied] = useState(false);
@@ -88,6 +90,12 @@ export default function AppHeader({ roomCode, connected, saveState, trip, onRese
                     <Copy className="size-4 text-muted-foreground" />
                     <span className="flex-1">{copied ? "¡Código copiado!" : "Copiar código"}</span>
                     <span className="font-mono text-xs font-semibold tracking-wider text-muted-foreground">{roomCode}</span>
+                  </Menu.Item>
+                )}
+                {onOpenActivity && (
+                  <Menu.Item className={ITEM} onClick={onOpenActivity}>
+                    <History className="size-4 text-muted-foreground" />
+                    Actividad
                   </Menu.Item>
                 )}
                 <Menu.Item className={ITEM} onClick={() => download("migration")}>
