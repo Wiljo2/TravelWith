@@ -1,6 +1,7 @@
 "use client";
 import { CATEGORIES } from "@/constants/categories";
 import { fmtHour } from "@/utils/time";
+import { eventIcon } from "@/utils/itemIcon";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Day } from "@/types";
 
@@ -63,7 +64,7 @@ export function AgendaRow({ ev }: { ev: CalendarEvent }) {
       </span>
       <span className="mt-[7px] h-2 w-2 shrink-0 rounded-full" style={{ background: cat.dot }} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm text-foreground">{ev.title}</span>
+        <span className="block truncate text-sm text-foreground"><span aria-hidden className="mr-1">{eventIcon(ev)}</span>{ev.title}</span>
         {ev.note && <span className="block truncate text-xs text-muted-foreground">{ev.note}</span>}
       </span>
     </li>

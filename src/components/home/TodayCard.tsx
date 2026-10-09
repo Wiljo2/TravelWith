@@ -3,6 +3,7 @@ import { AgendaRow } from "@/components/itinerary/DayAgenda";
 import { PANEL, SectionTitle } from "@/components/home/shared";
 import { CATEGORIES } from "@/constants/categories";
 import { fmtHour, untilLabel } from "@/utils/time";
+import { eventIcon } from "@/utils/itemIcon";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Day } from "@/types";
 
@@ -58,7 +59,7 @@ export default function TodayCard({ day, dayIdx, dayCount, hour, tomorrow, onOpe
           <div className="mt-4 flex items-center gap-2 border-t border-foreground/10 pt-3 text-[13px] text-secondary-foreground">
             <span className="shrink-0 text-muted-foreground">Luego</span>
             <span className="shrink-0 tabular-nums">{fmtHour(next.start)}</span>
-            <span className="truncate font-medium text-foreground">{next.title}</span>
+            <span className="truncate font-medium text-foreground"><span aria-hidden className="mr-1">{eventIcon(next)}</span>{next.title}</span>
           </div>
         )}
       </section>
@@ -90,7 +91,7 @@ function Spotlight({ ev, badge, detail, live }: { ev: CalendarEvent; badge: stri
       <div className="mt-2.5 flex items-start gap-2.5">
         <span className="mt-2.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: cat.dot }} />
         <div className="min-w-0">
-          <div className="text-xl font-semibold leading-snug tracking-tight md:text-2xl">{ev.title}</div>
+          <div className="text-xl font-semibold leading-snug tracking-tight md:text-2xl"><span aria-hidden className="mr-1.5">{eventIcon(ev)}</span>{ev.title}</div>
           <div className="mt-0.5 text-sm tabular-nums text-secondary-foreground">{detail}</div>
           {ev.note && <p className="mt-2 text-sm leading-snug text-secondary-foreground">{ev.note}</p>}
         </div>

@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import type { Task, TaskPriority, Day } from "@/types";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT, PRIORITIES, PRIORITY_ORDER } from "@/constants/taskCategories";
 import { fmtHour } from "@/utils/time";
+import { taskIcon } from "@/utils/itemIcon";
 import { optionGroupUSD, fmtUSDNum } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -211,7 +212,7 @@ function TaskRow({
             onClick={touch ? onStartEdit : undefined}
             className={cn("flex min-w-0 flex-1 cursor-text select-none items-center gap-[7px] text-sm text-foreground", task.done && "line-through")}
           >
-            <span title={c.label} className="shrink-0">{c.icon}</span>
+            <span title={c.label} className="shrink-0">{taskIcon(task)}</span>
             <span className="truncate">{task.title}</span>
           </span>
         )}

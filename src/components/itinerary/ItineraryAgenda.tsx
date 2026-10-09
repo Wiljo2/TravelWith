@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { CATEGORIES } from "@/constants/categories";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT } from "@/constants/taskCategories";
 import { fmtHour } from "@/utils/time";
+import { eventIcon, taskIcon } from "@/utils/itemIcon";
 import { nextFreeHour } from "@/utils/tripDays";
 import { daySpanLabels } from "@/utils/spans";
 import { PANEL } from "@/components/home/shared";
@@ -116,7 +117,7 @@ function EventRow({ ev, selected, onClick }: { ev: CalendarEvent; selected: bool
         </span>
         <span className="mt-[7px] h-2 w-2 shrink-0 rounded-full" style={{ background: cat.dot }} />
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium leading-snug text-foreground">{ev.title}</span>
+          <span className="block text-sm font-medium leading-snug text-foreground"><span aria-hidden className="mr-1">{eventIcon(ev)}</span>{ev.title}</span>
           {ev.note && <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">{ev.note}</span>}
         </span>
       </button>
@@ -141,7 +142,7 @@ function TaskRow({ task, onEdit, onToggle }: { task: Task; onEdit: (t: Task, x: 
       </button>
       <button onClick={(e) => onEdit(task, e.clientX, e.clientY)} className="min-w-0 flex-1 cursor-pointer text-left">
         <span className={cn("block text-sm leading-snug text-foreground", task.done && "text-muted-foreground line-through")}>
-          <span className="mr-1">{cat.icon}</span>{task.title}
+          <span aria-hidden className="mr-1">{taskIcon(task)}</span>{task.title}
         </span>
         <span className="text-xs text-muted-foreground">Tarea · {cat.label}</span>
       </button>

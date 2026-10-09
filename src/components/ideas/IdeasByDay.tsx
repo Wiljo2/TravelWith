@@ -8,6 +8,7 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { linkLabel } from "@/utils/linkify";
 import { fmtHour } from "@/utils/time";
+import { eventIcon } from "@/utils/itemIcon";
 import { cn } from "@/lib/utils";
 import type { Day, Idea, IdeaLink } from "@/types";
 
@@ -95,7 +96,7 @@ export default function IdeasByDay({ ideas, days, loadingIds, links, roomCode, p
     const [weekday, date] = day.label.split("·").map((s) => s.trim());
     const eventGroups = [...day.events]
       .sort((a, b) => a.start - b.start)
-      .map((ev) => ({ key: ev.id, start: ev.start, title: ev.title, time: fmtHour(ev.start), items: dayLinks.filter((l) => l.eventId === ev.id) }));
+      .map((ev) => ({ key: ev.id, start: ev.start, icon: eventIcon(ev), title: ev.title, time: fmtHour(ev.start), items: dayLinks.filter((l) => l.eventId === ev.id) }));
     const slotGroups = dayLinks
       .filter((l) => !l.eventId && l.slot)
       .reduce<Record<string, IdeaLink[]>>((acc, l) => {
@@ -121,7 +122,7 @@ export default function IdeasByDay({ ideas, days, loadingIds, links, roomCode, p
               <div className="mb-1.5 flex items-baseline gap-2 text-[13px]">
                 {"free" in g
                   ? <span className="flex items-center gap-1.5 font-medium text-emerald-700"><Clock className="size-3.5" />{g.title}</span>
-                  : <><span className="w-[60px] shrink-0 tabular-nums text-muted-foreground">{g.time}</span><span className="min-w-0 truncate font-medium">{g.title}</span></>}
+                  : <><span className="w-[60px] shrink-0 tabular-nums text-muted-foreground">{g.time}</span><span className="min-w-0 truncate font-medium">{"icon" in g && <span aria-hidden className="mr-1">{g.icon}</span>}{g.title}</span></>}
               </div>
               <ul className="flex flex-col gap-1.5 md:pl-[68px]">
                 {g.items.map((l) => chip(byId.get(l.ideaId)!, `${l.ideaId}-${g.key}`, l))}
