@@ -14,7 +14,7 @@ Read `GUIDELINES.md` before large features. Operational summary:
 - Realtime: Broadcast from database triggers on the private channel `trip:<code>` (`useTripChannel`); never `postgres_changes`.
 - Backend only in `src/app/api/rooms/**`; the service role key is only used in `lib/supabase-server.ts`.
 - Server-side writes go through the op registry `src/server/ops/*` (`runOp`): row validation in `src/server/domain/*Rows.ts`, version-guarded repositories in `src/server/repo/*`, multi-row changes as SQL functions. Never inline Supabase writes for trip data.
-- AI assistant: `POST /api/rooms/[code]/agent` (SSE, manual tool loop, `@anthropic-ai/sdk`). `ANTHROPIC_API_KEY` server-only; model via `AGENT_MODEL` (default `claude-sonnet-5`); system prompt in `src/server/agent/prompt.ts` must stay byte-stable (prompt cache) — dynamic data flows through read tools.
+- AI assistant: `POST /api/rooms/[code]/agent` (SSE, manual tool loop, `@anthropic-ai/sdk`). `ANTHROPIC_API_KEY` server-only; model via `AGENT_MODEL` (default `claude-sonnet-5`); system prompt in `src/server/agent/prompt.ts` must stay byte-stable (prompt cache) — dynamic data flows through read tools. Write/delete tools never run without user approval: the loop (`src/server/agent/loop.ts`) pauses with a `confirm` frame and a signed resume token (`AGENT_RESUME_SECRET`).
 
 ## Hard rules (never break existing features)
 - New columns on trip tables are nullable (or have a default) and the client fields are **optional**, with defaults applied at read time (`x.field ?? DEFAULT`). Never rename or repurpose an existing column or field.

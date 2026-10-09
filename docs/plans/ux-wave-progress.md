@@ -1,9 +1,9 @@
 # UX wave 1 progress
-- Iteration: 18
-- Last commit: (iteration 18 commit; see log)
-- Next step: F.1
+- Iteration: 19
+- Last commit: (iteration 19 commit; see log)
+- Next step: none (loop done; HUMAN items below)
 - Worktree: the loop runs in `../TravelWith-ux-wave` (the main checkout is on `feature/idea-video`).
-- Human actions pending: (00) migration number clash: `feature/idea-video` also adds `020_idea_video.sql`; whichever branch merges second renumbers its file to 021; (0) apply `supabase/migrations/020_item_icons.sql` on production BEFORE deploying this branch (choosing an icon fails without it; plain creates keep working); (1) set `AGENT_RESUME_SECRET` in Vercel and run `docs/plans/ux-wave-hitl-check.md` (H.V); (2) set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
+- Human actions pending: (01) review the landing copy; (02) push `feature/ux-wave` and open the PR (draft below); (00) migration number clash: `feature/idea-video` also adds `020_idea_video.sql`; whichever branch merges second renumbers its file to 021; (0) apply `supabase/migrations/020_item_icons.sql` on production BEFORE deploying this branch (choosing an icon fails without it; plain creates keep working); (1) set `AGENT_RESUME_SECRET` in Vercel and run `docs/plans/ux-wave-hitl-check.md` (H.V); (2) set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
 
 ## Steps
 - [x] L.1 Entry split: server `page.tsx` + `EntryGate` + `shouldEnterApp()`
@@ -24,7 +24,31 @@
 - [x] S.2 `Snackbar` + `useSnackbar`, save/delete messages, Deshacer on delete
 - [x] S.3 Header indicator on mobile + "Guardado · hace X"
 - [x] S.V Verify save feedback
-- [ ] F.1 Docs, `.env.example`, PR description draft (HUMAN: migration, env, push, PR)
+- [H] F.1 Docs, `.env.example`, PR description draft (HUMAN: migration, env, push, PR)
+
+
+## PR description (draft)
+
+**UX wave 1: landing page, assistant approvals, item icons, save feedback**
+
+### What
+- **Landing page** for anonymous visitors at `/` (server-rendered, SEO + Open Graph image, robots, sitemap). Signed-in users, `?local=1`, offline snapshots, OAuth callbacks and the installed PWA go straight to the app; a pre-paint script avoids a landing flash. Demo video slot behind `NEXT_PUBLIC_DEMO_VIDEO_URL`.
+- **Assistant approvals (HITL)**: write and delete tools never run on their own. The loop pauses with a `confirm` frame (Spanish summaries + signed resume token); the chat shows "Cambios propuestos" with a checkbox per action and "Aprobar (n)" / "Rechazar todo". Destructive tools are enabled again behind approval; `AGENT_DESTRUCTIVE_TOOLS` is gone.
+- **Dynamic icons**: events and tasks show an emoji derived from the title (44 keyword entries, Spanish + English), overridable with a picker ("Automático" resets). New nullable `icon` column (migration 020).
+- **Save feedback**: Google-Calendar-style snackbar after the server confirms creates, deletes (with "Deshacer"), completions and edits (once, when the editor closes); header shows "Guardando… / Guardado · hace X / Error al guardar", also on mobile.
+
+### Before deploying
+1. Apply `supabase/migrations/020_item_icons.sql` (renumber to 021 if `feature/idea-video` merges first with its own 020).
+2. Set `AGENT_RESUME_SECRET` (required in production) and optionally `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_DEMO_VIDEO_URL`.
+
+### Testing
+- `tsc`, 494 unit tests, lint and `next build` pass on every step.
+- Browser checks (local mode, 375px + 1280px): landing, icons + picker, snackbars + undo.
+- Manual check still to run on a real trip: `docs/plans/ux-wave-hitl-check.md` (assistant approvals) plus icon persistence across tabs after 020.
+
+### Known limits
+- A resume token is not single-use within its 15 minutes (owner-only; the card locks after the first decision).
+- Undo of a deleted event does not bring back cross-day spans or expense links removed by the delete.
 
 ## Log
 | Iter | Date | Step | Commit | Result | Notes / blockers |
@@ -47,3 +71,4 @@
 | 16 | 2026-10-09 | S.2 | (this commit) | tsc ok, 492 tests ok, lint 0 errors, build ok | `Snackbar` + `useSnackbar` (one at a time, 4 s / 6 s with action, `aria-live`); `Toast.tsx`/`ToastAction` removed, drag undo migrated. Notifies only on outcome ok: Evento creado / eliminado (+Deshacer, same id) / guardado (once, when the editor closes after edits and `flush()` succeeds); Tarea creada / completada / eliminada (+Deshacer incl. options); Gasto agregado / guardado (row ✓) / eliminado. Deletes are hard (`delete_trip_row`), so restoring the same id is valid. Orchestrator: event undo also restores `documentId`. Not restored: cross-day spans and expense links removed by the delete. |
 | 17 | 2026-10-09 | S.3 | (this commit) | tsc ok, 494 tests ok, lint 0 errors, build ok | Done by the orchestrator (small step). Header status: "Guardando…" / "Guardado" / "Error al guardar" now visible on mobile too (only "Al día" stays desktop-only); desktop adds "· hace N min / h" from `lastSavedAt` via `useNow`; `role=status` + `aria-live`. Pure helpers in `src/utils/syncLabel.ts` with tests. |
 | 18 | 2026-10-09 | S.V | (this commit) | pass (dev server in the worktree, `?local=1`, Playwright 375px + 1280px) | Task delete → "Tarea eliminada · Deshacer" → restored ("Tarea restaurada"). Event delete → "Evento eliminado · Deshacer" → restored ("Evento restaurado"). Editing an event title shows no snackbar per keystroke; closing the editor (button, Escape, backdrop) or switching events shows one "Evento guardado". No horizontal scroll at 375px. Header indicator is hidden in local mode; covered by S.3 unit tests and the HUMAN check on a real trip. Note: `TaskStop` does not kill the `next dev` child process on Windows; the loop now stops it by PID. |
+| 19 | 2026-10-09 | F.1 | (this commit) | docs only | `GUIDELINES.md` (agent frames/resume body, chat trace, save feedback rules, item emoji rule), `CLAUDE.md` agent bullet (approval flow), `.env.example` (`NEXT_PUBLIC_DEMO_VIDEO_URL`), PR description draft above. `[H]`: push + PR, migration 020, env vars, landing copy review, H.V manual check. Loop finished. |
