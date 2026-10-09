@@ -30,6 +30,24 @@ export function mapsUrlArg(value: unknown): string | null | undefined {
   return value;
 }
 
+// undefined = not sent; null or "" = back to automatic. Length counts code
+// points, like char_length in 020_item_icons.sql.
+export function iconArg(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== "string") throw new DomainError("icon must be an emoji string");
+  const icon = value.trim();
+  if (!icon) return null;
+  if ([...icon].length > LIMITS.icon) throw new DomainError(`icon is too long (max ${LIMITS.icon} characters)`);
+  return icon;
+}
+
+// Inserts omit the column unless an icon was chosen, so creating items keeps
+// working on a database without migration 020.
+export function optionalIcon(icon: string | null | undefined): { icon?: string } {
+  return icon ? { icon } : {};
+}
+
 export function documentRefArg(value: unknown): string | null | undefined {
   if (value === undefined || value === null) return value;
   if (typeof value !== "string" || !value || value.length > LIMITS.id) throw new DomainError("documentId must be an id");

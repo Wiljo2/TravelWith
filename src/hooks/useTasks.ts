@@ -69,6 +69,7 @@ export function useTasks(send: SendOp, isKnown: IsKnown) {
       if (k === "note") args.note = v ?? "";
       else if (v !== undefined) args[k] = v;
     }
+    if ("icon" in fields) args.icon = fields.icon ?? null;
     if (unschedule) args.unschedule = true;
     const sent = sendable(args);
     if (sent) send("task.update", sent);

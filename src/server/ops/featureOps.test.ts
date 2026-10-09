@@ -16,7 +16,7 @@ const ctx: OpContext = { code: "ABCD1234", userId: "u1", role: "member" };
 const DRIVE_ID = "1AbC_dEf-123456789xyz";
 const event: TripEventRow = {
   room_code: "ABCD1234", id: "e1", day_id: "d0", position: 0, start_hour: 30, end_hour: 31, title: "Legado", cat: "actividad",
-  note: null, maps_url: null, document_id: null, version: 2, updated_at: "t", updated_by: null,
+  note: null, maps_url: null, document_id: null, icon: null, version: 2, updated_at: "t", updated_by: null,
 };
 
 beforeEach(() => {

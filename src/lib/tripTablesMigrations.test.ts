@@ -333,3 +333,18 @@ describe("019_main_features_migration", () => {
     expect(m019.match(/set search_path = ''/g)!.length).toBe(5);
   });
 });
+
+describe("020_item_icons mirrors LIMITS.icon", () => {
+  const icons = readFileSync(join(process.cwd(), "supabase/migrations/020_item_icons.sql"), "utf8");
+
+  it.each(["trip_events", "trip_tasks"])("%s.icon is nullable text with a code point length check", (table) => {
+    expect(icons).toContain(`alter table public.${table} add column if not exists icon text;`);
+    const match = new RegExp(String.raw`add constraint ${table}_icon_length\s+check \(icon is null or char_length\(icon\) between 1 and (\d+)\)`).exec(icons);
+    expect(Number(match?.[1])).toBe(LIMITS.icon);
+  });
+
+  it("get_trip returns the icon of events and tasks", () => {
+    expect(icons).toContain("'icon', e.icon");
+    expect(icons).toContain("'icon', t.icon");
+  });
+});

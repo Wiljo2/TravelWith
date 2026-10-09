@@ -89,6 +89,7 @@ type TripEventRow = Flat<RowMeta & {
   note: string | null;
   maps_url: string | null;
   document_id: string | null;
+  icon: string | null;
 }>;
 
 type TripDaySpanRow = Flat<RowMeta & {
@@ -136,6 +137,7 @@ type TripTaskRow = Flat<RowMeta & {
   end_hour: number | null;
   cat: string | null;
   priority: "alta" | "media" | "baja" | null;
+  icon: string | null;
 }>;
 
 type TripTaskOptionRow = Flat<RowMeta & {
@@ -196,7 +198,7 @@ export type Database = {
       trip_days: TableOf<TripDayRow, MetaDefaults | "position" | "sub" | "flexible", [RoomFk<"trip_days">]>;
       trip_events: TableOf<
         TripEventRow,
-        MetaDefaults | "position" | "note" | "maps_url" | "document_id",
+        MetaDefaults | "position" | "note" | "maps_url" | "document_id" | "icon",
         [RoomFk<"trip_events">, DayFk<"trip_events", "day_id">, DocumentFk<"trip_events">]
       >;
       trip_day_spans: TableOf<
@@ -227,7 +229,7 @@ export type Database = {
       >;
       trip_tasks: TableOf<
         TripTaskRow,
-        MetaDefaults | "position" | "done" | "note" | "day_id" | "start_hour" | "end_hour" | "cat" | "priority",
+        MetaDefaults | "position" | "done" | "note" | "day_id" | "start_hour" | "end_hour" | "cat" | "priority" | "icon",
         [RoomFk<"trip_tasks">, DayFk<"trip_tasks", "day_id">]
       >;
       trip_task_options: TableOf<

@@ -54,7 +54,7 @@ export function useItinerary(send: SendOp) {
     const merged = { ...selectedEvent.ev, ...patch };
     const hoursChanged = patch.start !== undefined || patch.end !== undefined;
     const validHours = merged.start >= HOUR_START && merged.end <= HOUR_END && merged.end > merged.start;
-    const args = sendable({ id, ...rest, ...(hoursChanged && validHours ? { start: merged.start, end: merged.end } : {}) });
+    const args = sendable({ id, ...rest, ...("icon" in patch ? { icon: patch.icon ?? null } : {}), ...(hoursChanged && validHours ? { start: merged.start, end: merged.end } : {}) });
     if (args) send("event.update", args);
   }
 
@@ -69,11 +69,11 @@ export function useItinerary(send: SendOp) {
     send("event.delete", { id });
   }
 
-  function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = DEFAULT_EVENT_CAT, mapsUrl?: string, id = uid()) {
-    const nev: CalendarEvent = { id, start, end, title, cat, note, ...(mapsUrl ? { mapsUrl } : {}) };
+  function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = DEFAULT_EVENT_CAT, mapsUrl?: string, id = uid(), icon?: string) {
+    const nev: CalendarEvent = { id, start, end, title, cat, note, ...(mapsUrl ? { mapsUrl } : {}), ...(icon ? { icon } : {}) };
     setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: [...d.events, nev] } : d)));
     setSelectedId(nev.id);
-    send("event.create", { id, dayId, title, start, end, note, cat, ...(mapsUrl ? { mapsUrl } : {}) });
+    send("event.create", { id, dayId, title, start, end, note, cat, ...(mapsUrl ? { mapsUrl } : {}), ...(icon ? { icon } : {}) });
     return nev.id;
   }
 

@@ -56,6 +56,13 @@ describe("lists and tasks", () => {
     expect(applyToTasks(tasks, "trip_task_options", "o1", null)[0].options).toEqual([]);
   });
 
+  it("maps icon, null becoming undefined", () => {
+    expect(rowToTask({ id: "k", title: "x", done: false, icon: "🏨", version: 1 } as Row).icon).toBe("🏨");
+    expect(rowToTask({ id: "k", title: "x", done: false, icon: null, version: 1 } as Row).icon).toBeUndefined();
+    const next = applyToDays(days, "trip_events", "e1", eventRow({ icon: "🍽️" }));
+    expect(next[0].events[0].icon).toBe("🍽️");
+  });
+
   it("rowToTask drops hours of backlog tasks", () => {
     expect(rowToTask({ id: "k", title: "x", done: false, day_id: null, start_hour: 9, end_hour: 10, version: 1 } as Row)).toMatchObject({ dayId: undefined, start: undefined, end: undefined });
   });

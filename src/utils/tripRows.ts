@@ -31,7 +31,7 @@ function isStale(current: { version?: number } | undefined, row: Row): boolean {
 export function rowToEvent(r: Row): CalendarEvent {
   return {
     id: r.id, start: num(r.start_hour), end: num(r.end_hour), title: String(r.title), cat: String(r.cat), note: String(r.note ?? ""),
-    mapsUrl: optStr(r.maps_url), documentId: optStr(r.document_id), version: r.version,
+    mapsUrl: optStr(r.maps_url), documentId: optStr(r.document_id), icon: optStr(r.icon), version: r.version,
   };
 }
 
@@ -72,7 +72,7 @@ export function rowToTask(r: Row, options: TaskOption[] = []): Task {
   return {
     id: r.id, title: String(r.title), done: Boolean(r.done), note: optStr(r.note), dayId: optStr(r.day_id),
     start: r.day_id == null ? undefined : optNum(r.start_hour), end: r.day_id == null ? undefined : optNum(r.end_hour),
-    cat: optStr(r.cat), priority: optStr(r.priority) as Task["priority"], options, version: r.version,
+    cat: optStr(r.cat), priority: optStr(r.priority) as Task["priority"], icon: optStr(r.icon), options, version: r.version,
   };
 }
 

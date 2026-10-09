@@ -7,7 +7,7 @@ import type { TripTaskOptionRow, TripTaskRow } from "@/types/database";
 const meta = { room_code: "ABCD1234", version: 2, updated_at: "t", updated_by: null };
 const task: TripTaskRow = {
   ...meta, id: "k1", position: 0, title: "Reservar hotel", done: false, note: null,
-  day_id: "d0", start_hour: 10, end_hour: null, cat: null, priority: null,
+  day_id: "d0", start_hour: 10, end_hour: null, cat: null, priority: null, icon: null,
 };
 const option: TripTaskOptionRow = {
   ...meta, id: "o1", task_id: "k1", position: 0, label: "Hotel A", note: "link", amount: 120, currency: null, split_mode: null,
@@ -26,6 +26,16 @@ describe("task rows", () => {
     expect(taskPatch(task, { id: "k1", dayId: "d2" })).toEqual({ day_id: "d2", start_hour: 10, end_hour: 11 });
     expect(() => taskPatch({ ...task, day_id: null }, { id: "k1", start: 10 })).toThrow(/dayId is required/);
     expect(() => taskPatch(task, { id: "k1", start: 30 })).toThrow(/time range/);
+  });
+
+  it("icon: trimmed on create, reset with null or empty, validated", () => {
+    expect(newTaskRow({ title: "A", icon: " ✈️ " }, 0).icon).toBe("✈️");
+    expect(newTaskRow({ title: "A" }, 0)).not.toHaveProperty("icon");
+    expect(taskPatch(task, { id: "k1", icon: "🏨" })).toEqual({ icon: "🏨" });
+    expect(taskPatch(task, { id: "k1", icon: null })).toEqual({ icon: null });
+    expect(taskPatch(task, { id: "k1", icon: "" })).toEqual({ icon: null });
+    expect(() => taskPatch(task, { id: "k1", icon: 3 })).toThrow(/icon must be/);
+    expect(() => newTaskRow({ title: "A", icon: "x".repeat(17) }, 0)).toThrow(/icon is too long/);
   });
 
   it("options validate money fields and allow clearing them", () => {

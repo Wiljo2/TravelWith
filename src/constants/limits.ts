@@ -17,6 +17,7 @@ export const LIMITS = {
   label: 200,
   name: 80,
   note: 4000,
+  icon: 16,
   id: 100,
   chatMessage: 4000,
   chatHistory: 40000,

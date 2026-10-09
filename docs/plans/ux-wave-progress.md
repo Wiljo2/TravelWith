@@ -1,8 +1,8 @@
 # UX wave 1 progress
-- Iteration: 10
-- Last commit: (iteration 10 commit; see log)
-- Next step: I.2
-- Human actions pending: (1) set `AGENT_RESUME_SECRET` in Vercel and run `docs/plans/ux-wave-hitl-check.md` (H.V); (2) set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
+- Iteration: 11
+- Last commit: (iteration 11 commit; see log)
+- Next step: I.3
+- Human actions pending: (0) apply `supabase/migrations/020_item_icons.sql` on production BEFORE deploying this branch (choosing an icon fails without it; plain creates keep working); (1) set `AGENT_RESUME_SECRET` in Vercel and run `docs/plans/ux-wave-hitl-check.md` (H.V); (2) set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
 
 ## Steps
 - [x] L.1 Entry split: server `page.tsx` + `EntryGate` + `shouldEnterApp()`
@@ -15,7 +15,7 @@
 - [x] H.4 Client `useAgentChat` + `AgentConfirmCard`
 - [H] H.V Verify HITL end to end (HUMAN if no API key; HUMAN: set `AGENT_RESUME_SECRET`)
 - [x] I.1 Icon catalog + `suggestIcon` / `eventIcon` / `taskIcon`
-- [ ] I.2 Persistence: migration 020 `icon` on events + tasks, full read/write path (HUMAN: apply 020 before deploy)
+- [H] I.2 Persistence: migration 020 `icon` on events + tasks, full read/write path (HUMAN: apply 020 before deploy)
 - [ ] I.3 Render icons in calendar, agenda, home, tasks
 - [ ] I.4 `IconPicker` in event and task editors
 - [ ] I.V Verify icons (old trip, override persists, syncs)
@@ -38,3 +38,4 @@
 | 8 | 2026-10-09 | H.4 | (this commit) | tsc ok, 446 tests ok, lint 0 errors, build ok | `useAgentChat` hook + pure `agentChat.ts` (frame reducer, history with a `[Propuesta: … → aprobada/rechazada/expirada]` trace so the model knows the outcome), `AgentConfirmCard` (checkbox per action, "Aprobar (n)" / "Rechazar todo", locks on first decision, 400 on resume → expirada), `AgentMessageBubble` split out; `AgentPanel` 233 → 119 lines; chat types moved to `src/types`. Orchestrator: create/edit icon now comes from the tool name, not the Spanish summary. |
 | 9 | 2026-10-09 | H.V | (this commit) | prepared, waiting for a human | The assistant needs a real API key, an owner session and real writes (the loop may not write remotely; local mode has no assistant). Manual checklist with 9 cases in `docs/plans/ux-wave-hitl-check.md`. Server behaviour is covered by the H.2 route tests. |
 | 10 | 2026-10-09 | I.1 | (this commit) | tsc ok, all tests ok, lint 0 errors (no app code wired yet, build skipped) | `ITEM_ICONS` (44 ordered keyword entries, Spanish + English, whole-word match via the exported `asWords`), `ICON_CHOICES` (50, no duplicates), `suggestIcon` / `eventIcon` / `taskIcon` (stored icon → title → category / 📍). Meals before café, transport before hotel. |
+| 11 | 2026-10-09 | I.2 | (this commit) | tsc ok, 481 tests ok, lint 0 errors, build ok; 020 parsed with libpg-query (top level + get_trip body + DO-block statements) | Migration 020: nullable `icon` + `char_length` 1..16 checks on `trip_events`/`trip_tasks`; `get_trip` copied from 019 (diff = the two `'icon'` lines); `trip_payload` intentionally unchanged (cosmetic). Validators (`iconArg`, null/"" = automatic), `database.ts`, `tripRows`, client types, hooks. Audit/broadcast triggers send whole rows. Orchestrator: inserts omit `icon` unless chosen (`optionalIcon`), so creates don't depend on 020 being applied first. `[H]`: apply 020 before deploy; later steps proceed. |

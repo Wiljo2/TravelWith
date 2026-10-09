@@ -16,6 +16,7 @@ const current: TripEventRow = {
   note: null,
   maps_url: null,
   document_id: null,
+  icon: null,
   version: 3,
   updated_at: "2026-09-29T00:00:00Z",
   updated_by: null,
@@ -39,6 +40,29 @@ describe("newEventRow", () => {
     expect(() => newEventRow({ dayId: "d0", title: "A", start: "9", end: 10 }, 0)).toThrow(/start must be a number/);
     expect(() => newEventRow({ dayId: "d0", title: "   ", start: 9, end: 10 }, 0)).toThrow(/title is required/);
     expect(() => newEventRow({ title: "A", start: 9, end: 10 }, 0)).toThrow(/dayId is required/);
+  });
+});
+
+describe("event icon", () => {
+  it("creates with a trimmed icon, omits it by default, and rejects bad values", () => {
+    const base = { dayId: "d0", title: "A", start: 9, end: 10 };
+    expect(newEventRow({ ...base, icon: " 🍽️ " }, 0).icon).toBe("🍽️");
+    expect(newEventRow(base, 0)).not.toHaveProperty("icon");
+    expect(newEventRow({ ...base, icon: "" }, 0)).not.toHaveProperty("icon");
+    expect(() => newEventRow({ ...base, icon: 5 }, 0)).toThrow(/icon must be/);
+    expect(() => newEventRow({ ...base, icon: "a".repeat(17) }, 0)).toThrow(/icon is too long/);
+    expect(newEventRow({ ...base, icon: "a".repeat(16) }, 0).icon).toHaveLength(16);
+  });
+
+  it("counts code points, not UTF-16 units", () => {
+    expect(newEventRow({ dayId: "d0", title: "A", start: 9, end: 10, icon: "😀".repeat(16) }, 0).icon).toBeTruthy();
+    expect(() => newEventRow({ dayId: "d0", title: "A", start: 9, end: 10, icon: "😀".repeat(17) }, 0)).toThrow(/too long/);
+  });
+
+  it("updates and resets with null or empty", () => {
+    expect(eventUpdatePatch(current, { id: "e1", icon: "🎨" })).toEqual({ icon: "🎨" });
+    expect(eventUpdatePatch(current, { id: "e1", icon: null })).toEqual({ icon: null });
+    expect(eventUpdatePatch(current, { id: "e1", icon: "" })).toEqual({ icon: null });
   });
 });
 
