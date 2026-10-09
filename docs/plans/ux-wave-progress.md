@@ -3,7 +3,7 @@
 - Last commit: (iteration 19 commit; see log)
 - Next step: none (loop done; HUMAN items below)
 - Worktree: the loop runs in `../TravelWith-ux-wave` (the main checkout is on `feature/idea-video`).
-- Human actions pending: (01) review the landing copy; (02) push `feature/ux-wave` and open the PR (draft below); (00) migration number clash resolved: `feature/ux-wave` merges first and keeps `020_item_icons.sql`; `feature/idea-video` must rename `020_idea_video.sql` to `021_idea_video.sql` before it merges; (0) apply `supabase/migrations/020_item_icons.sql` on production BEFORE deploying this branch (choosing an icon fails without it; plain creates keep working); (1) set `AGENT_RESUME_SECRET` in Vercel and run `docs/plans/ux-wave-hitl-check.md` (H.V); (2) set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
+- Human actions pending: (01) review the landing copy; (00) migration number clash resolved: `feature/ux-wave` merges first and keeps `020_item_icons.sql`; `feature/idea-video` must rename `020_idea_video.sql` to `021_idea_video.sql` before it merges; (1) run `docs/plans/ux-wave-hitl-check.md` on the Preview (H.V) and check icon persistence across tabs; (2) set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
 
 ## Steps
 - [x] L.1 Entry split: server `page.tsx` + `EntryGate` + `shouldEnterApp()`
@@ -16,7 +16,7 @@
 - [x] H.4 Client `useAgentChat` + `AgentConfirmCard`
 - [H] H.V Verify HITL end to end (HUMAN if no API key; HUMAN: set `AGENT_RESUME_SECRET`)
 - [x] I.1 Icon catalog + `suggestIcon` / `eventIcon` / `taskIcon`
-- [H] I.2 Persistence: migration 020 `icon` on events + tasks, full read/write path (HUMAN: apply 020 before deploy)
+- [x] I.2 Persistence: migration 020 `icon` on events + tasks, full read/write path (HUMAN: apply 020 before deploy)
 - [x] I.3 Render icons in calendar, agenda, home, tasks
 - [x] I.4 `IconPicker` in event and task editors
 - [x] I.V Verify icons (old trip, override persists, syncs)
@@ -38,8 +38,8 @@
 - **Save feedback**: Google-Calendar-style snackbar after the server confirms creates, deletes (with "Deshacer"), completions and edits (once, when the editor closes); header shows "Guardando… / Guardado · hace X / Error al guardar", also on mobile.
 
 ### Before deploying
-1. Apply `supabase/migrations/020_item_icons.sql` (this branch merges first; `feature/idea-video` renumbers its migration to 021).
-2. Set `AGENT_RESUME_SECRET` (required in production) and optionally `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_DEMO_VIDEO_URL`.
+1. Migration `020_item_icons.sql` is already applied on staging and production (2026-10-09). `feature/idea-video` renumbers its migration to 021.
+2. `AGENT_RESUME_SECRET` is set in Vercel. Optional: `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_DEMO_VIDEO_URL`.
 
 ### Testing
 - `tsc`, 494 unit tests, lint and `next build` pass on every step.
@@ -72,3 +72,4 @@
 | 17 | 2026-10-09 | S.3 | (this commit) | tsc ok, 494 tests ok, lint 0 errors, build ok | Done by the orchestrator (small step). Header status: "Guardando…" / "Guardado" / "Error al guardar" now visible on mobile too (only "Al día" stays desktop-only); desktop adds "· hace N min / h" from `lastSavedAt` via `useNow`; `role=status` + `aria-live`. Pure helpers in `src/utils/syncLabel.ts` with tests. |
 | 18 | 2026-10-09 | S.V | (this commit) | pass (dev server in the worktree, `?local=1`, Playwright 375px + 1280px) | Task delete → "Tarea eliminada · Deshacer" → restored ("Tarea restaurada"). Event delete → "Evento eliminado · Deshacer" → restored ("Evento restaurado"). Editing an event title shows no snackbar per keystroke; closing the editor (button, Escape, backdrop) or switching events shows one "Evento guardado". No horizontal scroll at 375px. Header indicator is hidden in local mode; covered by S.3 unit tests and the HUMAN check on a real trip. Note: `TaskStop` does not kill the `next dev` child process on Windows; the loop now stops it by PID. |
 | 19 | 2026-10-09 | F.1 | (this commit) | docs only | `GUIDELINES.md` (agent frames/resume body, chat trace, save feedback rules, item emoji rule), `CLAUDE.md` agent bullet (approval flow), `.env.example` (`NEXT_PUBLIC_DEMO_VIDEO_URL`), PR description draft above. `[H]`: push + PR, migration 020, env vars, landing copy review, H.V manual check. Loop finished. |
+| 20 | 2026-10-09 | I.2 HUMAN | (this commit) | applied | With the user's go-ahead: production `get_trip` matched 019 (whitespace-insensitive md5) before replacing it. Migration 020 applied via Supabase MCP to staging, then production; verified 2 `icon` columns, 2 length checks, `get_trip` grants unchanged (postgres, service_role), `get_trip` still builds every room. User set `AGENT_RESUME_SECRET` and pushed the branch. |
