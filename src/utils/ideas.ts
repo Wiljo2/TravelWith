@@ -43,7 +43,7 @@ export function normalizeText(text: string): string {
 }
 
 // " word word " form, so phrases can be matched on whole-word boundaries.
-const asWords = (s: string) => ` ${normalizeText(s).replace(/[^a-z0-9ñ]+/g, " ").trim()} `;
+export const asWords = (s: string) => ` ${normalizeText(s).replace(/[^a-z0-9ñ]+/g, " ").trim()} `;
 
 // ── Places ────────────────────────────────────────────────────────────────────
 

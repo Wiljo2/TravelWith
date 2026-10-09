@@ -86,7 +86,7 @@ describe("OpQueue", () => {
     calls[0].resolve({ status: 500, body: null });
     await flush();
     expect(handlers.onFailure).toHaveBeenCalledWith("expense.delete", 500);
-    expect(handlers.onState).toHaveBeenLastCalledWith("error");
+    expect(handlers.onState).toHaveBeenLastCalledWith("error", null);
 
     queue.send("itinerary.reset", {});
     calls[1].resolve(ok());
@@ -98,7 +98,7 @@ describe("OpQueue", () => {
     calls[2].resolve(ok(rows));
     await flush();
     expect(handlers.onRows).toHaveBeenCalledWith(rows);
-    expect(handlers.onState).toHaveBeenLastCalledWith("saved");
+    expect(handlers.onState).toHaveBeenLastCalledWith("saved", expect.anything());
   });
 
   it("passes the trip header of header ops", async () => {
@@ -109,6 +109,65 @@ describe("OpQueue", () => {
     await flush();
     expect(handlers.onTrip).toHaveBeenCalledWith({ exchange_rate: 4100 });
     expect(calls[1].args).toEqual({ rate: 4200 });
+  });
+});
+
+describe("OpQueue outcomes", () => {
+  it("resolves ok, and records lastSavedAt for onState", async () => {
+    const { queue, calls, handlers } = setup();
+    expect(queue.lastSavedAt).toBeNull();
+    const p = queue.send("event.create", { id: "e1", dayId: "d0" });
+    calls[0].resolve(ok());
+    await expect(p).resolves.toBe("ok");
+    expect(queue.lastSavedAt).toBeTypeOf("number");
+    expect(handlers.onState).toHaveBeenLastCalledWith("saved", queue.lastSavedAt);
+  });
+
+  it("gives merged ops the outcome of the merged request", async () => {
+    const { queue, calls } = setup();
+    const first = queue.send("event.update", { id: "e1", title: "a" });
+    const second = queue.send("event.update", { id: "e1", title: "ab" });
+    const third = queue.send("event.update", { id: "e1", title: "abc" });
+    calls[0].resolve(ok());
+    await expect(first).resolves.toBe("ok");
+    await flush();
+    calls[1].resolve({ status: 500, body: null });
+    await expect(Promise.all([second, third])).resolves.toEqual(["failed", "failed"]);
+  });
+
+  it("resolves conflict for the in-flight op and the dropped ones", async () => {
+    const { queue, calls } = setup();
+    queue.seed([["trip_events:e1", 2]]);
+    const a = queue.send("event.update", { id: "e1", title: "mine" });
+    const b = queue.send("event.delete", { id: "e1" });
+    calls[0].resolve({ status: 409, body: { table: "trip_events", current: { id: "e1", version: 7 } } });
+    await expect(Promise.all([a, b])).resolves.toEqual(["conflict", "conflict"]);
+  });
+
+  it("resolves failed on 500 and on network errors", async () => {
+    const handlers: OpQueueHandlers = {
+      onConflict: vi.fn(), onFailure: vi.fn(), onResync: vi.fn(), onTrip: vi.fn(), onRows: vi.fn(), onState: vi.fn(), onMaintenance: vi.fn(),
+    };
+    const queue = new OpQueue(() => Promise.reject(new Error("offline")), handlers, 5);
+    await expect(queue.send("expense.delete", { id: "x1" })).resolves.toBe("failed");
+    expect(queue.lastSavedAt).toBeNull();
+    const { queue: q2, calls } = setup();
+    const p = q2.send("expense.delete", { id: "x1" });
+    calls[0].resolve({ status: 500, body: null });
+    await expect(p).resolves.toBe("failed");
+  });
+
+  it("stays pending through a 503 and resolves ok after the retry", async () => {
+    const { queue, calls } = setup();
+    let outcome: string | undefined;
+    void queue.send("event.update", { id: "e1", title: "a" }).then((o) => { outcome = o; });
+    calls[0].resolve({ status: 503, body: { maintenance: true } });
+    await flush();
+    expect(outcome).toBeUndefined();
+    await new Promise((r) => setTimeout(r, 20));
+    calls[1].resolve(ok());
+    await flush();
+    expect(outcome).toBe("ok");
   });
 });
 
@@ -127,7 +186,7 @@ describe("OpQueue during maintenance", () => {
     calls[1].resolve(ok());
     await flush();
     expect(handlers.onMaintenance).toHaveBeenLastCalledWith(false);
-    expect(handlers.onState).toHaveBeenLastCalledWith("saved");
+    expect(handlers.onState).toHaveBeenLastCalledWith("saved", expect.anything());
   });
 });
 

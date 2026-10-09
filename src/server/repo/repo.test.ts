@@ -29,6 +29,7 @@ const event = (over: Partial<TripEventRow> = {}): TripEventRow => ({
   note: null,
   maps_url: null,
   document_id: null,
+  icon: null,
   version: 1,
   updated_at: "2026-09-29T00:00:00Z",
   updated_by: null,

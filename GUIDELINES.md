@@ -11,13 +11,15 @@ Language rule: **code, comments, identifiers, commit messages, and docs are alwa
 ```
 src/
 ├── app/                  Next.js App Router
-│   ├── page.tsx          Only mounts <App /> (client). No logic here.
+│   ├── page.tsx          Renders `EntryGate`: the server-rendered landing for anonymous visitors, `<App />` otherwise
+│                         (decision in `components/landing/entry.ts`).
 │   └── api/rooms/...     Route handlers (backend). The only place that touches Supabase with the service key.
 ├── App.tsx               Root composition: wires domain hooks to views. Global state lives here.
 ├── hooks/                One hook per domain: useItinerary (days/events/spans), useBudget (expenses),
 │                         useTasks, useTripInfo (header/travelers), useTripOps (writes),
 │                         useRoom (load + live changes via useTripChannel), useDragDrop, useAuth.
 ├── components/
+│   ├── landing/          Public landing page and the EntryGate (landing vs app)
 │   ├── calendar/         Grid, day columns, blocks, slot-create modal
 │   ├── budget/           Budget view and side panel
 │   ├── tasks/            Tasks view
@@ -85,13 +87,13 @@ Server-side mutations do NOT talk to Supabase directly. The layering is:
 
 ### AI assistant (Claude agent)
 
-- Endpoint: `POST /api/rooms/[code]/agent` — SSE stream (`text` deltas, `tool` activity, `done` usage, `error`). Manual tool-use loop (max 15 iterations), model from `AGENT_MODEL` env (default `claude-sonnet-5`), adaptive thinking, no sampling params.
-- Beta access rules: owner only (`requireMember(..., "owner")`, and the UI hides the tab for others); per-user daily token quota from `AGENT_DAILY_TOKEN_LIMIT`, recorded in `agent_usage` (`src/server/agent/usage.ts`); destructive tools (`delete_event`, `delete_task`, `remove_expense`, `set_exchange_rate`) are excluded from `AGENT_TOOLS` and refused by `executeTool` unless `AGENT_DESTRUCTIVE_TOOLS=on`. The model call receives `req.signal`, so a closed panel stops generation.
+- Endpoint: `POST /api/rooms/[code]/agent` — SSE stream (`text` deltas, `tool` activity, `confirm` proposals, `done` usage, `error`). Body `{ messages }` starts a turn; `{ resume: { token, decisions } }` continues one paused on `confirm` (token signed with `AGENT_RESUME_SECRET`, 15 min, bound to trip and user). Manual tool-use loop (max 15 iterations), model from `AGENT_MODEL` env (default `claude-sonnet-5`), adaptive thinking, no sampling params.
+- Beta access rules: owner only (`requireMember(..., "owner")`, and the UI hides the tab for others); per-user daily token quota from `AGENT_DAILY_TOKEN_LIMIT`, recorded in `agent_usage` (`src/server/agent/usage.ts`); write and destructive tools (`delete_event`, `delete_task`, `remove_expense`, `set_exchange_rate`, …) never run without approval: the loop (`src/server/agent/loop.ts`) pauses with a `confirm` frame carrying a signed resume token and executes only the actions approved in the resume request. The model call receives `req.signal`, so a closed panel stops generation.
 - `ANTHROPIC_API_KEY` lives **only** on the server (env). Never send it to, or accept it from, the browser.
 - Agent rules: read tools (`get_trip_overview`, `get_day_detail`, `get_budget`) ground the model before writes; write tools run one op each (same validation and version guards as the UI), so every member sees each change live over Broadcast; validation failures return `is_error` tool results (the model self-corrects) instead of throwing.
 - Tool schemas do **not** use `strict: true`: Anthropic caps total optional parameters across all `strict` tools in one request at 24, and our edit-style tools (`update_task`, `update_expense`, `update_event`, …) intentionally have many optional fields by design. Domain-layer validation (`DomainError` → `is_error`) is the real validation boundary; don't re-add `strict: true` without first checking the combined optional-param count across `AGENT_TOOLS`.
 - The system prompt must stay **byte-stable** (it carries a `cache_control` breakpoint): dynamic trip data reaches the model via read tools, never by interpolating state into the prompt.
-- Chat history is ephemeral client state — never persist conversations into the room payload.
+- Chat history is ephemeral client state — never persist conversations into the room payload. The client sends text turns only; an assistant turn with a proposal adds a `[Propuesta: … → aprobada/rechazada/expirada]` trace so the model knows the outcome (`components/agent/agentChat.ts`). Write tools are proposals: the prompt tells the model not to ask permission in text.
 
 ### API surface (Next.js route handlers)
 
@@ -137,10 +139,12 @@ Trip data lives in the `trip_*` tables; rows migrated from old payloads keep the
 - Derived values that span domains (e.g. `grandTotal` = extras × people) are computed in `App.tsx` with `useMemo`, not inside a single-domain hook.
 - Anything that must persist is written with an op: the hook updates state optimistically and calls `send(op, args)` (`useTripOps`), and exposes `applyRow` so 409s and Broadcast messages can replace one item. Text the server rejects when empty (titles, labels, names) stays local until it has content (`sendable`).
 - Never apply a remote row to an item with pending ops: `OpQueue.acceptRemote` decides, and the version guard settles the race with a 409 + Spanish notice.
+- Save feedback: `send` returns `Promise<OpOutcome>` (`ok` / `conflict` / `failed`, never rejects). Show a snackbar (`notify` from `useSnackbar`) only on `ok` and only for explicit user actions (create, delete, complete, ✓ commit, closing an editor after edits) — never per keystroke, never for remote changes. Failures stay on `SyncNotice`. The header shows `syncState` plus the time since `lastSavedAt`.
 
 ### Types and constants
 - All domain types in `src/types/index.ts`. No duplicated domain interfaces inside components (component prop interfaces do live next to the component).
 - Enumerable values (categories, priorities, colors) go in `src/constants/` as a typed `Record` plus an exported default (`DEFAULT_TASK_CAT`). Components never hardcode a category key.
+- Item emojis: render only through `eventIcon` / `taskIcon` (`utils/itemIcon.ts`): the stored `icon` wins, otherwise the first `ITEM_ICONS` entry whose keyword matches the title (order matters: specific before generic), otherwise the category icon / 📍. The picker offers `ICON_CHOICES`; "Automático" stores `null`.
 
 ### Business logic
 - **Math lives in `src/utils/` as pure functions**; components only call them. All money math goes through `extraGroupUSD` / `extraPerPersonUSD` / `extraUnitUSD` in `utils/currency.ts`. If a component starts doing `amount / people` by hand, that's wrong — use the helper (that's exactly how the group-vs-per-person expense bug was born).

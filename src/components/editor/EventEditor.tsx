@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import NoteLinks from "@/components/NoteLinks";
+import IconPicker from "@/components/IconPicker";
+import { DEFAULT_EVENT_ICON } from "@/constants/itemIcons";
 import type { CalendarEvent, Day } from "@/types";
 import { LIMITS } from "@/constants/limits";
 
@@ -37,13 +39,20 @@ export default function EventEditor({
 }: EventEditorProps) {
   return (
     <div className="flex flex-col gap-2.5">
-      <Input
-        value={ev.title}
-        maxLength={LIMITS.title}
-        onChange={(e) => onChange({ title: e.target.value })}
-        aria-label="Título"
-        className="h-10 bg-secondary text-[15px] font-medium"
-      />
+      <IconPicker
+        value={ev.icon}
+        title={ev.title}
+        fallback={DEFAULT_EVENT_ICON}
+        onChange={(icon) => onChange({ icon })}
+      >
+        <Input
+          value={ev.title}
+          maxLength={LIMITS.title}
+          onChange={(e) => onChange({ title: e.target.value })}
+          aria-label="Título"
+          className="h-10 bg-secondary text-[15px] font-medium"
+        />
+      </IconPicker>
 
       {days && dayId && onMoveDay && (
         <label className="text-xs text-secondary-foreground">

@@ -6,6 +6,7 @@ import { PX_PER_HOUR } from "@/constants/time";
 import { useGridStart } from "./gridStart";
 import { fmtHour, durLabel } from "@/utils/time";
 import { cssZoom } from "@/utils/zoom";
+import { eventIcon } from "@/utils/itemIcon";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Category } from "@/types";
 
@@ -56,7 +57,7 @@ export function EventCard({ ev, start, end, height, selected, cat, conflict, sty
         className={cn("overflow-hidden text-ellipsis text-xs font-medium leading-tight", height < 40 && "whitespace-nowrap")}
         style={{ color: c.text }}
       >
-        {ev.title}
+        <span aria-hidden className="mr-1">{eventIcon(ev)}</span>{ev.title}
       </div>
       {height >= 40 && (
         <div className="mt-0.5 text-[10.5px] tabular-nums" style={{ color: c.border }}>

@@ -3,6 +3,8 @@ import type { Task, TaskOption } from "@/types";
 import { sendable } from "@/lib/opQueue";
 import { applyToTasks, type Row, type TripTable } from "@/utils/tripRows";
 import type { IsKnown, SendOp } from "@/hooks/useTripOps";
+import type { Notify } from "@/hooks/useSnackbar";
+import { taskCreateArgs } from "@/utils/restore";
 
 function defined(obj: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
@@ -33,25 +35,35 @@ function syncOptions(taskId: string, prev: TaskOption[], next: TaskOption[], sen
   }
 }
 
-export function useTasks(send: SendOp, isKnown: IsKnown) {
+export function useTasks(send: SendOp, isKnown: IsKnown, notify?: Notify) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const latest = useRef(tasks);
   useEffect(() => {
     latest.current = tasks;
   }, [tasks]);
 
-  function addTask(partial: Partial<Task> & { title: string }) {
-    const task: Task = { id: crypto.randomUUID(), done: false, ...partial };
+  function insertTask(task: Task, message: string) {
     setTasks((prev) => [...prev, task]);
-    if (task.title.trim()) {
-      const { options: _options, version: _version, ...fields } = task;
-      send("task.create", defined(fields));
-    }
+    if (!task.title.trim()) return;
+    send("task.create", taskCreateArgs(task)).then((outcome) => {
+      if (outcome !== "ok") return;
+      for (const o of task.options ?? []) {
+        if (o.label.trim()) send("taskOption.create", { ...optionArgs(o), taskId: task.id });
+      }
+      notify?.({ message });
+    });
+  }
+
+  function addTask(partial: Partial<Task> & { title: string }) {
+    insertTask({ id: crypto.randomUUID(), done: false, ...partial }, "Tarea creada");
   }
 
   function toggleTask(id: string) {
+    const completing = latest.current.find((t) => t.id === id)?.done === false;
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
-    send("task.toggle", { id });
+    send("task.toggle", { id }).then((outcome) => {
+      if (outcome === "ok" && completing) notify?.({ message: "Tarea completada" });
+    });
   }
 
   function updateTask(id: string, patch: Partial<Task>) {
@@ -69,14 +81,22 @@ export function useTasks(send: SendOp, isKnown: IsKnown) {
       if (k === "note") args.note = v ?? "";
       else if (v !== undefined) args[k] = v;
     }
+    if ("icon" in fields) args.icon = fields.icon ?? null;
     if (unschedule) args.unschedule = true;
     const sent = sendable(args);
     if (sent) send("task.update", sent);
   }
 
   function deleteTask(id: string) {
+    const snapshot = latest.current.find((t) => t.id === id);
     setTasks((prev) => prev.filter((t) => t.id !== id));
-    send("task.delete", { id });
+    send("task.delete", { id }).then((outcome) => {
+      if (outcome !== "ok" || !snapshot) return;
+      notify?.({
+        message: "Tarea eliminada",
+        action: { label: "Deshacer", run: () => insertTask(snapshot, "Tarea restaurada") },
+      });
+    });
   }
 
   // The server creates the event and expense and deletes the task in one

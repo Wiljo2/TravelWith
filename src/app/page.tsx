@@ -1,6 +1,6 @@
-"use client";
-import App from "@/App";
+import EntryGate from "@/components/landing/EntryGate";
+import Landing from "@/components/landing/Landing";
 
 export default function Page() {
-  return <App />;
+  return <EntryGate landing={<Landing />} />;
 }

@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import type { Task, TaskPriority, Day } from "@/types";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT, PRIORITIES, PRIORITY_ORDER } from "@/constants/taskCategories";
 import { fmtHour } from "@/utils/time";
+import { taskIcon } from "@/utils/itemIcon";
 import { optionGroupUSD, fmtUSDNum } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import TaskOptions from "@/components/tasks/TaskOptions";
 import NoteLinks from "@/components/NoteLinks";
+import IconPicker from "@/components/IconPicker";
 import { LIMITS } from "@/constants/limits";
 import { useIsTouch } from "@/hooks/useMediaQuery";
 
@@ -211,7 +213,7 @@ function TaskRow({
             onClick={touch ? onStartEdit : undefined}
             className={cn("flex min-w-0 flex-1 cursor-text select-none items-center gap-[7px] text-sm text-foreground", task.done && "line-through")}
           >
-            <span title={c.label} className="shrink-0">{c.icon}</span>
+            <span title={c.label} className="shrink-0">{taskIcon(task)}</span>
             <span className="truncate">{task.title}</span>
           </span>
         )}
@@ -278,6 +280,16 @@ function TaskRow({
                 </button>
               );
             })}
+          </div>
+
+          <div className="flex items-start gap-2">
+            <span className="pt-3 text-xs text-secondary-foreground">Ícono</span>
+            <IconPicker
+              value={task.icon}
+              title={task.title}
+              fallback={(TASK_CATEGORIES[task.cat ?? DEFAULT_TASK_CAT] ?? TASK_CATEGORIES[DEFAULT_TASK_CAT]).icon}
+              onChange={(icon) => onUpdate({ icon })}
+            />
           </div>
 
           <div className="flex gap-[5px]">

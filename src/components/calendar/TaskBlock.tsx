@@ -4,6 +4,7 @@ import { TASK_CATEGORIES, DEFAULT_TASK_CAT, PRIORITIES } from "@/constants/taskC
 import { PX_PER_HOUR } from "@/constants/time";
 import { useGridStart } from "./gridStart";
 import { fmtHour } from "@/utils/time";
+import { taskIcon } from "@/utils/itemIcon";
 import { cn } from "@/lib/utils";
 
 interface TaskBlockProps {
@@ -54,7 +55,7 @@ export default function TaskBlock({ task, onToggle, onEdit }: TaskBlockProps) {
             )}
             style={{ color: c.text }}
           >
-            <span className="mr-[3px]">{c.icon}</span>{task.title}
+            <span aria-hidden className="mr-[3px]">{taskIcon(task)}</span>{task.title}
           </div>
           {height >= 38 && (
             <div className="mt-0.5 flex items-center gap-1.5">

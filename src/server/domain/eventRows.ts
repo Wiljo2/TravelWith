@@ -2,7 +2,7 @@ import { DEFAULT_EVENT_CAT } from "@/constants/categories";
 import { LIMITS } from "@/constants/limits";
 import { DomainError, checkArgs, checkClientId } from "@/server/domain/core";
 import { validateCat, validateHours } from "@/server/domain/events";
-import { documentRefArg, mapsUrlArg } from "@/server/domain/featureRows";
+import { documentRefArg, iconArg, mapsUrlArg, optionalIcon } from "@/server/domain/featureRows";
 import type { NewRow, RowPatch } from "@/server/repo/core";
 import type { TripEventRow } from "@/types/database";
 import { uid } from "@/utils/uid";
@@ -54,6 +54,7 @@ export function newEventRow(args: unknown, position: number): NewRow<"trip_event
     note: a.note?.trim() ?? "",
     maps_url: mapsUrlArg((args as Record<string, unknown>).mapsUrl) ?? null,
     document_id: documentRefArg((args as Record<string, unknown>).documentId) ?? null,
+    ...optionalIcon(iconArg((args as Record<string, unknown>).icon)),
   };
 }
 
@@ -92,6 +93,8 @@ export function eventUpdatePatch(current: TripEventRow, args: unknown): RowPatch
   if (mapsUrl !== undefined) patch.maps_url = mapsUrl;
   const documentId = documentRefArg((args as Record<string, unknown>).documentId);
   if (documentId !== undefined) patch.document_id = documentId;
+  const icon = iconArg((args as Record<string, unknown>).icon);
+  if (icon !== undefined) patch.icon = icon;
   if (Object.keys(patch).length === 0) throw new DomainError("nothing to update");
   if (patch.start_hour === undefined && patch.end_hour === undefined) return patch;
   validateHours(patch.start_hour ?? Number(current.start_hour), patch.end_hour ?? Number(current.end_hour));

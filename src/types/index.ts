@@ -16,6 +16,7 @@ export interface CalendarEvent {
   version?: number;
   mapsUrl?: string;       // Google Maps link: pins the activity's exact spot on the trip map
   documentId?: string;    // TripDocument it comes from
+  icon?: string;          // emoji chosen by the user; absent = automatic (from the title)
 }
 
 // A span defined at the trip level that can cross multiple days.
@@ -111,6 +112,7 @@ export interface Task {
   end?: number;
   cat?: string;           // key of TASK_CATEGORIES
   priority?: TaskPriority;
+  icon?: string;          // emoji chosen by the user; absent = automatic (from the title)
   options?: TaskOption[];  // candidate choices (a decision to resolve); unchosen options never sum into the confirmed total
   version?: number;
 }
@@ -263,9 +265,29 @@ export interface ActivityEntry {
   fields: string[];
 }
 
-export interface ToastAction {
-  title: string;
-  newStart: number;
-  newEnd: number;
-  undo: () => void;
+export interface AgentAction {
+  id: string;
+  name: string;
+  kind: "write" | "delete";
+  summary: string;
+}
+
+export interface AgentDecision {
+  id: string;
+  approve: boolean;
+}
+
+export interface AgentPending {
+  token: string;
+  actions: AgentAction[];
+  status: "pending" | "approved" | "rejected" | "expired";
+  decisions?: AgentDecision[];
+}
+
+export interface AgentChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  tools?: string[];
+  error?: boolean;
+  pending?: AgentPending;
 }

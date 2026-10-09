@@ -18,17 +18,7 @@ function schema(properties: Record<string, unknown>, required: string[] = []) {
   return { type: "object" as const, properties, required, additionalProperties: false };
 }
 
-// Tools that delete data or change every number in the trip. Disabled during
-// the beta (no confirmation flow yet) unless AGENT_DESTRUCTIVE_TOOLS=on. Read
-// once at module load, so the tool list stays stable per deploy (prompt cache).
-const DESTRUCTIVE_TOOLS = new Set(["delete_event", "delete_task", "remove_expense", "set_exchange_rate"]);
-const DESTRUCTIVE_ENABLED = process.env.AGENT_DESTRUCTIVE_TOOLS === "on";
-
-export function isToolEnabled(name: string): boolean {
-  return DESTRUCTIVE_ENABLED || !DESTRUCTIVE_TOOLS.has(name);
-}
-
-const ALL_TOOLS: Anthropic.Tool[] = [
+export const AGENT_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_trip_overview",
     description:
@@ -85,7 +75,7 @@ const ALL_TOOLS: Anthropic.Tool[] = [
   {
     name: "delete_event",
     description:
-      "Delete an event from the calendar. Linked expenses are kept but unlinked; cross-day ranges that start or end at the event are removed. Confirm with the user before deleting several events at once.",
+      "Delete an event from the calendar. Linked expenses are kept but unlinked; cross-day ranges that start or end at the event are removed.",
     input_schema: schema({ eventId: { type: "string" } }, ["eventId"]),
   },
   {
@@ -169,7 +159,7 @@ const ALL_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "remove_expense",
-    description: "Delete an expense from the budget. Confirm with the user before deleting several at once.",
+    description: "Delete an expense from the budget.",
     input_schema: schema({ extraId: { type: "string" } }, ["extraId"]),
   },
   {
@@ -178,8 +168,6 @@ const ALL_TOOLS: Anthropic.Tool[] = [
     input_schema: schema({ rate: { type: "number", description: "COP per 1 USD, e.g. 4000" } }, ["rate"]),
   },
 ];
-
-export const AGENT_TOOLS: Anthropic.Tool[] = ALL_TOOLS.filter((t) => isToolEnabled(t.name));
 
 // Spanish activity labels shown as chips in the chat UI while a tool runs.
 export const TOOL_LABELS: Record<string, string> = {
@@ -263,12 +251,6 @@ function summarize(results: OpResult[]) {
 }
 
 export async function executeTool(ctx: OpContext, name: string, input: Input): Promise<ToolOutcome> {
-  if (!isToolEnabled(name)) {
-    return {
-      content: `Tool "${name}" is disabled. Tell the user to make this change themselves in the app.`,
-      isError: true,
-    };
-  }
   try {
     const result = await runTool(ctx, name, input);
     return { content: JSON.stringify(result), isError: false };

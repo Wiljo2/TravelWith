@@ -18,7 +18,7 @@ import type {
   TripTravelerRow,
 } from "@/types/database";
 
-const sql = ["008_trip_tables.sql", "018_main_features_tables.sql"]
+const sql = ["008_trip_tables.sql", "018_main_features_tables.sql", "020_item_icons.sql"]
   .map((f) => readFileSync(join(process.cwd(), "supabase/migrations", f), "utf8"))
   .join("\n");
 
@@ -41,7 +41,7 @@ const typed: Record<string, string[]> = {
   trip_days: Object.keys({ ...meta, position: true, label: true, sub: true, flexible: true } satisfies Columns<TripDayRow>),
   trip_events: Object.keys({
     ...meta, day_id: true, position: true, start_hour: true, end_hour: true, title: true, cat: true, note: true,
-    maps_url: true, document_id: true,
+    maps_url: true, document_id: true, icon: true,
   } satisfies Columns<TripEventRow>),
   trip_day_spans: Object.keys({
     ...meta, day_id: true, position: true, label: true, start_event_id: true, end_event_id: true,
@@ -56,7 +56,7 @@ const typed: Record<string, string[]> = {
   } satisfies Columns<TripExpenseRow>),
   trip_tasks: Object.keys({
     ...meta, position: true, title: true, done: true, note: true, day_id: true,
-    start_hour: true, end_hour: true, cat: true, priority: true,
+    start_hour: true, end_hour: true, cat: true, priority: true, icon: true,
   } satisfies Columns<TripTaskRow>),
   trip_task_options: Object.keys({
     ...meta, task_id: true, position: true, label: true, note: true, amount: true, currency: true, split_mode: true,

@@ -3,14 +3,15 @@ import { requireMember, type MemberRole } from "@/server/auth";
 import { assertWritable } from "@/server/maintenance";
 import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
 import { LIMITS } from "@/constants/limits";
-import { AGENT_TOOLS, TOOL_LABELS, executeTool } from "@/server/agent/tools";
-import { SYSTEM_PROMPT } from "@/server/agent/prompt";
-import { addUsage, dailyTokenLimit, recordUsage, tokensUsedToday, type Usage } from "@/server/agent/usage";
+import { runAgentLoop, resumeMessages, type Decision, type Send } from "@/server/agent/loop";
+import { verifyPending, type PendingState } from "@/server/agent/pending";
+import { dailyTokenLimit, recordUsage, tokensUsedToday, type Usage } from "@/server/agent/usage";
 
 const AGENT_MODEL = process.env.AGENT_MODEL ?? "claude-sonnet-5";
-const MAX_ITERATIONS = 15;
+const MAX_DECISIONS = 50;
 const MAX_HISTORY_MESSAGES = 30;
 const BODY_ERROR = "Body inválido: se espera { messages: [{role, content}] }";
+const RESUME_ERROR = "Body inválido: resume debe ser { token, decisions: [{id, approve}] }";
 
 interface ChatTurn {
   role: "user" | "assistant";
@@ -20,7 +21,10 @@ interface ChatTurn {
 type Params = Promise<{ code: string }>;
 
 // POST /api/rooms/[code]/agent — runs the agentic loop and streams SSE frames:
-// {type:"text",delta} | {type:"tool",name,label} | {type:"done",usage} | {type:"error",message}
+// {type:"text",delta} | {type:"tool",name,label} | {type:"confirm",token,actions}
+// | {type:"done",usage} | {type:"error",message}
+// Body: { messages } starts a turn; { resume: { token, decisions } } continues a
+// turn paused on a `confirm` frame. Writes only run after an approval.
 export async function POST(req: Request, { params }: { params: Params }) {
   let code: string;
   let userId: string;
@@ -44,17 +48,23 @@ export async function POST(req: Request, { params }: { params: Params }) {
     );
   }
 
-  let turns: ChatTurn[];
+  let turns: ChatTurn[] = [];
+  let pending: { state: PendingState; decisions: Decision[] } | null = null;
   try {
     const body = await req.json().catch(() => {
       throw new HttpError(400, BODY_ERROR);
     });
-    turns = validateTurns(body?.messages);
+    if (body?.resume !== undefined) {
+      const { token, decisions } = validateResume(body.resume);
+      pending = { state: verifyPending(token, { code, userId }), decisions };
+    } else {
+      turns = validateTurns(body?.messages);
+      if (!turns.length || turns[turns.length - 1].role !== "user") {
+        throw new HttpError(400, "El último mensaje debe ser del usuario");
+      }
+    }
   } catch (e) {
     return errorResponse(e, "POST /api/rooms/[code]/agent");
-  }
-  if (!turns.length || turns[turns.length - 1].role !== "user") {
-    return jsonError("El último mensaje debe ser del usuario", 400);
   }
 
   const client = new Anthropic();
@@ -62,7 +72,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (frame: Record<string, unknown>) => {
+      const send: Send = (frame) => {
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(frame)}\n\n`));
         } catch {
@@ -70,71 +80,15 @@ export async function POST(req: Request, { params }: { params: Params }) {
         }
       };
 
-      const messages: Anthropic.MessageParam[] = turns.map((t) => ({
-        role: t.role,
-        content: t.content,
-      }));
-
+      const ctx = { code, userId, role };
       const usage: Usage = { input: 0, output: 0 };
 
       try {
-        for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-          if (req.signal.aborted) break;
+        const messages = pending
+          ? await resumeMessages(pending.state, pending.decisions, ctx, send)
+          : turns.map((t): Anthropic.MessageParam => ({ role: t.role, content: t.content }));
 
-          // The request signal aborts the model call when the user disconnects,
-          // so tokens stop being generated (and billed).
-          const msgStream = client.messages.stream(
-            {
-              model: AGENT_MODEL,
-              max_tokens: 8192,
-              thinking: { type: "adaptive" },
-              system: [
-                { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-              ],
-              tools: AGENT_TOOLS,
-              messages,
-            },
-            { signal: req.signal },
-          );
-
-          msgStream.on("text", (delta) => send({ type: "text", delta }));
-
-          const message = await msgStream.finalMessage();
-          addUsage(usage, message.usage);
-
-          if (message.stop_reason === "pause_turn") {
-            messages.push({ role: "assistant", content: message.content });
-            continue;
-          }
-
-          if (message.stop_reason !== "tool_use") break;
-
-          const toolUses = message.content.filter(
-            (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
-          );
-          messages.push({ role: "assistant", content: message.content });
-
-          const results: Anthropic.ToolResultBlockParam[] = [];
-          for (const tool of toolUses) {
-            send({ type: "tool", name: tool.name, label: TOOL_LABELS[tool.name] ?? tool.name });
-            const outcome = await executeTool({ code, userId, role }, tool.name, tool.input as Record<string, unknown>);
-            results.push({
-              type: "tool_result",
-              tool_use_id: tool.id,
-              content: outcome.content,
-              is_error: outcome.isError || undefined,
-            });
-          }
-          // All tool results for this turn go back in ONE user message.
-          messages.push({ role: "user", content: results });
-
-          if (iteration === MAX_ITERATIONS - 1) {
-            send({
-              type: "text",
-              delta: "\n\nHe alcanzado el límite de pasos para esta petición. Dime si continúo.",
-            });
-          }
-        }
+        await runAgentLoop({ client, model: AGENT_MODEL, messages, ctx, send, signal: req.signal, usage });
 
         send({ type: "done", usage: { input_tokens: usage.input, output_tokens: usage.output } });
       } catch (e) {
@@ -157,6 +111,24 @@ export async function POST(req: Request, { params }: { params: Params }) {
       Connection: "keep-alive",
     },
   });
+}
+
+function validateResume(raw: unknown): { token: string; decisions: Decision[] } {
+  const r = raw as { token?: unknown; decisions?: unknown } | null;
+  if (
+    typeof r !== "object" || r === null ||
+    typeof r.token !== "string" ||
+    !Array.isArray(r.decisions) || r.decisions.length > MAX_DECISIONS ||
+    !r.decisions.every(
+      (d) => typeof d === "object" && d !== null && typeof d.id === "string" && typeof d.approve === "boolean",
+    )
+  ) {
+    throw new HttpError(400, RESUME_ERROR);
+  }
+  return {
+    token: r.token,
+    decisions: r.decisions.map((d: Decision) => ({ id: d.id, approve: d.approve })),
+  };
 }
 
 // Bounds the input cost of every model call: user messages over the limit are

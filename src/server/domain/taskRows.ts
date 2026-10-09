@@ -1,6 +1,7 @@
 import { LIMITS } from "@/constants/limits";
 import { HOUR_END } from "@/constants/time";
 import { DomainError, checkArgs, checkClientId } from "@/server/domain/core";
+import { iconArg, optionalIcon } from "@/server/domain/featureRows";
 import { parseAmount, parseCurrency, parseSplitMode } from "@/server/domain/expenseRows";
 import { validatePriority, validateSchedule, validateTaskCat } from "@/server/domain/tasks";
 import type { NewRow, RowPatch } from "@/server/repo/core";
@@ -48,6 +49,7 @@ export function newTaskRow(args: unknown, position: number): NewRow<"trip_tasks"
     note,
     cat: (a.cat as string | undefined) ?? null,
     priority: (a.priority as TripTaskRow["priority"] | undefined) ?? null,
+    ...optionalIcon(iconArg(a.icon)),
     ...(a.dayId !== undefined
       ? { day_id: a.dayId as string, ...schedule(a.start as number | undefined, a.end as number | undefined) }
       : { day_id: null, start_hour: null, end_hour: null }),
@@ -74,6 +76,8 @@ export function taskPatch(current: TripTaskRow, args: unknown): RowPatch<"trip_t
     validatePriority(a.priority as string);
     patch.priority = a.priority as TripTaskRow["priority"];
   }
+  const icon = iconArg(a.icon);
+  if (icon !== undefined) patch.icon = icon;
   if (a.unschedule) {
     Object.assign(patch, { day_id: null, start_hour: null, end_hour: null });
   } else if (a.dayId !== undefined || a.start !== undefined || a.end !== undefined) {

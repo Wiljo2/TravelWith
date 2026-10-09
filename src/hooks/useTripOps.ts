@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { OpQueue, versionEntries, type OpQueueHandlers, type SyncState } from "@/lib/opQueue";
+import { OpQueue, versionEntries, type OpOutcome, type OpQueueHandlers, type SyncState } from "@/lib/opQueue";
 import type { RoomPayload } from "@/types";
 import type { Row, TripTable } from "@/utils/tripRows";
 
 export type { SyncState } from "@/lib/opQueue";
 
-export type SendOp = (op: string, args: Record<string, unknown>) => void;
+export type SendOp = (op: string, args: Record<string, unknown>) => Promise<OpOutcome>;
 export type IsKnown = (table: TripTable, id: string) => boolean;
 
 export interface TripOpsCallbacks {
@@ -26,6 +26,7 @@ const FAILURE_NOTICE = "No se pudo guardar un cambio. Se recargó el viaje.";
 // LOCAL demo room (no code or no token) sends are dropped.
 export function useTripOps(code: string | null, accessToken: string | undefined, callbacks: TripOpsCallbacks) {
   const [syncState, setSyncState] = useState<SyncState>("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [maintenance, setMaintenance] = useState(false);
   const token = useRef(accessToken);
@@ -53,7 +54,10 @@ export function useTripOps(code: string | null, accessToken: string | undefined,
       onResync: () => cb.current.resync(),
       onTrip: (header) => cb.current.applyHeader(header),
       onRows: (rows) => rows.forEach(({ table, row }) => cb.current.adoptRow(table, row.id, row)),
-      onState: setSyncState,
+      onState: (state, savedAt) => {
+        setSyncState(state);
+        setLastSavedAt(savedAt);
+      },
       onMaintenance: setMaintenance,
     };
     queueRef.current = new OpQueue(async (op, args, expectedVersion) => {
@@ -69,7 +73,7 @@ export function useTripOps(code: string | null, accessToken: string | undefined,
     };
   }, [code]);
 
-  const send = useCallback<SendOp>((op, args) => queueRef.current?.send(op, args), []);
+  const send = useCallback<SendOp>((op, args) => queueRef.current?.send(op, args) ?? Promise.resolve("ok"), []);
   const isKnown = useCallback<IsKnown>((table, id) => queueRef.current?.isKnown(table, id) ?? false, []);
   const seedVersions = useCallback((payload: RoomPayload) => queueRef.current?.seed(versionEntries(payload)), []);
   const noteVersion = useCallback((table: TripTable, id: string, version: number | null) => {
@@ -82,5 +86,5 @@ export function useTripOps(code: string | null, accessToken: string | undefined,
   const flush = useCallback(() => queueRef.current?.flush() ?? Promise.resolve(true), []);
   const dismissNotice = useCallback(() => setNotice(null), []);
 
-  return { send, isKnown, seedVersions, noteVersion, acceptRemote, idle, flush, syncState, notice, dismissNotice, maintenance };
+  return { send, isKnown, seedVersions, noteVersion, acceptRemote, idle, flush, syncState, lastSavedAt, notice, dismissNotice, maintenance };
 }

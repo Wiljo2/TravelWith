@@ -7,6 +7,7 @@ import { PANEL, SectionTitle } from "@/components/home/shared";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT } from "@/constants/taskCategories";
 import { fmtUSD, optionGroupUSD, fmtUSDNum } from "@/utils/currency";
 import { fmtHour } from "@/utils/time";
+import { taskIcon } from "@/utils/itemIcon";
 import { tripPhase } from "@/utils/tripDays";
 import type { TripPhase } from "@/utils/tripDays";
 import { useNow } from "@/hooks/useNow";
@@ -190,7 +191,7 @@ function TaskList({ tasks, people, exchangeRate, onOpen }: {
               onClick={onOpen}
               className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-secondary"
             >
-              <span className="text-base">{cat.icon}</span>
+              <span aria-hidden className="text-base">{taskIcon(t)}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm">{t.title}</span>
                 <span className="block text-xs text-muted-foreground">{detail}</span>
