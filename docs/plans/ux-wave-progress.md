@@ -3,7 +3,7 @@
 - Last commit: (iteration 19 commit; see log)
 - Next step: none (loop done; HUMAN items below)
 - Worktree: the loop runs in `../TravelWith-ux-wave` (the main checkout is on `feature/idea-video`).
-- Human actions pending: (01) review the landing copy; (02) push `feature/ux-wave` and open the PR (draft below); (00) migration number clash: `feature/idea-video` also adds `020_idea_video.sql`; whichever branch merges second renumbers its file to 021; (0) apply `supabase/migrations/020_item_icons.sql` on production BEFORE deploying this branch (choosing an icon fails without it; plain creates keep working); (1) set `AGENT_RESUME_SECRET` in Vercel and run `docs/plans/ux-wave-hitl-check.md` (H.V); (2) set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
+- Human actions pending: (01) review the landing copy; (02) push `feature/ux-wave` and open the PR (draft below); (00) migration number clash resolved: `feature/ux-wave` merges first and keeps `020_item_icons.sql`; `feature/idea-video` must rename `020_idea_video.sql` to `021_idea_video.sql` before it merges; (0) apply `supabase/migrations/020_item_icons.sql` on production BEFORE deploying this branch (choosing an icon fails without it; plain creates keep working); (1) set `AGENT_RESUME_SECRET` in Vercel and run `docs/plans/ux-wave-hitl-check.md` (H.V); (2) set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
 
 ## Steps
 - [x] L.1 Entry split: server `page.tsx` + `EntryGate` + `shouldEnterApp()`
@@ -38,7 +38,7 @@
 - **Save feedback**: Google-Calendar-style snackbar after the server confirms creates, deletes (with "Deshacer"), completions and edits (once, when the editor closes); header shows "Guardando… / Guardado · hace X / Error al guardar", also on mobile.
 
 ### Before deploying
-1. Apply `supabase/migrations/020_item_icons.sql` (renumber to 021 if `feature/idea-video` merges first with its own 020).
+1. Apply `supabase/migrations/020_item_icons.sql` (this branch merges first; `feature/idea-video` renumbers its migration to 021).
 2. Set `AGENT_RESUME_SECRET` (required in production) and optionally `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_DEMO_VIDEO_URL`.
 
 ### Testing
