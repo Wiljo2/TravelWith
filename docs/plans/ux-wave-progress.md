@@ -1,7 +1,7 @@
 # UX wave 1 progress
-- Iteration: 16
-- Last commit: (iteration 16 commit; see log)
-- Next step: S.3
+- Iteration: 17
+- Last commit: (iteration 17 commit; see log)
+- Next step: S.V
 - Worktree: the loop runs in `../TravelWith-ux-wave` (the main checkout is on `feature/idea-video`).
 - Human actions pending: (00) migration number clash: `feature/idea-video` also adds `020_idea_video.sql`; whichever branch merges second renumbers its file to 021; (0) apply `supabase/migrations/020_item_icons.sql` on production BEFORE deploying this branch (choosing an icon fails without it; plain creates keep working); (1) set `AGENT_RESUME_SECRET` in Vercel and run `docs/plans/ux-wave-hitl-check.md` (H.V); (2) set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
 
@@ -22,7 +22,7 @@
 - [x] I.V Verify icons (old trip, override persists, syncs)
 - [x] S.1 `OpQueue`: `lastSavedAt` + `send` ack promise
 - [x] S.2 `Snackbar` + `useSnackbar`, save/delete messages, Deshacer on delete
-- [ ] S.3 Header indicator on mobile + "Guardado · hace X"
+- [x] S.3 Header indicator on mobile + "Guardado · hace X"
 - [ ] S.V Verify save feedback
 - [ ] F.1 Docs, `.env.example`, PR description draft (HUMAN: migration, env, push, PR)
 
@@ -45,3 +45,4 @@
 | 14 | 2026-10-09 | I.V | (this commit) | pass (dev server in the worktree, `?local=1`, Playwright 1280px + 375px) | Demo trip renders auto emojis (✈️ vuelo, 🏨 check-in, 🍽️ cena, 🥐 desayuno, 🗺️ tour, 🏛️ museo; tasks ✈️/🏨/🧳). Event picker: 🍽️ → 🎉 updates the list, "Automático" restores 🍽️. Task picker: 🧳 → ⭐. At 375px the grid fits (right edge 323px), no horizontal scroll. Old trips: icon is optional, rows without it fall back automatically (covered by tripRows/row tests). Persistence/sync across tabs needs migration 020 on a real database (HUMAN, with H.V). |
 | 15 | 2026-10-09 | S.1 | (this commit) | tsc ok, 486 tests ok, lint 0 errors, build ok | `OpQueue.send` returns `Promise<OpOutcome>` (ok / conflict / failed, never rejects); merged updates share their request's outcome; ops dropped behind a 409 resolve conflict; 503 stays pending until the retry settles. `lastSavedAt` set on every 200 and passed through `onState`; `useTripOps` exposes it; LOCAL room resolves ok immediately. |
 | 16 | 2026-10-09 | S.2 | (this commit) | tsc ok, 492 tests ok, lint 0 errors, build ok | `Snackbar` + `useSnackbar` (one at a time, 4 s / 6 s with action, `aria-live`); `Toast.tsx`/`ToastAction` removed, drag undo migrated. Notifies only on outcome ok: Evento creado / eliminado (+Deshacer, same id) / guardado (once, when the editor closes after edits and `flush()` succeeds); Tarea creada / completada / eliminada (+Deshacer incl. options); Gasto agregado / guardado (row ✓) / eliminado. Deletes are hard (`delete_trip_row`), so restoring the same id is valid. Orchestrator: event undo also restores `documentId`. Not restored: cross-day spans and expense links removed by the delete. |
+| 17 | 2026-10-09 | S.3 | (this commit) | tsc ok, 494 tests ok, lint 0 errors, build ok | Done by the orchestrator (small step). Header status: "Guardando…" / "Guardado" / "Error al guardar" now visible on mobile too (only "Al día" stays desktop-only); desktop adds "· hace N min / h" from `lastSavedAt` via `useNow`; `role=status` + `aria-live`. Pure helpers in `src/utils/syncLabel.ts` with tests. |

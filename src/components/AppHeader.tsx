@@ -6,6 +6,8 @@ import AuthButton from "@/components/auth/AuthButton";
 import { fmtTripDates } from "@/utils/tripDays";
 import { cn } from "@/lib/utils";
 import type { SyncState } from "@/hooks/useTripOps";
+import { useNow } from "@/hooks/useNow";
+import { savedAgo, syncLabel } from "@/utils/syncLabel";
 import type { TripInfo } from "@/types";
 import type { ReportKind } from "@/utils/tripReport";
 
@@ -13,6 +15,7 @@ interface AppHeaderProps {
   roomCode: string;
   connected: boolean;
   saveState: SyncState;
+  lastSavedAt: number | null;
   trip: TripInfo | null;
   // Owner only; the menu item is hidden without it.
   onReset?: () => void;
@@ -28,18 +31,22 @@ const FALLBACK = {
   subtitle: "Viaje en grupo",
 };
 
-const SYNC: Record<SyncState, { label: string; dot: string }> = {
-  idle:   { label: "Al día",          dot: "bg-primary" },
-  saving: { label: "Guardando…",      dot: "bg-amber-400 animate-pulse" },
-  saved:  { label: "Guardado",        dot: "bg-primary" },
-  error:  { label: "Error al guardar", dot: "bg-destructive" },
+const DOT: Record<SyncState, string> = {
+  idle: "bg-primary",
+  saving: "bg-amber-400 animate-pulse",
+  saved: "bg-primary",
+  error: "bg-destructive",
 };
 
 const ITEM = "flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-foreground outline-none data-highlighted:bg-secondary";
 
-export default function AppHeader({ roomCode, connected, saveState, trip, onReset, onLeaveRoom, onOpenActivity, onDownloadPdf }: AppHeaderProps) {
+export default function AppHeader({ roomCode, connected, saveState, lastSavedAt, trip, onReset, onLeaveRoom, onOpenActivity, onDownloadPdf }: AppHeaderProps) {
   const local = roomCode === "LOCAL";
-  const sync = connected ? SYNC[saveState] : { label: "Conectando…", dot: "bg-muted-foreground animate-pulse" };
+  const now = useNow();
+  const ago = connected ? savedAgo(saveState, lastSavedAt, now.getTime()) : null;
+  const sync = connected
+    ? { label: syncLabel(saveState), dot: DOT[saveState] }
+    : { label: "Conectando…", dot: "bg-muted-foreground animate-pulse" };
   const [copied, setCopied] = useState(false);
 
   function download(kind: ReportKind) {
@@ -69,9 +76,17 @@ export default function AppHeader({ roomCode, connected, saveState, trip, onRese
 
       <div className="flex shrink-0 items-center gap-1.5 md:gap-2.5">
         {!local && (
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground" title={sync.label}>
-            <span className={cn("h-2 w-2 rounded-full", sync.dot)} />
-            <span className="hidden md:inline">{sync.label}</span>
+          <span
+            role="status"
+            aria-live="polite"
+            className={cn("flex items-center gap-1.5 text-xs text-muted-foreground", saveState === "error" && "text-destructive")}
+            title={ago ? `${sync.label} · ${ago}` : sync.label}
+          >
+            <span className={cn("h-2 w-2 shrink-0 rounded-full", sync.dot)} />
+            <span className={cn("whitespace-nowrap", saveState === "idle" && "hidden md:inline")}>
+              {sync.label}
+              {ago && <span className="hidden md:inline"> · {ago}</span>}
+            </span>
           </span>
         )}
 

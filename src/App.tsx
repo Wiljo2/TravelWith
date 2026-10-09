@@ -177,6 +177,7 @@ export default function App() {
         roomCode={roomCode}
         connected={connected || localMode}
         saveState={ops.syncState}
+        lastSavedAt={ops.lastSavedAt}
         trip={trip}
         onReset={isOwner ? () => {
           if (confirm("¿Restablecer el itinerario? Se perderán las actividades del calendario.")) {
