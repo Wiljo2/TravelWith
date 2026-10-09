@@ -4,12 +4,14 @@ import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 import RegisterServiceWorker from "@/components/RegisterServiceWorker";
 import { ENTRY_SCRIPT } from "@/components/landing/entryScript";
+import { SITE_DESCRIPTION, SITE_TITLE, siteUrl } from "@/lib/site";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: "TravelWith",
-  description: "Planificador colaborativo de viajes en grupo · itinerario, presupuesto y tareas en tiempo real",
+  metadataBase: siteUrl(),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
   applicationName: "TravelWith",
   appleWebApp: {
     capable: true,
@@ -17,6 +19,15 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   formatDetection: { telephone: false },
+  openGraph: {
+    type: "website",
+    locale: "es_CO",
+    siteName: "TravelWith",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: "/",
+  },
+  twitter: { card: "summary_large_image", title: SITE_TITLE, description: SITE_DESCRIPTION },
 };
 
 export const viewport: Viewport = {
