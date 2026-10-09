@@ -15,13 +15,15 @@ export type PostOp = (op: string, args: Record<string, unknown>, expectedVersion
 
 export type SyncState = "idle" | "saving" | "saved" | "error";
 
+export type OpOutcome = "ok" | "conflict" | "failed";
+
 export interface OpQueueHandlers {
   onConflict: (table: TripTable, id: string, current: Row | null) => void;
   onFailure: (op: string, status: number) => void;
   onResync: () => void;
   onTrip: (header: Record<string, unknown>) => void;
   onRows: (rows: { table: TripTable; row: Row }[]) => void;
-  onState: (state: SyncState) => void;
+  onState: (state: SyncState, lastSavedAt: number | null) => void;
   // Writes are paused server-side (503 during the cut-over); ops are kept and retried.
   onMaintenance: (active: boolean) => void;
 }
@@ -31,6 +33,7 @@ const MAINTENANCE_RETRY_MS = 15_000;
 interface QueuedOp {
   op: string;
   args: Record<string, unknown>;
+  resolvers: ((outcome: OpOutcome) => void)[];
 }
 
 interface ChangeBody {
@@ -68,6 +71,7 @@ export class OpQueue {
   private pendingCreates = new Set<string>();
   private failed = false;
   private maintenance = false;
+  private savedAt: number | null = null;
   private idleWaiters: ((ok: boolean) => void)[] = [];
 
   constructor(
@@ -111,20 +115,29 @@ export class OpQueue {
     return true;
   }
 
+  get lastSavedAt(): number | null {
+    return this.savedAt;
+  }
+
   idle(): boolean {
     return this.pending() === 0;
   }
 
-  send(op: string, args: Record<string, unknown>) {
+  send(op: string, args: Record<string, unknown>): Promise<OpOutcome> {
     const { key } = opTarget(op, args);
     const queue = this.queues.get(key) ?? [];
     const last = queue[queue.length - 1];
-    if (last && last.op === op && MERGEABLE(op)) last.args = { ...last.args, ...args };
-    else queue.push({ op, args });
+    const result = new Promise<OpOutcome>((resolve) => {
+      if (last && last.op === op && MERGEABLE(op)) {
+        last.args = { ...last.args, ...args };
+        last.resolvers.push(resolve);
+      } else queue.push({ op, args, resolvers: [resolve] });
+    });
     this.queues.set(key, queue);
     if (op.endsWith(".create") || op === "traveler.add") this.pendingCreates.add(key);
     this.emitState();
     void this.pump(key);
+    return result;
   }
 
   private pending(): number {
@@ -135,7 +148,7 @@ export class OpQueue {
 
   private emitState() {
     const pending = this.pending();
-    this.handlers.onState(pending > 0 ? "saving" : this.failed ? "error" : "saved");
+    this.handlers.onState(pending > 0 ? "saving" : this.failed ? "error" : "saved", this.savedAt);
     if (pending === 0) for (const resolve of this.idleWaiters.splice(0)) resolve(!this.failed);
   }
 
@@ -181,7 +194,12 @@ export class OpQueue {
       this.handlers.onMaintenance(false);
     }
     this.pendingCreates.delete(key);
-    if (this.handle(next.op, table, id, res)) this.queues.delete(key);
+    const outcome: OpOutcome = res.status === 200 ? "ok" : res.status === 409 && table && id ? "conflict" : "failed";
+    if (this.handle(next.op, table, id, res)) {
+      for (const dropped of this.queues.get(key) ?? []) for (const resolve of dropped.resolvers) resolve("conflict");
+      this.queues.delete(key);
+    }
+    for (const resolve of next.resolvers) resolve(outcome);
 
     this.busy.delete(key);
     this.emitState();
@@ -192,6 +210,7 @@ export class OpQueue {
     const body = (res.body ?? {}) as ChangeBody;
     if (res.status === 200) {
       this.failed = false;
+      this.savedAt = Date.now();
       for (const c of body.changed ?? []) this.setVersion(c.table, c.row.id, c.row.version);
       for (const d of body.deleted ?? []) this.setVersion(d.table, d.id, null);
       if (body.trip) this.handlers.onTrip(body.trip);
