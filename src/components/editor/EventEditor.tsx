@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import NoteLinks from "@/components/NoteLinks";
 import IconPicker from "@/components/IconPicker";
+import ConfirmDelete from "@/components/ConfirmDelete";
 import { DEFAULT_EVENT_ICON } from "@/constants/itemIcons";
 import type { CalendarEvent, Day } from "@/types";
 import { LIMITS } from "@/constants/limits";
@@ -111,13 +112,17 @@ export default function EventEditor({
       </div>
 
       {onDelete && (
-        <Button
-          variant="outline"
-          onClick={onDelete}
-          className="w-full border-[#F09595] bg-[#FCEBEB] text-xs font-medium text-[#A32D2D] hover:bg-[#FCEBEB]/80 hover:text-[#A32D2D]"
-        >
-          {deleteLabel}
-        </Button>
+        <ConfirmDelete name={ev.title} onConfirm={onDelete}>
+          {(ask) => (
+            <Button
+              variant="outline"
+              onClick={ask}
+              className="w-full border-[#F09595] bg-[#FCEBEB] text-xs font-medium text-[#A32D2D] hover:bg-[#FCEBEB]/80 hover:text-[#A32D2D]"
+            >
+              {deleteLabel}
+            </Button>
+          )}
+        </ConfirmDelete>
       )}
     </div>
   );

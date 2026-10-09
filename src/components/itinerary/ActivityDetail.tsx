@@ -5,6 +5,7 @@ import LocationSection from "@/components/itinerary/LocationSection";
 import RangesSection from "@/components/itinerary/RangesSection";
 import DocumentPicker from "@/components/documents/DocumentPicker";
 import { Disclosure } from "@/components/ui/disclosure";
+import ConfirmDelete from "@/components/ConfirmDelete";
 import { extraGroupUSD, fmtUSD } from "@/utils/currency";
 import type { CalendarEvent, Day, EventPlace, Extra, TripDocument, TripSpan } from "@/types";
 
@@ -79,12 +80,18 @@ export default function ActivityDetail({
         </Disclosure>
       </div>
 
-      <button
-        onClick={onDelete}
-        className="mt-4 cursor-pointer self-center rounded-lg px-3 py-2 text-[13px] font-medium text-destructive hover:bg-destructive/10"
-      >
-        Eliminar actividad
-      </button>
+      <div className="mt-4 flex justify-center">
+        <ConfirmDelete name={selected.ev.title} onConfirm={onDelete}>
+          {(ask) => (
+            <button
+              onClick={ask}
+              className="cursor-pointer rounded-lg px-3 py-2 text-[13px] font-medium text-destructive hover:bg-destructive/10"
+            >
+              Eliminar actividad
+            </button>
+          )}
+        </ConfirmDelete>
+      </div>
     </div>
   );
 }
