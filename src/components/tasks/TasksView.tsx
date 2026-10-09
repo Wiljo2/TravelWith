@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import TaskOptions from "@/components/tasks/TaskOptions";
 import NoteLinks from "@/components/NoteLinks";
+import IconPicker from "@/components/IconPicker";
 import { LIMITS } from "@/constants/limits";
 import { useIsTouch } from "@/hooks/useMediaQuery";
 
@@ -279,6 +280,16 @@ function TaskRow({
                 </button>
               );
             })}
+          </div>
+
+          <div className="flex items-start gap-2">
+            <span className="pt-3 text-xs text-secondary-foreground">Ícono</span>
+            <IconPicker
+              value={task.icon}
+              title={task.title}
+              fallback={(TASK_CATEGORIES[task.cat ?? DEFAULT_TASK_CAT] ?? TASK_CATEGORIES[DEFAULT_TASK_CAT]).icon}
+              onChange={(icon) => onUpdate({ icon })}
+            />
           </div>
 
           <div className="flex gap-[5px]">
