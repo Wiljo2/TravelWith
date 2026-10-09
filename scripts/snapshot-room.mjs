@@ -25,7 +25,7 @@ if (!url || !key) {
 }
 
 const supabase = createClient(url, key, { auth: { persistSession: false } });
-const { data, error } = await supabase.from("rooms").select("payload, members").eq("code", code).maybeSingle();
+const { data, error } = await supabase.rpc("get_trip", { p_code: code });
 if (error) throw error;
 if (!data) {
   console.error(`Room ${code} not found`);

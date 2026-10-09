@@ -1,4 +1,4 @@
-import type { RoomPayload, CalendarEvent, Day } from "@/types";
+import type { RoomPayload, Day } from "@/types";
 import { LIMITS } from "@/constants/limits";
 
 // Validation failure with a message the agent (or an API consumer) can act on.
@@ -37,20 +37,6 @@ export function requireDay(payload: RoomPayload, dayId: string): Day {
     throw new DomainError(`Day "${dayId}" not found. Valid days: ${ids}`);
   }
   return day;
-}
-
-export function findEvent(payload: RoomPayload, eventId: string): { day: Day; event: CalendarEvent } | null {
-  for (const day of payload.days) {
-    const event = day.events.find((e) => e.id === eventId);
-    if (event) return { day, event };
-  }
-  return null;
-}
-
-export function requireEvent(payload: RoomPayload, eventId: string): { day: Day; event: CalendarEvent } {
-  const found = findEvent(payload, eventId);
-  if (!found) throw new DomainError(`Event "${eventId}" not found. Use get_day_detail to list current event ids.`);
-  return found;
 }
 
 const CLIENT_ID_RE =/^[A-Za-z0-9_-]+$/;

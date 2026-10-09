@@ -251,6 +251,18 @@ export interface RoomMember {
   joinedAt: string;
 }
 
+// One entry of the trip history (trip_changes), as the activity panel shows it.
+export interface ActivityEntry {
+  id: number;
+  table: string;
+  rowId: string;
+  op: "INSERT" | "UPDATE" | "DELETE";
+  at: string;
+  userName: string | null;
+  label: string | null;
+  fields: string[];
+}
+
 export interface ToastAction {
   title: string;
   newStart: number;

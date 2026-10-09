@@ -1,5 +1,7 @@
 # Migration rehearsal runbook (step 2.3)
 
+> Historical: the production cut-over ran on 2026-10-09. `scripts/check-payloads.ts` was removed in step 5.1 (find it in git history, e.g. commit `52508d5`, if a payload check is needed again).
+
 Rehearse the payload-to-tables migration on a **copy of production in staging** before the cut-over. It shows whether every trip migrates cleanly and how long it takes. Step 4.1 (the cut-over) only happens once this rehearsal ends with **0 differences**.
 
 Production is only **read** here: one read-only script and one data dump. Every write happens in staging.

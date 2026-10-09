@@ -17,6 +17,7 @@ import TabBar from "@/components/TabBar";
 import type { Tab } from "@/components/TabBar";
 import AppHeader from "@/components/AppHeader";
 import OfflineBanner from "@/components/OfflineBanner";
+import ActivityDialog from "@/components/ActivityDialog";
 import SyncNotice from "@/components/SyncNotice";
 import MaintenanceBanner from "@/components/MaintenanceBanner";
 import { downloadTripPdf } from "@/lib/tripPdf";
@@ -74,6 +75,7 @@ export default function App() {
   }
 
   const [toastAction, setToastAction] = useState<ToastAction | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
   const dismissToast = useCallback(() => setToastAction(null), []);
 
   const people = Math.max(1, members.length + mockPeople.length);
@@ -189,8 +191,10 @@ export default function App() {
           }
         } : undefined}
         onLeaveRoom={() => { data.resetLocalSeed(); setRoomCode(null); }}
+        onOpenActivity={localMode ? undefined : () => setActivityOpen(true)}
         onDownloadPdf={(kind) => downloadTripPdf(kind, { trip, days, documents, travelers: [...members, ...mockPeople].map((p) => p.name) })}
       />
+      {!localMode && <ActivityDialog open={activityOpen} onOpenChange={setActivityOpen} roomCode={roomCode} accessToken={session?.access_token} />}
       {offlineSince && <OfflineBanner since={offlineSince} />}
 
       <TabBar active={activeTab} onChange={setActiveTab} pendingTaskCount={pendingTaskCount} />
