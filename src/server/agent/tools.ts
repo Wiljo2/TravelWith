@@ -1,11 +1,12 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { RoomPayload } from "@/types";
-import { TripStoreError, loadRoom, mutateRoom } from "@/server/trip-store";
 import { DomainError } from "@/server/domain/core";
-import { addEvent, updateEvent, deleteEvent } from "@/server/domain/events";
-import { addTask, updateTask, deleteTask } from "@/server/domain/tasks";
-import { addExtra, updateExtra, removeExtra, setExchangeRate } from "@/server/domain/extras";
 import { tripOverview, dayDetail, budgetDetail } from "@/server/domain/read";
+import { HttpError } from "@/server/http";
+import { runOp } from "@/server/ops";
+import type { OpContext, OpResult } from "@/server/ops/types";
+import { RowConflictError, RowNotFoundError } from "@/server/repo/errors";
+import { getTrip } from "@/server/repo/trip";
 import { DEFAULT_EVENT_CAT, EVENT_CATEGORY_KEYS } from "@/constants/categories";
 import { TASK_CATEGORIES } from "@/constants/taskCategories";
 
@@ -67,7 +68,7 @@ const ALL_TOOLS: Anthropic.Tool[] = [
   {
     name: "update_event",
     description:
-      "Edit an existing event: title, times, category, note, or move it to another day (pass dayId). Only pass the fields to change.",
+      "Edit an existing event: title, times, category, note, or move it to another day (pass dayId, optionally with new start/end). Only pass the fields to change. Fails if someone else changed the event at the same time: re-read it and retry.",
     input_schema: schema(
       {
         eventId: { type: "string", description: "Event id from get_day_detail" },
@@ -84,7 +85,7 @@ const ALL_TOOLS: Anthropic.Tool[] = [
   {
     name: "delete_event",
     description:
-      "Delete an event from the calendar. Linked expenses are kept but unlinked. Confirm with the user before deleting several events at once.",
+      "Delete an event from the calendar. Linked expenses are kept but unlinked; cross-day ranges that start or end at the event are removed. Confirm with the user before deleting several events at once.",
     input_schema: schema({ eventId: { type: "string" } }, ["eventId"]),
   },
   {
@@ -206,26 +207,62 @@ function peopleCount(payload: RoomPayload, memberCount: number): number {
   return Math.max(1, memberCount + (payload.mockPeople?.length ?? 0));
 }
 
-// Applies a mutation with the store's read-modify-write retry, capturing the
-// domain result of the attempt that actually persisted.
-async function withMutation<T>(
-  code: string,
-  fn: (payload: RoomPayload) => { payload: RoomPayload; result: T },
-): Promise<T> {
-  let captured: T | undefined;
-  await mutateRoom(code, (payload) => {
-    const { payload: next, result } = fn(payload);
-    captured = result;
-    return next;
-  });
-  return captured as T;
+async function readTrip(code: string) {
+  const trip = await getTrip(code);
+  if (!trip) throw new DomainError("The trip no longer exists.");
+  return trip;
 }
 
-export async function executeTool(
-  code: string,
-  name: string,
-  input: Record<string, unknown>,
-): Promise<ToolOutcome> {
+type Input = Record<string, unknown>;
+type OpCall = { op: string; args: Input };
+
+function rename(input: Input, from: string): Input {
+  const { [from]: id, ...rest } = input;
+  return { id, ...rest };
+}
+
+function pick(input: Input, keys: string[]): Input {
+  return Object.fromEntries(keys.filter((k) => input[k] !== undefined).map((k) => [k, input[k]]));
+}
+
+// Tool inputs keep their original shape (the model and the prompt know them);
+// each write tool becomes one or two ops of the registry, the same path as
+// the app, so validation, limits, versions and history are shared.
+const WRITE_TOOLS: Record<string, (input: Input) => OpCall[]> = {
+  create_event: (input) => [{ op: "event.create", args: input }],
+  update_event: (input) => {
+    const args = rename(input, "eventId");
+    if (args.dayId === undefined) return [{ op: "event.update", args }];
+    const calls: OpCall[] = [{ op: "event.move", args: pick(args, ["id", "dayId", "start", "end"]) }];
+    const rest = pick(args, ["title", "cat", "note"]);
+    if (Object.keys(rest).length) calls.push({ op: "event.update", args: { id: args.id, ...rest } });
+    return calls;
+  },
+  delete_event: (input) => [{ op: "event.delete", args: rename(input, "eventId") }],
+  create_task: (input) => [{ op: "task.create", args: input }],
+  update_task: (input) => [{ op: "task.update", args: rename(input, "taskId") }],
+  delete_task: (input) => [{ op: "task.delete", args: rename(input, "taskId") }],
+  add_expense: (input) => [{ op: "expense.create", args: input }],
+  update_expense: (input) => [{ op: "expense.update", args: rename(input, "extraId") }],
+  remove_expense: (input) => [{ op: "expense.delete", args: rename(input, "extraId") }],
+  set_exchange_rate: (input) => [{ op: "trip.setExchangeRate", args: input }],
+};
+
+function publicRow(row: object): Input {
+  const { room_code: _code, updated_at: _at, updated_by: _by, ...rest } = row as Input;
+  return rest;
+}
+
+function summarize(results: OpResult[]) {
+  return {
+    ok: true,
+    changed: results.flatMap((r) => r.changed.map(({ table, row }) => ({ table, ...publicRow(row) }))),
+    deleted: results.flatMap((r) => r.deleted),
+    ...(results.some((r) => r.trip) ? { trip: results.findLast((r) => r.trip)?.trip } : {}),
+  };
+}
+
+export async function executeTool(ctx: OpContext, name: string, input: Input): Promise<ToolOutcome> {
   if (!isToolEnabled(name)) {
     return {
       content: `Tool "${name}" is disabled. Tell the user to make this change themselves in the app.`,
@@ -233,88 +270,39 @@ export async function executeTool(
     };
   }
   try {
-    const result = await runTool(code, name, input);
+    const result = await runTool(ctx, name, input);
     return { content: JSON.stringify(result), isError: false };
   } catch (e) {
-    if (e instanceof DomainError) {
-      return { content: e.message, isError: true };
+    if (e instanceof DomainError) return { content: e.message, isError: true };
+    if (e instanceof RowConflictError) {
+      return { content: "That item was changed by someone else at the same time. Re-read it and try again.", isError: true };
     }
-    // Lost the concurrency race twice: let the model re-read and retry.
-    if (e instanceof TripStoreError && e.status === 409) {
-      return { content: "The trip was changed by someone else at the same time. Re-read it and try again.", isError: true };
+    if (e instanceof RowNotFoundError) {
+      return { content: "That item no longer exists (someone may have deleted it). Re-read the trip.", isError: true };
     }
+    if (e instanceof HttpError && e.status < 500) return { content: e.message, isError: true };
     throw e;
   }
 }
 
-async function runTool(code: string, name: string, input: Record<string, unknown>): Promise<unknown> {
+async function runTool(ctx: OpContext, name: string, input: Input): Promise<unknown> {
   switch (name) {
     case "get_trip_overview": {
-      const { payload, members } = await loadRoom(code);
+      const { payload, members } = await readTrip(ctx.code);
       return tripOverview(payload, peopleCount(payload, members.length));
     }
     case "get_day_detail": {
-      const { payload } = await loadRoom(code);
+      const { payload } = await readTrip(ctx.code);
       return dayDetail(payload, String(input.dayId));
     }
     case "get_budget": {
-      const { payload, members } = await loadRoom(code);
+      const { payload, members } = await readTrip(ctx.code);
       return budgetDetail(payload, peopleCount(payload, members.length));
     }
-    case "create_event":
-      return withMutation(code, (p) => {
-        const { payload, event } = addEvent(p, input as never);
-        return { payload, result: { ok: true, event } };
-      });
-    case "update_event":
-      return withMutation(code, (p) => {
-        const { eventId, ...patch } = input as { eventId: string } & Record<string, unknown>;
-        const { payload, event } = updateEvent(p, eventId, patch as never);
-        return { payload, result: { ok: true, event } };
-      });
-    case "delete_event":
-      return withMutation(code, (p) => {
-        const { payload, event } = deleteEvent(p, String(input.eventId));
-        return { payload, result: { ok: true, deleted: event.title } };
-      });
-    case "create_task":
-      return withMutation(code, (p) => {
-        const { payload, task } = addTask(p, input as never);
-        return { payload, result: { ok: true, task } };
-      });
-    case "update_task":
-      return withMutation(code, (p) => {
-        const { taskId, ...patch } = input as { taskId: string } & Record<string, unknown>;
-        const { payload, task } = updateTask(p, taskId, patch as never);
-        return { payload, result: { ok: true, task } };
-      });
-    case "delete_task":
-      return withMutation(code, (p) => {
-        const { payload, task } = deleteTask(p, String(input.taskId));
-        return { payload, result: { ok: true, deleted: task.title } };
-      });
-    case "add_expense":
-      return withMutation(code, (p) => {
-        const { payload, extra } = addExtra(p, input as never);
-        return { payload, result: { ok: true, expense: extra } };
-      });
-    case "update_expense":
-      return withMutation(code, (p) => {
-        const { extraId, ...patch } = input as { extraId: string } & Record<string, unknown>;
-        const { payload, extra } = updateExtra(p, extraId, patch as never);
-        return { payload, result: { ok: true, expense: extra } };
-      });
-    case "remove_expense":
-      return withMutation(code, (p) => {
-        const { payload, extra } = removeExtra(p, String(input.extraId));
-        return { payload, result: { ok: true, deleted: extra.label } };
-      });
-    case "set_exchange_rate":
-      return withMutation(code, (p) => {
-        const { payload } = setExchangeRate(p, Number(input.rate));
-        return { payload, result: { ok: true, exchangeRate: Number(input.rate) } };
-      });
-    default:
-      throw new DomainError(`Unknown tool "${name}"`);
   }
+  const toOps = WRITE_TOOLS[name];
+  if (!toOps) throw new DomainError(`Unknown tool "${name}"`);
+  const results: OpResult[] = [];
+  for (const { op, args } of toOps(input)) results.push(await runOp(op, ctx, { args }));
+  return summarize(results);
 }

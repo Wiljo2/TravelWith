@@ -14,7 +14,8 @@ const optId = id.nullish();
 const text = (max: number) => z.string().max(max);
 const hour = z.number().min(0).max(48);
 const money = z.number();
-const color = z.string().regex(/^(#[0-9a-fA-F]{3,8}|transparent|rgba?\([\d\s.,%]+\))$/);
+export const COLOR_RE = /^(#[0-9a-fA-F]{3,8}|transparent|rgba?\([\d\s.,%]+\))$/;
+const color = z.string().regex(COLOR_RE);
 const currency = z.enum(["USD", "COP"]).nullish();
 const splitMode = z.enum(["group", "perPerson"]).nullish();
 

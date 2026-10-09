@@ -1,12 +1,22 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
-import { loadSnapshot, saveSnapshot, updateSnapshotPayload } from "@/lib/offline";
+import { useTripChannel } from "@/hooks/useTripChannel";
+import { needsRefetch, type TripMessage } from "@/utils/tripChannel";
+import { loadSnapshot, saveSnapshot } from "@/lib/offline";
 import type { RoomMember, RoomPayload } from "@/types";
+import type { Row, TripTable } from "@/utils/tripRows";
 
 export type { MockPerson, RoomPayload } from "@/types";
 
-export type SaveState = "idle" | "saving" | "saved" | "error";
+export interface RoomHandlers {
+  onLoad: (payload: RoomPayload) => void;
+  onRow: (table: TripTable, id: string, row: Row | null, version: number) => void;
+  onHeader: (header: Record<string, unknown>) => void;
+  // The room was deleted or we were removed from it.
+  onGone: () => void;
+  // Refetching replaces local state, so it waits while writes are pending.
+  canResync: () => boolean;
+}
 
 interface UseRoomResult {
   connected: boolean;
@@ -14,80 +24,30 @@ interface UseRoomResult {
   // when that copy was taken (ISO).
   offlineSince: string | null;
   members: RoomMember[];
-  saveState: SaveState;
-  // Resolves true only when this payload reached the database. `force` saves even
-  // right after a remote update (autosave skips that echo).
-  save: (payload: RoomPayload, opts?: { force?: boolean }) => Promise<boolean>;
+  reload: () => void;
 }
 
-export function useRoom(
-  code: string | null,
-  accessToken: string | undefined,
-  onRemoteUpdate: (payload: RoomPayload) => void,
-): UseRoomResult {
-  const [connected, setConnected] = useState(false);
+const RESYNC_DEBOUNCE_MS = 250;
+const RESYNC_RETRY_MS = 1000;
+
+// Loads the trip (assembled from the trip tables by GET /api/rooms/[code])
+// and applies live changes from the private trip channel. Writes go through
+// useTripOps.
+export function useRoom(code: string | null, accessToken: string | undefined, handlers: RoomHandlers): UseRoomResult {
+  const [loaded, setLoaded] = useState(false);
   const [members, setMembers] = useState<RoomMember[]>([]);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
   const [offlineSince, setOfflineSince] = useState<string | null>(null);
-  // Bumped when the network comes back, to load the room again.
-  const [attempt, setAttempt] = useState(0);
-  const skipSave = useRef(false);
-  const lastUpdatedAt = useRef<string | null>(null);
-  // Tokens refresh about hourly; a ref keeps saves current without resubscribing.
+  // Tokens refresh about hourly; refs keep requests current without resubscribing.
   const token = useRef(accessToken);
+  const h = useRef(handlers);
   useEffect(() => {
     token.current = accessToken;
-  }, [accessToken]);
+    h.current = handlers;
+  });
   const hasToken = !!accessToken;
 
-  const save = useCallback(
-    async (payload: RoomPayload, opts?: { force?: boolean }) => {
-      if (!code || code === "LOCAL") return false;
-      if (skipSave.current && !opts?.force) {
-        skipSave.current = false;
-        return false;
-      }
-      setSaveState("saving");
-      try {
-        const res = await apiFetch(`/api/rooms/${code}`, token.current, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...payload, expectedUpdatedAt: lastUpdatedAt.current ?? undefined }),
-        });
-
-        if (res.status === 409) {
-          // Someone else saved first — adopt their version instead of overwriting it.
-          const data = await res.json();
-          if (data?.payload?.days) {
-            lastUpdatedAt.current = data.updated_at ?? null;
-            skipSave.current = true;
-            onRemoteUpdate(data.payload);
-          }
-          setSaveState("saved");
-          return false;
-        }
-
-        if (!res.ok) {
-          setSaveState("error");
-          return false;
-        }
-
-        const data = await res.json();
-        if (data?.updated_at) lastUpdatedAt.current = data.updated_at;
-        updateSnapshotPayload(code, payload);
-        setSaveState("saved");
-        return true;
-      } catch {
-        setSaveState("error");
-        return false;
-      }
-    },
-    [code, onRemoteUpdate],
-  );
-
-  useEffect(() => {
-    if (!code || code === "LOCAL" || !hasToken) return;
-
+  const reload = useCallback(() => {
+    if (!code || code === "LOCAL") return;
     apiFetch(`/api/rooms/${code}`, token.current)
       .then((r) => {
         if (!r.ok) throw new Error(`GET room ${r.status}`);
@@ -95,68 +55,70 @@ export function useRoom(
       })
       .then((data) => {
         const p = data?.payload as RoomPayload | undefined;
-        if (data?.updated_at) lastUpdatedAt.current = data.updated_at;
+        const roster = Array.isArray(data?.members) ? (data.members as RoomMember[]) : [];
         if (p?.days && Array.isArray(p.days)) {
-          skipSave.current = true;
-          onRemoteUpdate(p);
-          saveSnapshot(code, { payload: p, members: Array.isArray(data?.members) ? data.members : [] });
+          h.current.onLoad(p);
+          saveSnapshot(code, { payload: p, members: roster });
         }
-        if (Array.isArray(data?.members)) {
-          setMembers(data.members);
-        }
+        setMembers(roster);
         setOfflineSince(null);
-        setConnected(true);
+        setLoaded(true);
       })
       .catch(() => {
-        // No network: show this device's last copy, read-only (autosave waits
-        // for `connected`), and load the room again once the network is back.
-        setConnected(false);
+        // No network: show this device's last copy and load the room again
+        // once the network is back.
+        setLoaded(false);
         const snap = loadSnapshot(code);
         if (!snap) return;
-        skipSave.current = true;
-        onRemoteUpdate(snap.payload);
+        h.current.onLoad(snap.payload);
         setMembers(snap.members);
         setOfflineSince(snap.savedAt);
       });
+  }, [code]);
 
-    if (!supabase) return;
-
-    const channel = supabase
-      .channel(`room-${code}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "rooms", filter: `code=eq.${code}` },
-        ({ new: row }) => {
-          const r = row as { payload: RoomPayload; members?: RoomMember[]; updated_at?: string };
-          // Roster-only changes (join/leave) keep updated_at: don't reload the
-          // payload, or pending local edits would be replaced by the stored copy.
-          const payloadChanged = !r.updated_at || r.updated_at !== lastUpdatedAt.current;
-          if (r.updated_at) lastUpdatedAt.current = r.updated_at;
-          if (payloadChanged && r.payload?.days && Array.isArray(r.payload.days)) {
-            skipSave.current = true;
-            onRemoteUpdate(r.payload);
-            saveSnapshot(code, { payload: r.payload, members: Array.isArray(r.members) ? r.members : loadSnapshot(code)?.members ?? [] });
-          }
-          if (Array.isArray(r.members)) {
-            setMembers(r.members);
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase!.removeChannel(channel);
-      setConnected(false);
+  const resyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleResync = useCallback(() => {
+    const schedule = (delay: number) => {
+      if (resyncTimer.current) clearTimeout(resyncTimer.current);
+      resyncTimer.current = setTimeout(() => {
+        resyncTimer.current = null;
+        if (h.current.canResync()) reload();
+        else schedule(RESYNC_RETRY_MS);
+      }, delay);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, hasToken, attempt]);
+    schedule(RESYNC_DEBOUNCE_MS);
+  }, [reload]);
+
+  useEffect(() => {
+    if (!code || code === "LOCAL" || !hasToken) return;
+    reload();
+    return () => {
+      if (resyncTimer.current) clearTimeout(resyncTimer.current);
+      setLoaded(false);
+    };
+  }, [code, hasToken, reload]);
 
   useEffect(() => {
     if (!offlineSince) return;
-    const retry = () => setAttempt((n) => n + 1);
-    window.addEventListener("online", retry);
-    return () => window.removeEventListener("online", retry);
-  }, [offlineSince]);
+    window.addEventListener("online", reload);
+    return () => window.removeEventListener("online", reload);
+  }, [offlineSince, reload]);
 
-  return { connected, offlineSince, members, saveState, save };
+  const onMessage = useCallback((m: TripMessage) => {
+    if (m.kind === "roomDeleted") return h.current.onGone();
+    if (m.kind === "room") {
+      if (Array.isArray(m.record.members)) setMembers(m.record.members as RoomMember[]);
+      return h.current.onHeader(m.record);
+    }
+    if (needsRefetch(m)) return scheduleResync();
+    h.current.onRow(m.table, m.id, m.row, m.version);
+  }, [scheduleResync]);
+
+  const { subscribed } = useTripChannel(code, hasToken, {
+    onMessage,
+    onResync: () => scheduleResync(),
+    onDenied: () => h.current.onGone(),
+  });
+
+  return { connected: loaded && subscribed, offlineSince, members, reload };
 }

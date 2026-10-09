@@ -1,9 +1,8 @@
 import { MAX_TRIP_DAYS } from "@/utils/tripDays";
 
-// Size limits for persisted trip data. Shared by payload validation (PATCH),
-// the domain layer (agent writes) and the agent chat endpoint.
+// Size limits for trip data. Shared by the row validators (ops and agent
+// writes), the payload schema (reading the frozen backup) and the agent chat.
 export const LIMITS = {
-  bodyBytes: 512 * 1024,
   days: MAX_TRIP_DAYS,
   eventsPerDay: 100,
   spansPerDay: 50,

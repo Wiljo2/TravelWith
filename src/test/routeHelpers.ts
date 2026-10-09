@@ -15,6 +15,7 @@ export const db: { handler: QueryHandler; mock: ReturnType<typeof createSupabase
 export function resetDb(handler: QueryHandler) {
   db.handler = handler;
   db.mock = createSupabaseMock((q) => db.handler(q));
+  return db.mock;
 }
 
 export const supabaseServerMock = {

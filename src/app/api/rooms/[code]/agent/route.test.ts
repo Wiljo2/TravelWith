@@ -61,7 +61,7 @@ describe("agent tools (beta)", () => {
 
   it("refuses a destructive call even if the model invents it", async () => {
     resetDb(() => ({ data: null }));
-    const outcome = await executeTool("ABC123", "delete_event", { eventId: "e1" });
+    const outcome = await executeTool({ code: "ABC123", userId: "u1", role: "owner" }, "delete_event", { eventId: "e1" });
     expect(outcome.isError).toBe(true);
   });
 });

@@ -41,6 +41,7 @@ function builder(table: string, handler: QueryHandler, log: RecordedQuery[]) {
     in(column: string, value: unknown) { q.filters.push({ column, op: "in", value }); return chain; },
     gte(column: string, value: unknown) { q.filters.push({ column, op: "gte", value }); return chain; },
     order() { return chain; },
+    limit() { return chain; },
     maybeSingle() { q.single = true; return Promise.resolve(run()); },
     single() { q.single = true; return Promise.resolve(run()); },
     then<T>(resolve: (v: ReturnType<typeof run>) => T, reject?: (e: unknown) => T) {

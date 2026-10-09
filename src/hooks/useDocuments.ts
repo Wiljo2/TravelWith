@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import type { RoomPayload, TripDocument } from "@/types";
+import { applyToList, rowToDocument, type Row } from "@/utils/tripRows";
 
 export function useDocuments() {
   const [documents, setDocuments] = useState<TripDocument[]>([]);
@@ -18,5 +19,9 @@ export function useDocuments() {
     setDocuments(Array.isArray(payload.documents) ? payload.documents : []);
   }, []);
 
-  return { documents, addDocument, updateDocument, removeDocument, loadPayload };
+  const applyRow = useCallback((id: string, row: Row | null) => {
+    setDocuments((prev) => applyToList(prev, id, row, rowToDocument));
+  }, []);
+
+  return { documents, addDocument, updateDocument, removeDocument, loadPayload, applyRow };
 }

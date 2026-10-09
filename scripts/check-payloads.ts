@@ -1,5 +1,5 @@
-// Read-only check of every stored room against the payload schema, to run
-// before switching PAYLOAD_VALIDATION from "report" to "enforce".
+// Read-only check of every stored room payload against the payload schema.
+// Run before the cut-over: rooms with issues may migrate with skipped rows.
 //
 //   npx tsx --env-file=.env.local scripts/check-payloads.ts
 //
@@ -18,30 +18,42 @@ if (!url || !key) {
 
 const supabase = createClient(url, key, { auth: { persistSession: false } });
 const PAGE = 100;
-let checked = 0;
-let failing = 0;
 
-for (let from = 0; ; from += PAGE) {
-  const { data, error } = await supabase
-    .from("rooms")
-    .select("code, payload")
-    .order("code")
-    .range(from, from + PAGE - 1);
-  if (error) throw error;
-  if (!data?.length) break;
+// Wrapped in a function: tsx runs this file as CommonJS, without top-level await.
+async function main(): Promise<number> {
+  let checked = 0;
+  let failing = 0;
 
-  for (const room of data) {
-    checked++;
-    const bytes = Buffer.byteLength(JSON.stringify(room.payload));
-    const structural = validateRoomPayload(room.payload) ? [] : ["structural check failed"];
-    const issues = [...structural, ...payloadIssues(room.payload)];
-    if (issues.length) {
-      failing++;
-      console.log(`${room.code} (${bytes} bytes)`);
-      for (const issue of issues) console.log(`  - ${issue}`);
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("rooms")
+      .select("code, payload")
+      .order("code")
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+
+    for (const room of data) {
+      checked++;
+      const bytes = Buffer.byteLength(JSON.stringify(room.payload));
+      const structural = validateRoomPayload(room.payload) ? [] : ["structural check failed"];
+      const issues = [...structural, ...payloadIssues(room.payload)];
+      if (issues.length) {
+        failing++;
+        console.log(`${room.code} (${bytes} bytes)`);
+        for (const issue of issues) console.log(`  - ${issue}`);
+      }
     }
   }
+
+  console.log(`\n${checked} rooms checked, ${failing} with issues`);
+  return failing ? 2 : 0;
 }
 
-console.log(`\n${checked} rooms checked, ${failing} with issues`);
-process.exit(failing ? 2 : 0);
+main().then(
+  (code) => process.exit(code),
+  (e) => {
+    console.error(e);
+    process.exit(1);
+  },
+);

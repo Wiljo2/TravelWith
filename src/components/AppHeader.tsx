@@ -5,16 +5,17 @@ import { Copy, Ellipsis, FileDown, LogOut, RotateCcw } from "lucide-react";
 import AuthButton from "@/components/auth/AuthButton";
 import { fmtTripDates } from "@/utils/tripDays";
 import { cn } from "@/lib/utils";
-import type { SaveState } from "@/hooks/useRoom";
+import type { SyncState } from "@/hooks/useTripOps";
 import type { TripInfo } from "@/types";
 import type { ReportKind } from "@/utils/tripReport";
 
 interface AppHeaderProps {
   roomCode: string;
   connected: boolean;
-  saveState: SaveState;
+  saveState: SyncState;
   trip: TripInfo | null;
-  onReset: () => void;
+  // Owner only; the menu item is hidden without it.
+  onReset?: () => void;
   onLeaveRoom: () => void;
   onDownloadPdf: (kind: ReportKind) => Promise<void>;
 }
@@ -25,7 +26,7 @@ const FALLBACK = {
   subtitle: "Viaje en grupo",
 };
 
-const SYNC: Record<SaveState, { label: string; dot: string }> = {
+const SYNC: Record<SyncState, { label: string; dot: string }> = {
   idle:   { label: "Al día",          dot: "bg-primary" },
   saving: { label: "Guardando…",      dot: "bg-amber-400 animate-pulse" },
   saved:  { label: "Guardado",        dot: "bg-primary" },
@@ -97,11 +98,15 @@ export default function AppHeader({ roomCode, connected, saveState, trip, onRese
                   <FileDown className="size-4 text-muted-foreground" />
                   PDF del itinerario completo
                 </Menu.Item>
-                <Menu.Separator className="mx-1 my-1 h-px bg-border" />
-                <Menu.Item className={ITEM} onClick={onReset}>
-                  <RotateCcw className="size-4 text-muted-foreground" />
-                  Restablecer itinerario
-                </Menu.Item>
+                {onReset && (
+                  <>
+                    <Menu.Separator className="mx-1 my-1 h-px bg-border" />
+                    <Menu.Item className={ITEM} onClick={onReset}>
+                      <RotateCcw className="size-4 text-muted-foreground" />
+                      Restablecer itinerario
+                    </Menu.Item>
+                  </>
+                )}
                 <Menu.Separator className="mx-1 my-1 h-px bg-border" />
                 <Menu.Item className={ITEM} onClick={onLeaveRoom}>
                   <LogOut className="size-4 text-muted-foreground" />

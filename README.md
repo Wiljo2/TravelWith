@@ -43,7 +43,7 @@ Open `http://localhost:3000/?local=1` (or the "Modo local" link on the entry scr
 
 `SUPABASE_SERVICE_ROLE_KEY` is required: route handlers use it and enforce trip membership themselves (production refuses requests without it). Browser clients only get rows of trips they belong to.
 
-Optional server settings (see `.env.example`): `AGENT_MODEL`, `AGENT_DAILY_TOKEN_LIMIT`, `AGENT_DESTRUCTIVE_TOOLS`, `PAYLOAD_VALIDATION`.
+Optional server settings (see `.env.example`): `AGENT_MODEL`, `AGENT_DAILY_TOKEN_LIMIT`, `AGENT_DESTRUCTIVE_TOOLS`, `MAINTENANCE_MODE`.
 
 ## Checks
 

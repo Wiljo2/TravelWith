@@ -10,19 +10,19 @@ const DOCUMENT_FIELDS = {
   kind: { type: "string", max: LIMITS.id },
 } as const;
 
-function validateDriveFileId(driveFileId: string) {
+export function validateDriveFileId(driveFileId: string) {
   if (!DRIVE_ID_RE.test(driveFileId)) {
     throw new DomainError("driveFileId must be a plain Google Drive file id (letters, digits, - and _), not a link");
   }
 }
 
-function validateKind(kind: string): asserts kind is DocumentKind {
+export function validateKind(kind: string): asserts kind is DocumentKind {
   if (!(kind in DOCUMENT_KINDS)) {
     throw new DomainError(`Invalid kind "${kind}". Valid: ${Object.keys(DOCUMENT_KINDS).join(", ")}`);
   }
 }
 
-function validateTitle(title: string): string {
+export function validateTitle(title: string): string {
   const t = title.trim();
   if (!t) throw new DomainError("title is required");
   return t;

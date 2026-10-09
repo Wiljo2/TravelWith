@@ -1,4 +1,5 @@
 import type { RoomPayload, CalendarEvent, Day } from "@/types";
+import { LIMITS } from "@/constants/limits";
 
 // Validation failure with a message the agent (or an API consumer) can act on.
 export class DomainError extends Error {}
@@ -50,4 +51,21 @@ export function requireEvent(payload: RoomPayload, eventId: string): { day: Day;
   const found = findEvent(payload, eventId);
   if (!found) throw new DomainError(`Event "${eventId}" not found. Use get_day_detail to list current event ids.`);
   return found;
+}
+
+const CLIENT_ID_RE =/^[A-Za-z0-9_-]+$/;
+
+// Ids chosen by the client (so an optimistic insert keeps its id) share the
+// format of utils/uid; anything else would end up in URLs, logs and channels.
+export function checkClientId(id: unknown, field = "id"): string {
+  if (typeof id !== "string" || !id || id.length > LIMITS.id || !CLIENT_ID_RE.test(id)) {
+    throw new DomainError(`${field} must be 1-${LIMITS.id} letters, digits, "_" or "-"`);
+  }
+  return id;
+}
+
+// The id of the row an op targets, checked before the row is loaded.
+export function argId(args: unknown): string {
+  checkArgs(args, { id: { type: "string", required: true, max: LIMITS.id } });
+  return (args as { id: string }).id;
 }

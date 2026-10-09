@@ -12,8 +12,8 @@ import { LIMITS } from "@/constants/limits";
 
 // Decimal hours ↔ "HH:MM"
 function toTimeStr(h: number): string {
-  const hh = Math.floor(Math.max(0, h));
-  const mm = Math.round((h - hh) * 60);
+  const hh = Math.floor(Math.max(0, h) % 24);
+  const mm = Math.round((Math.max(0, h) % 24 - hh) * 60);
   return `${String(hh).padStart(2, "0")}:${String(mm === 60 ? 0 : mm).padStart(2, "0")}`;
 }
 function fromTimeStr(t: string): number {

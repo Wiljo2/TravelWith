@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { validateRoomPayload } from "@/lib/validate";
-import { loadRoom } from "@/server/trip-store";
+import { getTrip } from "@/server/repo/trip";
 import { requireMember } from "@/server/auth";
 import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
 import { GeocodeError, locateEvents } from "@/server/geocode";
@@ -37,7 +37,9 @@ export async function POST(req: Request, { params }: { params: Params }) {
       if ((await tokensUsedToday(userId)) >= dailyTokenLimit()) {
         throw new HttpError(429, "Alcanzaste el límite diario del asistente. Vuelve a intentarlo mañana.");
       }
-      payload = (await loadRoom(code)).payload;
+      const trip = await getTrip(code);
+      if (!trip) throw new HttpError(404, "Sala no encontrada");
+      payload = trip.payload;
     }
   } catch (e) {
     return errorResponse(e, "POST /api/rooms/[code]/places");

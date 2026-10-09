@@ -62,6 +62,7 @@ export default function TaskOptions({ options, people, exchangeRate, scheduled, 
               <CurrencyToggle currency={cur} onClick={() => patch(o.id, { currency: cur === "USD" ? "COP" : "USD" })} />
               <Input
                 inputMode="numeric"
+                key={o.amount ?? 0}
                 defaultValue={o.amount ? String(o.amount) : ""}
                 onBlur={(e) => patch(o.id, { amount: parseAmount(e.target.value) })}
                 placeholder="Precio"

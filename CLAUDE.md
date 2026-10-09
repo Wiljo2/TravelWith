@@ -8,15 +8,17 @@ Read `GUIDELINES.md` before large features. Operational summary:
 
 ## Architecture
 - Next.js 16 App Router, but the app is a single client tree mounted from `app/page.tsx` → `src/App.tsx`.
-- `App.tsx` composes domain hooks (`useItinerary`, `useBudget`, `useRoom`, `useDragDrop`) and passes everything down via props.
-- Persistence: all trip state is one JSONB `payload` in the `rooms` table (Supabase). Autosave debounced 600ms + Supabase Realtime for member sync.
+- `App.tsx` composes domain hooks (`useItinerary`, `useBudget`, `useTasks`, `useTripInfo`, `useTripOps`, `useRoom`, `useDragDrop`) and passes everything down via props.
+- Persistence: trip header in `rooms` columns, items in one table each (`trip_days`, `trip_events`, `trip_expenses`, `trip_tasks`, …, key `(room_code, id)`, per-row `version`). `rooms.payload` is a frozen backup: never write it.
+- Writes: hooks update state optimistically and send one op per change (`useTripOps` → `POST /api/rooms/[code]/ops`); 409 = stale version, adopt the returned row. Reads: `GET /api/rooms/[code]` (SQL `get_trip`).
+- Realtime: Broadcast from database triggers on the private channel `trip:<code>` (`useTripChannel`); never `postgres_changes`.
 - Backend only in `src/app/api/rooms/**`; the service role key is only used in `lib/supabase-server.ts`.
-- Server-side mutations go through the domain layer: pure functions in `src/server/domain/*` + persistence via `src/server/trip-store.ts` (`mutateRoom` handles concurrency). Never inline Supabase writes for trip state.
+- Server-side writes go through the op registry `src/server/ops/*` (`runOp`): row validation in `src/server/domain/*Rows.ts`, version-guarded repositories in `src/server/repo/*`, multi-row changes as SQL functions. Never inline Supabase writes for trip data.
 - AI assistant: `POST /api/rooms/[code]/agent` (SSE, manual tool loop, `@anthropic-ai/sdk`). `ANTHROPIC_API_KEY` server-only; model via `AGENT_MODEL` (default `claude-sonnet-5`); system prompt in `src/server/agent/prompt.ts` must stay byte-stable (prompt cache) — dynamic data flows through read tools.
 
 ## Hard rules (never break existing features)
-- New fields on persisted types (`Extra`, `Task`, `Day`, `CalendarEvent`, `TripSpan`, `RoomPayload`) are **always optional**, with defaults applied at read time (`x.field ?? DEFAULT`). Never rename or repurpose an existing field.
-- New state that must persist: add it to `RoomPayload`, to `App.tsx`'s `save({...})`, to `onRemoteUpdate`, and to the autosave deps.
+- New columns on trip tables are nullable (or have a default) and the client fields are **optional**, with defaults applied at read time (`x.field ?? DEFAULT`). Never rename or repurpose an existing column or field.
+- New state that must persist: migration (column + check), `src/types/database.ts`, row validator, op, `get_trip`, `utils/tripRows.ts`, and the hook's optimistic update + `applyRow` (checklist in `GUIDELINES.md` §2).
 - SQL migrations: only new files in `supabase/migrations/`, additive only.
 - `npx tsc --noEmit` must pass before considering anything done.
 

@@ -1,13 +1,7 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { useItinerary } from "@/hooks/useItinerary";
+import { useState, useCallback, useMemo } from "react";
 import { useDragDrop } from "@/hooks/useDragDrop";
-import { useBudget } from "@/hooks/useBudget";
-import { useRoom } from "@/hooks/useRoom";
 import { useTripSession } from "@/hooks/useTripSession";
-import { useTasks } from "@/hooks/useTasks";
-import { useIdeas } from "@/hooks/useIdeas";
-import { useTripGeo } from "@/hooks/useTripGeo";
-import { useDocuments } from "@/hooks/useDocuments";
+import { useTripData } from "@/hooks/useTripData";
 import DocumentsPanel from "@/components/documents/DocumentsPanel";
 import { chooseOption } from "@/utils/taskDecision";
 import { HOUR_START, HOUR_END } from "@/constants/time";
@@ -23,13 +17,15 @@ import TabBar from "@/components/TabBar";
 import type { Tab } from "@/components/TabBar";
 import AppHeader from "@/components/AppHeader";
 import OfflineBanner from "@/components/OfflineBanner";
+import SyncNotice from "@/components/SyncNotice";
+import MaintenanceBanner from "@/components/MaintenanceBanner";
 import { downloadTripPdf } from "@/lib/tripPdf";
 import Toast from "@/components/Toast";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
 import IdeasTab from "@/components/ideas/IdeasTab";
 import ItineraryMap from "@/components/map/ItineraryMap";
-import type { MockPerson, RoomPayload, Task, ToastAction, TripInfo, TripSpan } from "@/types";
+import type { Task, ToastAction } from "@/types";
 import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
 import { generateDays, tripDayIndex } from "@/utils/tripDays";
 import { useIsMobile } from "@/hooks/useMediaQuery";
@@ -43,8 +39,9 @@ export default function App() {
   const { roomCode, setRoomCode, resumeAttempted, localMode, auth, userRooms: rooms } = useTripSession();
   const { user, session, loading: authLoading, signInWithGoogle, signOut } = auth;
   const { rooms: userRooms, addRoom, removeRoom } = rooms;
-  // Beta: the assistant is owner-only (enforced server-side too).
-  const canUseAgent = localMode || userRooms.some((r) => r.room_code === roomCode && r.role === "owner");
+  // Beta: the assistant is owner-only, like resetting the itinerary (both enforced server-side too).
+  const isOwner = localMode || userRooms.some((r) => r.room_code === roomCode && r.role === "owner");
+  const canUseAgent = isOwner;
 
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [slotDraft, setSlotDraft] = useState<{ dayId: string; hour: number; x: number; y: number; task: Task | null } | null>(null);
@@ -52,29 +49,22 @@ export default function App() {
   const [sheet, setSheet] = useState<ItinerarySheet | null>(null);
   const [agentMessages, setAgentMessages] = useState<AgentChatMessage[]>([]);
 
-  const { days, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, setDaySub, loadDays, removeDaySpan, updateDaySpan } = useItinerary();
-  const { extras, exchangeRate, setExchangeRate, updateExtra, addExtra, removeExtra, loadBudget } = useBudget();
-  const [mockPeople, setMockPeople] = useState<MockPerson[]>([]);
-  const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
-  const { tasks, setTasks, addTask, toggleTask, updateTask, deleteTask, swapTaskDays } = useTasks();
-  const ideasApi = useIdeas(roomCode, session?.access_token);
-  const { ideas, loadPayload: loadIdeasPayload, payload: ideasPayload, customPlaces, planLinks, planLinksAt, planIdeaIds } = ideasApi;
-  const [trip, setTrip] = useState<TripInfo | null>(null);
-  const geoApi = useTripGeo();
-  const { documents, addDocument, updateDocument, removeDocument, loadPayload: loadDocuments } = useDocuments();
+  const data = useTripData(roomCode, session?.access_token, localMode, () => setRoomCode(null));
+  const { ops, itinerary, budget, taskState, tripInfo, ideasApi, geoApi, docs, payloadNow } = data;
+  const { days, tripSpans, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, setDaySub, removeDaySpan, updateDaySpan, addTripSpan, removeTripSpan, updateTripSpan } = itinerary;
+  const { extras, exchangeRate, setExchangeRate, updateExtra, addExtra, removeExtra } = budget;
+  const { tasks, addTask, toggleTask, updateTask, deleteTask, swapTaskDays } = taskState;
+  const { trip, mockPeople, addMockPerson, removeMockPerson } = tripInfo;
+  const { ideas } = ideasApi;
+  const { documents, addDocument, updateDocument, removeDocument } = docs;
+  const { connected, offlineSince, members } = data.room;
 
-  function addTripSpan(span: TripSpan) { setTripSpans((p) => [...p, span]); }
-  function removeTripSpan(id: string)  { setTripSpans((p) => p.filter((s) => s.id !== id)); }
-  function updateTripSpan(id: string, patch: Partial<TripSpan>) { setTripSpans((p) => p.map((s) => s.id === id ? { ...s, ...patch } : s)); }
+  // The server turns the task into an event and an expense in one transaction;
+  // the LOCAL demo does it in memory.
+  const chooseTaskOption = (taskId: string, optionId: string) =>
+    localMode ? chooseOption(tasks, taskId, optionId, { addEvent, addExtra, deleteTask }) : taskState.chooseOption(taskId, optionId);
 
-  function addMockPerson(name: string) {
-    setMockPeople((prev) => [...prev, { id: crypto.randomUUID(), name }]);
-  }
-  function removeMockPerson(id: string) {
-    setMockPeople((prev) => prev.filter((p) => p.id !== id));
-  }
-
-  const chooseTaskOption = (taskId: string, optionId: string) => chooseOption(tasks, taskId, optionId, { addEvent, addExtra, deleteTask });
+  const { save } = data;
 
   // Swap the whole contents of two days (events + spans) and their scheduled tasks.
   function swapDaysWithTasks(aId: string, bId: string) {
@@ -85,31 +75,6 @@ export default function App() {
 
   const [toastAction, setToastAction] = useState<ToastAction | null>(null);
   const dismissToast = useCallback(() => setToastAction(null), []);
-
-  const onRemoteUpdate = useCallback((payload: RoomPayload) => {
-    loadDays(payload.days);
-    loadBudget(payload.extras, payload.exchangeRate);
-    if (payload.trip?.name)                setTrip(payload.trip);
-    if (Array.isArray(payload.mockPeople)) setMockPeople(payload.mockPeople);
-    if (Array.isArray(payload.tripSpans))  setTripSpans(payload.tripSpans);
-    if (Array.isArray(payload.tasks))      setTasks(payload.tasks);
-    loadIdeasPayload(payload);
-    geoApi.loadPayload(payload);
-    loadDocuments(payload);
-  }, [loadDays, loadBudget, loadIdeasPayload, geoApi.loadPayload, loadDocuments]);
-
-  const { connected, offlineSince, members, saveState, save } = useRoom(roomCode, session?.access_token, onRemoteUpdate);
-
-  // useRoom fetches nothing for LOCAL, so the mock payload is seeded here. The
-  // ref keeps edits from being wiped: onRemoteUpdate is a new function each render.
-  // The demo is imported lazily and never in production builds.
-  const localSeeded = useRef(false);
-  useEffect(() => {
-    // Inline NODE_ENV check (not LOCAL_MODE_ENABLED) so the bundler can drop the import.
-    if (process.env.NODE_ENV === "production" || !localMode || localSeeded.current) return;
-    localSeeded.current = true;
-    import("@/data/localPayload").then(({ loadLocalPayload }) => loadLocalPayload()).then(onRemoteUpdate);
-  }, [localMode, onRemoteUpdate]);
 
   const people = Math.max(1, members.length + mockPeople.length);
   // grandTotal depends on people: "perPerson" expenses scale up with the traveler count.
@@ -122,21 +87,6 @@ export default function App() {
   const linkExtra = useCallback((extraId: string, eventId: string | undefined) => {
     updateExtra(extraId, { linkedEventId: eventId });
   }, [updateExtra]);
-
-  // The whole trip as stored in the room, right now.
-  const payloadNow = (): RoomPayload => ({ days, extras, exchangeRate, trip: trip ?? undefined, mockPeople, tripSpans, tasks, documents, ...ideasPayload, ...geoApi.payload });
-
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!roomCode || roomCode === "LOCAL") return;
-    // Never autosave before the room's own payload has loaded: the local demo
-    // state would overwrite the real trip.
-    if (!connected) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => save(payloadNow()), 600);
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, extras, exchangeRate, trip, mockPeople, tripSpans, tasks, ideas, customPlaces, planLinks, planLinksAt, planIdeaIds, geoApi.eventPlaces, documents, roomCode, connected]);
 
   function handleSelect(id: string | null) {
     setSelectedId(id);
@@ -230,16 +180,15 @@ export default function App() {
       <AppHeader
         roomCode={roomCode}
         connected={connected || localMode}
-        saveState={saveState}
+        saveState={ops.syncState}
         trip={trip}
-        onReset={() => {
+        onReset={isOwner ? () => {
           if (confirm("¿Restablecer el itinerario? Se perderán las actividades del calendario.")) {
             const regenerated = trip ? generateDays(trip.startDate, trip.endDate) : null;
-            loadDays(regenerated ?? days.map((d) => ({ ...d, events: [], spans: [] })));
-            setTripSpans([]);
+            itinerary.resetItinerary(regenerated ?? days.map((d) => ({ ...d, events: [], spans: [] })));
           }
-        }}
-        onLeaveRoom={() => { localSeeded.current = false; setRoomCode(null); }}
+        } : undefined}
+        onLeaveRoom={() => { data.resetLocalSeed(); setRoomCode(null); }}
         onDownloadPdf={(kind) => downloadTripPdf(kind, { trip, days, documents, travelers: [...members, ...mockPeople].map((p) => p.name) })}
       />
       {offlineSince && <OfflineBanner since={offlineSince} />}
@@ -387,6 +336,8 @@ export default function App() {
       )}
 
       <Toast action={toastAction} onUndo={toastAction?.undo} onDismiss={dismissToast} />
+      <SyncNotice message={ops.notice} onDismiss={ops.dismissNotice} />
+      {ops.maintenance && <MaintenanceBanner />}
 
       {slotDraft && (
         <SlotCreateModal

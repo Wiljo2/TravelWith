@@ -13,6 +13,7 @@ export interface CalendarEvent {
   title: string;
   cat: string;
   note: string;
+  version?: number;
   mapsUrl?: string;       // Google Maps link: pins the activity's exact spot on the trip map
   documentId?: string;    // TripDocument it comes from
 }
@@ -28,6 +29,7 @@ export interface TripSpan {
   bg: string;
   border: string;
   zIndex?: number;
+  version?: number;
 }
 
 // A colored time-range block within a day. startEventId/endEventId are resolved
@@ -42,6 +44,7 @@ export interface DaySpan {
   bg: string;
   border: string;
   zIndex?: number;       // lower = further back; higher = drawn on top
+  version?: number;
 }
 
 export interface Day {
@@ -51,6 +54,7 @@ export interface Day {
   flexible: boolean;
   spans?: DaySpan[];
   events: CalendarEvent[];
+  version?: number;
 }
 
 export interface Category {
@@ -79,6 +83,7 @@ export interface Extra {
   // amount is divided across the days in the range for the per-day display.
   startDayId?: string;
   endDayId?: string;      // if omitted, defaults to startDayId (single day)
+  version?: number;
   documentId?: string;    // TripDocument it comes from
 }
 
@@ -93,6 +98,7 @@ export interface TaskOption {
   amount?: number;                   // cost of this option, in `currency`
   currency?: "USD" | "COP";          // default "USD"
   splitMode?: "group" | "perPerson"; // default "group"
+  version?: number;
 }
 
 export interface Task {
@@ -106,6 +112,7 @@ export interface Task {
   cat?: string;           // key of TASK_CATEGORIES
   priority?: TaskPriority;
   options?: TaskOption[];  // candidate choices (a decision to resolve); unchosen options never sum into the confirmed total
+  version?: number;
 }
 
 export type IdeaPlatform = "tiktok" | "instagram" | "youtube" | "other";
@@ -146,6 +153,7 @@ export interface Idea {
   placeManual?: boolean;    // place set by hand: "Analizar con Claude" leaves it alone
   catManual?: boolean;      // type set by hand: likewise
   moment?: IdeaMoment;      // moment in the plan set by hand: wins over the analysis and the rules
+  version?: number;
 }
 
 // Where a member put an idea on the plan: an activity (eventId), a whole day,
@@ -183,6 +191,7 @@ export interface EventPlace {
   source?: "link" | "geocoder" | "claude";
   photo?: string;                // Wikipedia photo of the place; "" = searched, none found
   photoPage?: string;            // the Wikipedia article it comes from (credit)
+  version?: number;
 }
 
 // One "Analizar con Claude" run: its links and the ideas it actually read.
@@ -204,16 +213,20 @@ export interface TripDocument {
   driveFileId: string;
   title: string;
   kind?: DocumentKind;    // default "other"
+  version?: number;
 }
 
 // A traveler without an account, counted in per-person math.
 export interface MockPerson {
   id: string;
   name: string;
+  version?: number;
 }
 
 // The persisted trip document (rooms.payload). Every field added after the
 // first release is optional; consumers apply defaults at read time.
+// Items carry `version` (their row version) when read from the trip tables;
+// writes send it back so the server can detect concurrent edits.
 export interface RoomPayload {
   days: Day[];
   extras: Extra[];
