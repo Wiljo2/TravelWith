@@ -71,7 +71,7 @@ Notes and known trade-offs:
 - The trip header (`name`, `destination`, dates, `exchange_rate`) is written only by the `trip.update` / `trip.setExchangeRate` ops; it has no row version (last write wins).
 - References between items are **foreign keys** (`008_trip_tables.sql`): deleting an event nulls `linked_event_id` and day-span event ids and deletes the trip spans that start or end on it; deleting a day deletes its events and day spans and nulls expense and task day ids. New data has no dangling ids. Consumers still handle a missing reference gracefully (`find(...) ?? null`).
 - New rooms are **built server-side** in `POST /api/rooms`: header columns plus empty days in `trip_days` (via `reset_itinerary`). Client hooks start empty; the fictional demo trip (`src/data/mockRoom.ts`) is loaded with a dynamic import only in the `LOCAL` room in development builds, so it never ships to production. Never put real trip data in app code or anything the client bundle imports (the idea-matching tests use the fixture `src/test/fixtures/initialDays.ts`, test-only).
-- `rooms.payload` is the backup from before the cut-over: never write it from the app. `private.rebuild_payload(code)` regenerates it from the tables for a rollback; `validateRoomPayload` / `payloadIssues` (`lib/validate.ts`, `lib/schemas.ts`) only read it (`scripts/check-payloads.ts`).
+- `rooms.payload` is the backup from before the cut-over: never write it from the app. `private.rebuild_payload(code)` regenerates it from the tables for a rollback. The cut-over ran on 2026-10-09; production reads and writes only the tables. `validateRoomPayload` (`lib/validate.ts`) checks payload-shaped JSON that the client sends (local mode, offline snapshots).
 - Event categories: new events use `DEFAULT_EVENT_CAT`; pickers, the legend and the agent list `EVENT_CATEGORY_KEYS`. Legacy keys (`barco`, `puerto`, `miami`) stay in `CATEGORIES` so stored events render — never remove a category key.
 
 ### Server domain layer (`src/server/`)
@@ -124,7 +124,7 @@ Trip data lives in the `trip_*` tables; rows migrated from old payloads keep the
 3. **Never rename or repurpose an existing column or field.** If the meaning must change, add a new one and keep reading the old one as fallback.
 4. **Incoming data is untrusted**: `parseTripMessage` ignores unknown tables and malformed messages, row helpers (`utils/tripRows.ts`) tolerate nulls, and `useRoom` checks collections with `Array.isArray`.
 5. **SQL migrations are additive only:** `create table if not exists`, `add column if not exists`. Never `drop` or `alter type` on production data without a rollback plan. A new trip table gets RLS, the audit and broadcast triggers, and a `(room_code, id)` key.
-6. A new field touches: the migration (column + check mirroring `LIMITS`), `src/types/database.ts`, the row validator in `domain/*Rows.ts`, `get_trip`, `utils/tripRows.ts`, the client type, and `rebuild_payload` + `lib/schemas.ts` if it must survive a rollback.
+6. A new field touches: the migration (column + check mirroring `LIMITS`), `src/types/database.ts`, the row validator in `domain/*Rows.ts`, `get_trip`, `utils/tripRows.ts`, the client type, and `trip_payload` (used by `rebuild_payload`) if it must survive a rollback.
 7. Before merging a feature that touches trip data, test: **open a trip created before the change** and verify it loads and edits without errors.
 
 ---
@@ -200,7 +200,7 @@ Trip data lives in the `trip_*` tables; rows migrated from old payloads keep the
 
 1. ~~Unit tests for `utils/currency.ts` and `utils/time.ts`~~ (done — see `src/utils/__tests__/`).
 2. ~~Migrate deep relative imports to the `@/` alias~~ (done).
-3. ~~Schema validation (zod)~~ (done — `src/lib/schemas.ts` for the payload shape; limits in `src/constants/limits.ts`, mirrored by the trip tables' check constraints and the row validators).
+3. ~~Schema validation (zod)~~ (done — limits in `src/constants/limits.ts`, mirrored by the trip tables' check constraints and the row validators).
 4. ~~Concurrent-save protection~~ (done — per-item versions, 409 with the current row).
 5. `BudgetPanel` takes ~25 props: consider splitting into connected subcomponents or a room context.
 6. Translate remaining Spanish UI copy if the product ever targets English-speaking users.

@@ -227,6 +227,8 @@ Implemented in `012_verify_rebuild.sql` (step 2.2):
 
 **Rollback.** Before phase 5 cleanup, `private.rebuild_payload(code)` writes the tables back into `rooms.payload`. If the new version has to be rolled back after users made changes: turn maintenance on, run `rebuild_payload` for rooms with `trip_changes` after the cut-over, redeploy the previous version. With no changes after the cut-over, redeploying the previous version is enough because `payload` was never modified.
 
+Step 5.1 (after the 2026-10-09 cut-over): the maintenance flag stays (`MAINTENANCE_MODE`, documented for future data migrations) instead of being removed. Removed: the payload-mutating document functions and `findEvent`/`requireEvent` (only they used them), `scripts/check-payloads.ts`, the zod payload schema `lib/schemas.ts` and the `zod` dependency (the span color rule moved into `domain/spanRows.ts`). `npm run snapshot` now reads the trip through `get_trip` instead of the frozen `rooms.payload`. Global expenses render in creation order, so a new one appears next to its add button.
+
 Relation to the existing remediation plan: phase 3 here replaces the old Phase 14 (command-style writes); phases 5–6 replace the old snapshot-based Phases 7 and 16.
 
 ## Code that changes

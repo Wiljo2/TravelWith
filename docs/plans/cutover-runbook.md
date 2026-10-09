@@ -1,5 +1,7 @@
 # Cut-over runbook (step 4.1)
 
+> Historical: the production cut-over ran on 2026-10-09. `scripts/check-payloads.ts` was removed in step 5.1 (find it in git history, e.g. commit `52508d5`, if a payload check is needed again).
+
 Moves production from `rooms.payload` (one JSONB per trip) to the `trip_*` tables, the ops endpoint and the private Broadcast channel `trip:<code>`, in one short maintenance window. Every step is **[H]**: a person runs it. The loop never touches production.
 
 Design and rollback logic: `docs/plans/relational-broadcast.md` ("Migration: direct cut-over"). Rehearsal that this runbook repeats on production: `docs/plans/migration-rehearsal.md` (done with 0 differences on staging, 001–019).

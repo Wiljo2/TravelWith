@@ -1,10 +1,13 @@
 import { HOUR_END, HOUR_START } from "@/constants/time";
 import { LIMITS } from "@/constants/limits";
-import { COLOR_RE } from "@/lib/schemas";
 import { DomainError, checkArgs, checkClientId } from "@/server/domain/core";
 import type { NewRow, RowPatch } from "@/server/repo/core";
 import type { TripDaySpanRow } from "@/types/database";
 import { uid } from "@/utils/uid";
+
+// Colors are rendered into inline CSS, so only hex, rgb(a) and `transparent`:
+// a `url(...)` would make every member's browser fetch an attacker-chosen address.
+const COLOR_RE = /^(#[0-9a-fA-F]{3,8}|transparent|rgba?\([\d\s.,%]+\))$/;
 
 // Pure validation for day spans (colored ranges inside a day) and trip spans
 // (ranges between two events, across days). Event existence is checked by the
