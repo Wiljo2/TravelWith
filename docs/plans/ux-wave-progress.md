@@ -1,7 +1,7 @@
 # UX wave 1 progress
-- Iteration: 5
-- Last commit: (iteration 5 commit; see log)
-- Next step: H.2
+- Iteration: 6
+- Last commit: (iteration 6 commit; see log)
+- Next step: H.3
 - Human actions pending: set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
 
 ## Steps
@@ -10,7 +10,7 @@
 - [x] L.3 SEO: metadata, OG image, robots, sitemap
 - [x] L.V Verify landing (desktop + 375px, no flash for signed-in / `?local=1`)
 - [x] H.1 `actions.ts` (tool kinds, Spanish summaries) + `pending.ts` (HMAC resume token)
-- [ ] H.2 Agent loop pause/resume, `confirm` frame, destructive gate removed
+- [x] H.2 Agent loop pause/resume, `confirm` frame, destructive gate removed
 - [ ] H.3 Prompt + tool descriptions static text for approval flow
 - [ ] H.4 Client `useAgentChat` + `AgentConfirmCard`
 - [ ] H.V Verify HITL end to end (HUMAN if no API key; HUMAN: set `AGENT_RESUME_SECRET`)
@@ -33,3 +33,4 @@
 | 3 | 2026-10-09 | L.3 | (this commit) | tsc ok, 405 tests ok, lint 0 errors, build ok (`/opengraph-image`, `/robots.txt`, `/sitemap.xml` static) | Done by the orchestrator (small step). `src/lib/site.ts` (`siteUrl()`: `NEXT_PUBLIC_SITE_URL` → `VERCEL_PROJECT_PRODUCTION_URL` → localhost), OG/Twitter metadata, generated OG image (no emoji, no external fonts) checked visually. No CSP change needed. |
 | 4 | 2026-10-09 | L.V | (this commit) | all pass (dev server + Playwright, 1280px and 375px) | Anonymous `/` shows the landing, no horizontal scroll at 375px, sticky nav OK, `og:image` present. `?local=1` sets `data-entry=app` before paint and opens the demo trip; a Supabase session key in storage goes straight to the app; CTA `/?app=1` opens RoomGate sign-in. Note: `next dev` appends an agent-rules block to `CLAUDE.md`; the loop reverts it after each dev-server run (HUMAN decision: commit it or set `agentRules: false`). |
 | 5 | 2026-10-09 | H.1 | (this commit) | tsc ok, 426 tests ok, lint 0 errors (no app code wired yet, build skipped) | `actions.ts` (tool kinds, unknown → write; pure Spanish summaries over the trip payload) + `pending.ts` (base64url JSON + HMAC-SHA256, 15 min TTL, bound to code + user, 400 KB cap; prod without `AGENT_RESUME_SECRET` fails closed). Orchestrator removed the redundant "USD" suffix (`fmtUSD` already prints `US$`). Plan updated: `describeAction` takes the loaded trip. |
+| 6 | 2026-10-09 | H.2 | (this commit) | tsc ok, 435 tests ok, lint 0 errors, build ok | Loop moved to `src/server/agent/loop.ts`; reads run, writes/deletes pause with a `confirm` frame (token + actions) and only run on `{ resume: { token, decisions } }`; missing decision = rejected. Beta destructive gate removed (`AGENT_DESTRUCTIVE_TOOLS` gone). Orchestrator restored the escaped `\n\n` SSE separator (the subagent had turned it into literal newlines, which CRLF checkouts would break) and documented `AGENT_RESUME_SECRET` in `.env.example`. Accepted limit: tokens are not single-use (noted in the plan). |
