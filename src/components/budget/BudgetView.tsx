@@ -127,7 +127,7 @@ export default function BudgetView({
                 </tr>
               </thead>
               <tbody className={TBODY_CLASS}>
-                {[...globalExtras, ...linkedExtras].map((e) => (
+                {extras.filter((e) => !e.startDayId).map((e) => (
                   <GlobalExtraRow key={e.id} extra={e} exchangeRate={exchangeRate} people={people} days={days} documents={documents}
                     onCommit={(p) => onUpdateExtra(e.id, p)} onRemove={() => onRemoveExtra(e.id)} onLinkExtra={(eid) => onLinkExtra(e.id, eid)} />
                 ))}
