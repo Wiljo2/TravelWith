@@ -265,13 +265,6 @@ export interface ActivityEntry {
   fields: string[];
 }
 
-export interface ToastAction {
-  title: string;
-  newStart: number;
-  newEnd: number;
-  undo: () => void;
-}
-
 export interface AgentAction {
   id: string;
   name: string;

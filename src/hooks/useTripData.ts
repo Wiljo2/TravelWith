@@ -8,6 +8,7 @@ import { useRoom } from "@/hooks/useRoom";
 import { useIdeas } from "@/hooks/useIdeas";
 import { useTripGeo } from "@/hooks/useTripGeo";
 import { useDocuments } from "@/hooks/useDocuments";
+import type { Notify } from "@/hooks/useSnackbar";
 import { useFeatureSync } from "@/hooks/useFeatureSync";
 import { ideaPlanOf, type FeatureState, type IdeaPlan } from "@/utils/featureSync";
 import type { RoomPayload } from "@/types";
@@ -36,15 +37,15 @@ function ideaSettings(p: Partial<RoomPayload>): Pick<FeatureState, "ideaPlaces" 
 
 // All trip state for the open room: the domain hooks, the op queue that saves
 // their changes, and the load + live channel that fills them.
-export function useTripData(roomCode: string | null, accessToken: string | undefined, localMode: boolean, onGone: () => void) {
+export function useTripData(roomCode: string | null, accessToken: string | undefined, localMode: boolean, onGone: () => void, notify: Notify) {
   const ops = useTripOps(roomCode, accessToken, {
     adoptRow: (table, id, row) => adoptRow(table, id, row),
     applyHeader: (header) => applyHeader(header),
     resync: () => room.reload(),
   });
-  const itinerary = useItinerary(ops.send);
-  const budget = useBudget(ops.send);
-  const taskState = useTasks(ops.send, ops.isKnown);
+  const itinerary = useItinerary(ops.send, { notify, flush: ops.flush });
+  const budget = useBudget(ops.send, notify);
+  const taskState = useTasks(ops.send, ops.isKnown, notify);
   const tripInfo = useTripInfo(ops.send);
   const ideasApi = useIdeas(roomCode, accessToken);
   const geoApi = useTripGeo();

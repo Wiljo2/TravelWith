@@ -5,7 +5,7 @@ import { useTripData } from "@/hooks/useTripData";
 import DocumentsPanel from "@/components/documents/DocumentsPanel";
 import { chooseOption } from "@/utils/taskDecision";
 import { HOUR_START, HOUR_END } from "@/constants/time";
-import { snapHour } from "@/utils/time";
+import { snapHour, fmtHour } from "@/utils/time";
 import { extraGroupUSD } from "@/utils/currency";
 import CalendarGrid from "@/components/calendar/CalendarGrid";
 import SlotCreateModal from "@/components/calendar/SlotCreateModal";
@@ -20,12 +20,13 @@ import ActivityDialog from "@/components/ActivityDialog";
 import SyncNotice from "@/components/SyncNotice";
 import MaintenanceBanner from "@/components/MaintenanceBanner";
 import { downloadTripPdf } from "@/lib/tripPdf";
-import Toast from "@/components/Toast";
+import Snackbar from "@/components/Snackbar";
+import { useSnackbar } from "@/hooks/useSnackbar";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
 import IdeasTab from "@/components/ideas/IdeasTab";
 import ItineraryMap from "@/components/map/ItineraryMap";
-import type { AgentChatMessage, Task, ToastAction } from "@/types";
+import type { AgentChatMessage, Task } from "@/types";
 import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
 import { generateDays, tripDayIndex } from "@/utils/tripDays";
 import { useIsMobile } from "@/hooks/useMediaQuery";
@@ -49,10 +50,11 @@ export default function App() {
   const [sheet, setSheet] = useState<ItinerarySheet | null>(null);
   const [agentMessages, setAgentMessages] = useState<AgentChatMessage[]>([]);
 
-  const data = useTripData(roomCode, session?.access_token, localMode, () => setRoomCode(null));
+  const { snack, notify, dismiss: dismissSnack } = useSnackbar();
+  const data = useTripData(roomCode, session?.access_token, localMode, () => setRoomCode(null), notify);
   const { ops, itinerary, budget, taskState, tripInfo, ideasApi, geoApi, docs, payloadNow } = data;
   const { days, tripSpans, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, setDaySub, removeDaySpan, updateDaySpan, addTripSpan, removeTripSpan, updateTripSpan } = itinerary;
-  const { extras, exchangeRate, setExchangeRate, updateExtra, addExtra, removeExtra } = budget;
+  const { extras, exchangeRate, setExchangeRate, updateExtra, commitExtra, addExtra, removeExtra } = budget;
   const { tasks, addTask, toggleTask, updateTask, deleteTask, swapTaskDays } = taskState;
   const { trip, mockPeople, addMockPerson, removeMockPerson } = tripInfo;
   const { ideas } = ideasApi;
@@ -73,9 +75,7 @@ export default function App() {
     swapTaskDays(aId, bId);
   }
 
-  const [toastAction, setToastAction] = useState<ToastAction | null>(null);
   const [activityOpen, setActivityOpen] = useState(false);
-  const dismissToast = useCallback(() => setToastAction(null), []);
 
   const people = Math.max(1, members.length + mockPeople.length);
   // grandTotal depends on people: "perPerson" expenses scale up with the traveler count.
@@ -105,14 +105,9 @@ export default function App() {
       const newStart = snapHour(droppedHour, dur, HOUR_START, HOUR_END);
       const newEnd = newStart + dur;
       moveEvent(fromDayId, toDayId, ev, newStart);
-      setToastAction({
-        title: ev.title,
-        newStart,
-        newEnd,
-        undo: () => {
-          moveEvent(toDayId, fromDayId, { ...ev, start: newStart, end: newEnd }, ev.start);
-          setToastAction(null);
-        },
+      notify({
+        message: `${ev.title} movida · ${fmtHour(newStart)} – ${fmtHour(newEnd)}`,
+        action: { label: "Deshacer", run: () => moveEvent(toDayId, fromDayId, { ...ev, start: newStart, end: newEnd }, ev.start) },
       });
     }
   );
@@ -314,7 +309,7 @@ export default function App() {
             tasks={tasks}
             documents={documents}
             onSetExchangeRate={setExchangeRate}
-            onUpdateExtra={updateExtra}
+            onUpdateExtra={commitExtra}
             onLinkExtra={linkExtra}
             onAddExtra={addExtra}
             onRemoveExtra={removeExtra}
@@ -338,7 +333,7 @@ export default function App() {
         />
       )}
 
-      <Toast action={toastAction} onUndo={toastAction?.undo} onDismiss={dismissToast} />
+      <Snackbar snack={snack} onDismiss={dismissSnack} />
       <SyncNotice message={ops.notice} onDismiss={ops.dismissNotice} />
       {ops.maintenance && <MaintenanceBanner />}
 

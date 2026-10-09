@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { uid } from "@/utils/uid";
 import type { Day, CalendarEvent, DaySpan, TripSpan } from "@/types";
 import { DEFAULT_EVENT_CAT } from "@/constants/categories";
@@ -6,6 +6,13 @@ import { HOUR_END, HOUR_START } from "@/constants/time";
 import { applyToDays, applyToList, rowToTripSpan, type Row, type TripTable } from "@/utils/tripRows";
 import type { SendOp } from "@/hooks/useTripOps";
 import { sendable } from "@/lib/opQueue";
+import { eventCreateArgs } from "@/utils/restore";
+import type { Notify } from "@/hooks/useSnackbar";
+
+export interface SaveFeedback {
+  notify: Notify;
+  flush: () => Promise<boolean>;
+}
 
 // Repairs payloads saved before ids were globally unique: the legacy counter
 // restarted at 0 each session, so older rooms can hold repeated event ids.
@@ -28,7 +35,7 @@ function dedupeEventIds(incoming: Day[]): Day[] {
   return changed ? result : incoming;
 }
 
-export function useItinerary(send: SendOp) {
+export function useItinerary(send: SendOp, feedback?: SaveFeedback) {
   const [days, setDays] = useState<Day[]>([]);
   const [tripSpans, setTripSpans] = useState<TripSpan[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -41,9 +48,25 @@ export function useItinerary(send: SendOp) {
     return null;
   }, [days, selectedId]);
 
+  // Editing saves on every keystroke; one "saved" message is shown when the editor moves off the event.
+  const edited = useRef<string | null>(null);
+  const fb = useRef(feedback);
+  useEffect(() => {
+    fb.current = feedback;
+  });
+  useEffect(() => {
+    const id = edited.current;
+    if (id === null || id === selectedId) return;
+    edited.current = null;
+    fb.current?.flush().then((ok) => {
+      if (ok) fb.current?.notify({ message: "Evento guardado" });
+    });
+  }, [selectedId]);
+
   function updateEvent(patch: Partial<CalendarEvent>) {
     if (!selectedEvent) return;
     const id = selectedEvent.ev.id;
+    edited.current = id;
     setDays((prev) =>
       prev.map((d) =>
         d.id === selectedEvent.dayId ? { ...d, events: d.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) } : d,
@@ -62,19 +85,32 @@ export function useItinerary(send: SendOp) {
   // unlinks its expenses; spans are dropped here right away.
   function deleteEvent() {
     if (!selectedEvent) return;
-    const id = selectedEvent.ev.id;
-    setDays((prev) => prev.map((d) => (d.id === selectedEvent.dayId ? { ...d, events: d.events.filter((e) => e.id !== id) } : d)));
+    const { ev, dayId } = selectedEvent;
+    const id = ev.id;
+    if (edited.current === id) edited.current = null;
+    setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: d.events.filter((e) => e.id !== id) } : d)));
     setTripSpans((prev) => prev.filter((s) => s.startEventId !== id && s.endEventId !== id));
     setSelectedId(null);
-    send("event.delete", { id });
+    send("event.delete", { id }).then((outcome) => {
+      if (outcome !== "ok") return;
+      fb.current?.notify({
+        message: "Evento eliminado",
+        action: { label: "Deshacer", run: () => insertEvent(dayId, ev, "Evento restaurado") },
+      });
+    });
+  }
+
+  function insertEvent(dayId: string, ev: CalendarEvent, message: string) {
+    setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: [...d.events, ev] } : d)));
+    setSelectedId(ev.id);
+    send("event.create", eventCreateArgs(dayId, ev)).then((outcome) => {
+      if (outcome === "ok") fb.current?.notify({ message });
+    });
   }
 
   function addEvent(dayId: string, title: string, start: number, end: number, note = "", cat = DEFAULT_EVENT_CAT, mapsUrl?: string, id = uid(), icon?: string) {
-    const nev: CalendarEvent = { id, start, end, title, cat, note, ...(mapsUrl ? { mapsUrl } : {}), ...(icon ? { icon } : {}) };
-    setDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, events: [...d.events, nev] } : d)));
-    setSelectedId(nev.id);
-    send("event.create", { id, dayId, title, start, end, note, cat, ...(mapsUrl ? { mapsUrl } : {}), ...(icon ? { icon } : {}) });
-    return nev.id;
+    insertEvent(dayId, { id, start, end, title, cat, note, ...(mapsUrl ? { mapsUrl } : {}), ...(icon ? { icon } : {}) }, "Evento creado");
+    return id;
   }
 
   // Swap the whole contents (events + day-level spans) between two days, keeping
