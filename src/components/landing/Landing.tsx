@@ -1,22 +1,27 @@
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { AssistantShowcase } from "@/components/landing/AssistantShowcase";
+import { DemoVideo } from "@/components/landing/DemoVideo";
+import { Faq } from "@/components/landing/Faq";
+import { Features } from "@/components/landing/Features";
+import { FinalCta } from "@/components/landing/FinalCta";
+import { Hero } from "@/components/landing/Hero";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { LandingFooter } from "@/components/landing/LandingFooter";
+import { LandingNav } from "@/components/landing/LandingNav";
 
 export default function Landing() {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-background px-4 text-center text-foreground">
-      <div className="text-6xl" aria-hidden>🧳</div>
-      <h1 className="text-4xl font-semibold tracking-tight">TravelWith</h1>
-      <p className="max-w-md text-muted-foreground">
-        Planea viajes en grupo: itinerario, presupuesto y tareas en tiempo real
-      </p>
-      <div className="flex flex-col items-center gap-3">
-        <a href="/?app=1" className={cn(buttonVariants({ size: "lg" }), "px-6")}>
-          Empezar
-        </a>
-        <a href="/?app=1" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-          Ya tengo cuenta · Entrar
-        </a>
-      </div>
-    </main>
+    <div className="min-h-dvh overflow-x-clip bg-background text-foreground">
+      <LandingNav />
+      <main>
+        <Hero />
+        <Features />
+        <HowItWorks />
+        <AssistantShowcase />
+        <DemoVideo />
+        <Faq />
+        <FinalCta />
+      </main>
+      <LandingFooter />
+    </div>
   );
 }

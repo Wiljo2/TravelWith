@@ -1,12 +1,12 @@
 # UX wave 1 progress
-- Iteration: 1
-- Last commit: (iteration 1 commit; see log)
-- Next step: L.2
+- Iteration: 2
+- Last commit: (iteration 2 commit; see log)
+- Next step: L.3
 - Human actions pending: none
 
 ## Steps
 - [x] L.1 Entry split: server `page.tsx` + `EntryGate` + `shouldEnterApp()`
-- [ ] L.2 Landing sections (`src/components/landing/*`)
+- [x] L.2 Landing sections (`src/components/landing/*`)
 - [ ] L.3 SEO: metadata, OG image, robots, sitemap
 - [ ] L.V Verify landing (desktop + 375px, no flash for signed-in / `?local=1`)
 - [ ] H.1 `actions.ts` (tool kinds, Spanish summaries) + `pending.ts` (HMAC resume token)
@@ -29,3 +29,4 @@
 | Iter | Date | Step | Commit | Result | Notes / blockers |
 |---|---|---|---|---|---|
 | 1 | 2026-10-09 | L.1 | (this commit) | tsc ok, 402 tests ok, lint 0 errors, build ok | Inline pre-paint script (`entryScript.ts`) hides the landing for likely app users; EntryGate clears the flag when the landing stays (fixes blank page for `?local=1` in production). CTA links to `/?app=1`; installed PWA always enters the app. Not yet checked in a browser (L.V). |
+| 2 | 2026-10-09 | L.2 | (this commit) | tsc ok, 402 tests ok, lint 0 errors, build ok (`/` static) | 10 server-component sections in `src/components/landing/` (nav, hero + HTML mock, 8 features, how it works, assistant approval mock, demo video slot behind `NEXT_PUBLIC_DEMO_VIDEO_URL`, FAQ, final CTA, footer). Orchestrator fixed the offline FAQ answer (offline is read-only). Copy to be reviewed by a human. |
