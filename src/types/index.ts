@@ -269,3 +269,30 @@ export interface ToastAction {
   newEnd: number;
   undo: () => void;
 }
+
+export interface AgentAction {
+  id: string;
+  name: string;
+  kind: "write" | "delete";
+  summary: string;
+}
+
+export interface AgentDecision {
+  id: string;
+  approve: boolean;
+}
+
+export interface AgentPending {
+  token: string;
+  actions: AgentAction[];
+  status: "pending" | "approved" | "rejected" | "expired";
+  decisions?: AgentDecision[];
+}
+
+export interface AgentChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  tools?: string[];
+  error?: boolean;
+  pending?: AgentPending;
+}
