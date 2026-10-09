@@ -75,7 +75,7 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
   {
     name: "delete_event",
     description:
-      "Delete an event from the calendar. Linked expenses are kept but unlinked; cross-day ranges that start or end at the event are removed. Confirm with the user before deleting several events at once.",
+      "Delete an event from the calendar. Linked expenses are kept but unlinked; cross-day ranges that start or end at the event are removed.",
     input_schema: schema({ eventId: { type: "string" } }, ["eventId"]),
   },
   {
@@ -159,7 +159,7 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "remove_expense",
-    description: "Delete an expense from the budget. Confirm with the user before deleting several at once.",
+    description: "Delete an expense from the budget.",
     input_schema: schema({ extraId: { type: "string" } }, ["extraId"]),
   },
   {
