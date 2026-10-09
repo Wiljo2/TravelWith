@@ -1,8 +1,9 @@
 # UX wave 1 progress
-- Iteration: 12
-- Last commit: (iteration 12 commit; see log)
-- Next step: I.4
-- Human actions pending: (0) apply `supabase/migrations/020_item_icons.sql` on production BEFORE deploying this branch (choosing an icon fails without it; plain creates keep working); (1) set `AGENT_RESUME_SECRET` in Vercel and run `docs/plans/ux-wave-hitl-check.md` (H.V); (2) set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
+- Iteration: 13
+- Last commit: b02f6d7
+- Next step: I.V
+- Worktree: the loop runs in `../TravelWith-ux-wave` (the main checkout is on `feature/idea-video`).
+- Human actions pending: (00) migration number clash: `feature/idea-video` also adds `020_idea_video.sql`; whichever branch merges second renumbers its file to 021; (0) apply `supabase/migrations/020_item_icons.sql` on production BEFORE deploying this branch (choosing an icon fails without it; plain creates keep working); (1) set `AGENT_RESUME_SECRET` in Vercel and run `docs/plans/ux-wave-hitl-check.md` (H.V); (2) set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
 
 ## Steps
 - [x] L.1 Entry split: server `page.tsx` + `EntryGate` + `shouldEnterApp()`
@@ -17,7 +18,7 @@
 - [x] I.1 Icon catalog + `suggestIcon` / `eventIcon` / `taskIcon`
 - [H] I.2 Persistence: migration 020 `icon` on events + tasks, full read/write path (HUMAN: apply 020 before deploy)
 - [x] I.3 Render icons in calendar, agenda, home, tasks
-- [ ] I.4 `IconPicker` in event and task editors
+- [x] I.4 `IconPicker` in event and task editors
 - [ ] I.V Verify icons (old trip, override persists, syncs)
 - [ ] S.1 `OpQueue`: `lastSavedAt` + `send` ack promise
 - [ ] S.2 `Snackbar` + `useSnackbar`, save/delete messages, Deshacer on delete
@@ -40,3 +41,4 @@
 | 10 | 2026-10-09 | I.1 | (this commit) | tsc ok, all tests ok, lint 0 errors (no app code wired yet, build skipped) | `ITEM_ICONS` (44 ordered keyword entries, Spanish + English, whole-word match via the exported `asWords`), `ICON_CHOICES` (50, no duplicates), `suggestIcon` / `eventIcon` / `taskIcon` (stored icon → title → category / 📍). Meals before café, transport before hotel. |
 | 11 | 2026-10-09 | I.2 | (this commit) | tsc ok, 481 tests ok, lint 0 errors, build ok; 020 parsed with libpg-query (top level + get_trip body + DO-block statements) | Migration 020: nullable `icon` + `char_length` 1..16 checks on `trip_events`/`trip_tasks`; `get_trip` copied from 019 (diff = the two `'icon'` lines); `trip_payload` intentionally unchanged (cosmetic). Validators (`iconArg`, null/"" = automatic), `database.ts`, `tripRows`, client types, hooks. Audit/broadcast triggers send whole rows. Orchestrator: inserts omit `icon` unless chosen (`optionalIcon`), so creates don't depend on 020 being applied first. `[H]`: apply 020 before deploy; later steps proceed. |
 | 12 | 2026-10-09 | I.3 | (this commit) | tsc ok, 481 tests ok, lint 0 errors, build ok | `eventIcon` before event titles (calendar block, day agenda, itinerary agenda, today card, ideas-by-day groups) and `taskIcon` replacing the category icon next to task titles (calendar task block, tasks view, home, agenda). Emojis `aria-hidden`. Skipped: editable title inputs (picker goes there in I.4) and map lists (they show place names). Orchestrator moved the ideas-group emoji to its own `aria-hidden` field instead of the title string. |
+| 13 | 2026-10-09 | I.4 | b02f6d7 | tsc ok, 481 tests ok, lint 0 errors, build ok | Loop paused once: the main checkout was switched to `feature/idea-video` (uncommitted work). With the user's OK, continued in a new worktree `../TravelWith-ux-wave`. `IconPicker` (inline panel, "Automático" + 8-column grid, suggested emoji first, Escape closes) wired left of the event title in `EventEditor` (saves immediately, like the title) and as an "Ícono" row in the task panel of `TasksView`. Skipped `SlotCreateModal`. Orchestrator made grid cells fluid for narrow screens. Progress update landed in a follow-up commit. |
