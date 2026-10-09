@@ -1,8 +1,8 @@
 # UX wave 1 progress
-- Iteration: 8
-- Last commit: (iteration 8 commit; see log)
-- Next step: H.V
-- Human actions pending: set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
+- Iteration: 9
+- Last commit: (iteration 9 commit; see log)
+- Next step: I.1
+- Human actions pending: (1) set `AGENT_RESUME_SECRET` in Vercel and run `docs/plans/ux-wave-hitl-check.md` (H.V); (2) set `NEXT_PUBLIC_SITE_URL` in Vercel if the app uses a custom domain (otherwise the Vercel production domain is used)
 
 ## Steps
 - [x] L.1 Entry split: server `page.tsx` + `EntryGate` + `shouldEnterApp()`
@@ -13,7 +13,7 @@
 - [x] H.2 Agent loop pause/resume, `confirm` frame, destructive gate removed
 - [x] H.3 Prompt + tool descriptions static text for approval flow
 - [x] H.4 Client `useAgentChat` + `AgentConfirmCard`
-- [ ] H.V Verify HITL end to end (HUMAN if no API key; HUMAN: set `AGENT_RESUME_SECRET`)
+- [H] H.V Verify HITL end to end (HUMAN if no API key; HUMAN: set `AGENT_RESUME_SECRET`)
 - [ ] I.1 Icon catalog + `suggestIcon` / `eventIcon` / `taskIcon`
 - [ ] I.2 Persistence: migration 020 `icon` on events + tasks, full read/write path (HUMAN: apply 020 before deploy)
 - [ ] I.3 Render icons in calendar, agenda, home, tasks
@@ -36,3 +36,4 @@
 | 6 | 2026-10-09 | H.2 | (this commit) | tsc ok, 435 tests ok, lint 0 errors, build ok | Loop moved to `src/server/agent/loop.ts`; reads run, writes/deletes pause with a `confirm` frame (token + actions) and only run on `{ resume: { token, decisions } }`; missing decision = rejected. Beta destructive gate removed (`AGENT_DESTRUCTIVE_TOOLS` gone). Orchestrator restored the escaped `\n\n` SSE separator (the subagent had turned it into literal newlines, which CRLF checkouts would break) and documented `AGENT_RESUME_SECRET` in `.env.example`. Accepted limit: tokens are not single-use (noted in the plan). |
 | 7 | 2026-10-09 | H.3 | (this commit) | tsc ok, 435 tests ok, lint 0 errors, build ok | Done by the orchestrator (static text). System prompt: write tools are proposals the user approves, so call them directly, batch one request's changes in one turn, don't retry rejected actions. Removed "confirm before deleting several" from delete tool descriptions. Prompt stays a module-load constant (byte-stable from here on). |
 | 8 | 2026-10-09 | H.4 | (this commit) | tsc ok, 446 tests ok, lint 0 errors, build ok | `useAgentChat` hook + pure `agentChat.ts` (frame reducer, history with a `[Propuesta: … → aprobada/rechazada/expirada]` trace so the model knows the outcome), `AgentConfirmCard` (checkbox per action, "Aprobar (n)" / "Rechazar todo", locks on first decision, 400 on resume → expirada), `AgentMessageBubble` split out; `AgentPanel` 233 → 119 lines; chat types moved to `src/types`. Orchestrator: create/edit icon now comes from the tool name, not the Spanish summary. |
+| 9 | 2026-10-09 | H.V | (this commit) | prepared, waiting for a human | The assistant needs a real API key, an owner session and real writes (the loop may not write remotely; local mode has no assistant). Manual checklist with 9 cases in `docs/plans/ux-wave-hitl-check.md`. Server behaviour is covered by the H.2 route tests. |
