@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { RoomPayload } from "@/types";
+import { IDEA_TOOLS, IDEA_TOOL_LABELS, isIdeaTool, runIdeaTool } from "@/server/agent/ideaTools";
 import { DomainError } from "@/server/domain/core";
 import { tripOverview, dayDetail, budgetDetail } from "@/server/domain/read";
 import { HttpError } from "@/server/http";
@@ -167,6 +168,7 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     description: "Set the COP per USD exchange rate (TRM) used for all currency conversions.",
     input_schema: schema({ rate: { type: "number", description: "COP per 1 USD, e.g. 4000" } }, ["rate"]),
   },
+  ...IDEA_TOOLS,
 ];
 
 // Spanish activity labels shown as chips in the chat UI while a tool runs.
@@ -184,6 +186,7 @@ export const TOOL_LABELS: Record<string, string> = {
   update_expense: "Editando gasto",
   remove_expense: "Eliminando gasto",
   set_exchange_rate: "Actualizando TRM",
+  ...IDEA_TOOL_LABELS,
 };
 
 export interface ToolOutcome {
@@ -282,6 +285,7 @@ async function runTool(ctx: OpContext, name: string, input: Input): Promise<unkn
       return budgetDetail(payload, peopleCount(payload, members.length));
     }
   }
+  if (isIdeaTool(name)) return runIdeaTool(ctx, name, input);
   const toOps = WRITE_TOOLS[name];
   if (!toOps) throw new DomainError(`Unknown tool "${name}"`);
   const results: OpResult[] = [];
