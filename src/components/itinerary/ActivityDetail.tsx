@@ -4,14 +4,17 @@ import LinkedExtrasSection from "@/components/itinerary/LinkedExtrasSection";
 import LocationSection from "@/components/itinerary/LocationSection";
 import RangesSection from "@/components/itinerary/RangesSection";
 import DocumentPicker from "@/components/documents/DocumentPicker";
+import PlacedInsightList from "@/components/ideas/PlacedInsightList";
 import { Disclosure } from "@/components/ui/disclosure";
 import ConfirmDelete from "@/components/ConfirmDelete";
 import { extraGroupUSD, fmtUSD } from "@/utils/currency";
+import type { PlacedInsight } from "@/utils/insights";
 import type { CalendarEvent, Day, EventPlace, Extra, TripDocument, TripSpan } from "@/types";
 
 interface ActivityDetailProps {
   selected: { ev: CalendarEvent; dayId: string };
   place?: EventPlace;          // where the trip map located it
+  tips?: PlacedInsight[];      // advice from the videos placed on this activity
   days: Day[];
   extras: Extra[];
   tripSpans: TripSpan[];
@@ -30,7 +33,7 @@ interface ActivityDetailProps {
 
 // Everything about one activity: the essentials up front, money and ranges folded away.
 export default function ActivityDetail({
-  selected, place, days, extras, tripSpans, documents, people, exchangeRate,
+  selected, place, tips = [], days, extras, tripSpans, documents, people, exchangeRate,
   onUpdate, onDelete, onMoveDay, onLinkExtra, onAddExtra, onRemoveExtra, onAddTripSpan, onRemoveTripSpan,
 }: ActivityDetailProps) {
   const linked = extras.filter((x) => x.linkedEventId === selected.ev.id);
@@ -48,6 +51,13 @@ export default function ActivityDetail({
       />
 
       <LocationSection ev={selected.ev} place={place} onSetLink={(mapsUrl) => onUpdate({ mapsUrl })} />
+
+      {tips.length > 0 && (
+        <section className="mt-4 flex flex-col gap-2 rounded-xl border border-border p-3">
+          <h3 className="text-[13px] font-semibold">💡 Consejos de los videos <span className="font-normal text-muted-foreground">{tips.length}</span></h3>
+          <PlacedInsightList items={tips} />
+        </section>
+      )}
 
       {documents.length > 0 && (
         <section className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-border p-3">

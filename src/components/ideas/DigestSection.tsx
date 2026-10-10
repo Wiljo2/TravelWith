@@ -1,7 +1,8 @@
-import { Play } from "lucide-react";
+import { Check, ListPlus, Play } from "lucide-react";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { fmtVideoTime } from "@/utils/ideaVideo";
 import { fmtDeadline, insightMeta, type DigestInsight, type DigestSpot } from "@/utils/insights";
+import { cn } from "@/lib/utils";
 
 // A titled list of a destination's digest ("✅ Por hacer", "📍 Lugares").
 export function DigestSection({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
@@ -27,12 +28,16 @@ function Source({ sources, at }: { sources: string[]; at?: number }) {
 
 const ROW = "flex w-full cursor-pointer items-start gap-2 rounded-lg px-1.5 py-1.5 text-left text-[13px] leading-snug hover:bg-secondary";
 
-export function InsightLine({ item, onOpen }: { item: DigestInsight; onOpen: (ideaId: string) => void }) {
+export function InsightLine({ item, onOpen, action }: {
+  item: DigestInsight;
+  onOpen: (ideaId: string) => void;
+  action?: React.ReactNode;   // e.g. "pasar a pendientes", next to the line
+}) {
   const meta = insightMeta(item.insight);
   const deadline = item.link?.deadline;
   return (
-    <li>
-      <button onClick={() => onOpen(item.ideaId)} className={ROW}>
+    <li className="flex items-start gap-1">
+      <button onClick={() => onOpen(item.ideaId)} className={cn(ROW, "min-w-0 flex-1")}>
         <span className="min-w-0 flex-1">
           {item.insight.text}
           {deadline && <span className="ml-1.5 rounded bg-amber-100 px-1 text-xs font-medium text-amber-900">{fmtDeadline(deadline)}</span>}
@@ -41,7 +46,25 @@ export function InsightLine({ item, onOpen }: { item: DigestInsight; onOpen: (id
         </span>
         <Source sources={item.sources} at={item.insight.at} />
       </button>
+      {action}
     </li>
+  );
+}
+
+// Turns a todo into a task of the group, or says it already is one.
+export function ToTaskButton({ done, onAdd }: { done: boolean; onAdd: () => void }) {
+  if (done) {
+    return <span title="Ya está en Pendientes" className="flex size-8 shrink-0 items-center justify-center text-emerald-700"><Check className="size-4" /></span>;
+  }
+  return (
+    <button
+      onClick={onAdd}
+      title="Pasar a Pendientes"
+      aria-label="Pasar a Pendientes"
+      className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+    >
+      <ListPlus className="size-4" />
+    </button>
   );
 }
 

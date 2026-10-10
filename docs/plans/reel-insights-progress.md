@@ -1,7 +1,7 @@
 # Reel insights progress
-- Iteration: 4
+- Iteration: 5
 - Last commit: (see log)
-- Next step: 4.1
+- Next step: 5.1
 - Browser checks run on `?local=1` with a generated `public/local-snapshot.json` (gitignored; Florida & Bahamas fixture + sample ideas).
 - Human actions pending: (0.3) provide the Crucero reel links and annotate `evals/reel-insights/cases.json`
 
@@ -31,10 +31,10 @@
 - [x] 3.3 Digest uses links (new / covered / n.a., deadlines)
 - [x] 3.4 Tests
 - [x] 3.V Verify anchoring
-- [ ] 4.1 Calendar 💡 badges
-- [ ] 4.2 "Consejos para hoy"
-- [ ] 4.3 Todos → tasks
-- [ ] 4.V Verify calendar, Hoy, tasks
+- [x] 4.1 Calendar 💡 badges
+- [x] 4.2 "Consejos para hoy" (during) + "Antes del viaje" todos by deadline (before)
+- [x] 4.3 Todos → tasks
+- [x] 4.V Verify calendar, Hoy, tasks
 - [ ] 5.1 `trip_insight_states` (migration 024) full path
 - [ ] 5.2 Triage controls + "Guía del viaje"
 - [ ] 5.3 Cross-reel consolidation

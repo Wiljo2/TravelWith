@@ -2,7 +2,7 @@ import { INSIGHT_KINDS, INSIGHT_KIND_ORDER, INSIGHT_PHASES } from "@/constants/i
 import { CRUISE_PLACE, normalizeText, vocab } from "@/utils/ideas";
 import { MONTHS } from "@/utils/tripDays";
 import { fmtHour } from "@/utils/time";
-import type { Day, Idea, IdeaInsight, IdeaSpot, InsightLink, InsightPhase } from "@/types";
+import type { Day, Idea, IdeaInsight, IdeaSpot, InsightLink, InsightPhase, Task } from "@/types";
 
 export interface Contribution {
   icon: string;
@@ -167,3 +167,49 @@ export function fmtDeadline(iso: string): string {
   const [, m, d] = iso.split("-").map(Number);
   return `antes de ${MONTHS[m - 1]} ${d}`;
 }
+
+// A video insight Claude placed on a day or activity of the plan.
+export interface PlacedInsight {
+  id: string;
+  insight: IdeaInsight;
+  idea: Idea;
+  link: InsightLink;
+}
+
+// The new advice placed on the plan, for the calendar, the activity and "Hoy".
+// Links to insights that no longer exist (a video analyzed again) are skipped.
+export function placedInsights(ideas: Idea[], links: InsightLink[] | undefined): PlacedInsight[] {
+  if (!links?.length) return [];
+  const byId = new Map(ideas.map((i) => [i.id, i]));
+  return links.flatMap((link) => {
+    if (link.status !== "new" || !link.dayId) return [];
+    const idea = byId.get(insightIdeaId(link.insightId));
+    const index = Number(link.insightId.slice(link.insightId.lastIndexOf(":i") + 2));
+    const insight = idea?.video?.insights?.[index];
+    return idea && insight && idea.status !== "discarded" ? [{ id: link.insightId, insight, idea, link }] : [];
+  });
+}
+
+export function countByEvent(placed: PlacedInsight[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const p of placed) if (p.link.eventId) out[p.link.eventId] = (out[p.link.eventId] ?? 0) + 1;
+  return out;
+}
+
+const URGENT_DAYS = 14;
+
+// A todo from the videos as a task of the group: its text, when and why in the
+// note with the video link, high priority when the deadline is close.
+export function insightTask(item: DigestInsight, videoUrl: string, now = new Date()): Pick<Task, "title" | "note" | "priority"> {
+  const deadline = item.link?.deadline;
+  const days = deadline ? (Date.parse(`${deadline}T12:00:00`) - now.getTime()) / 86_400_000 : Infinity;
+  const note = [
+    [item.insight.when, deadline && fmtDeadline(deadline)].filter(Boolean).join(" · "),
+    item.link?.reason,
+    `Del video: ${videoUrl}`,
+  ].filter(Boolean).join("\n");
+  return { title: item.insight.text, note, priority: days <= URGENT_DAYS ? "alta" : "media" };
+}
+
+export const hasTaskFor = (tasks: Task[], item: DigestInsight) =>
+  tasks.some((t) => normalizeText(t.title) === normalizeText(item.insight.text));

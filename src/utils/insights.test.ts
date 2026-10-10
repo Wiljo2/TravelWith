@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectInsights, fmtDeadline, momentGroups, momentLabel, videoContribution } from "@/utils/insights";
+import { collectInsights, countByEvent, fmtDeadline, hasTaskFor, insightTask, momentGroups, momentLabel, placedInsights, videoContribution } from "@/utils/insights";
 import type { Idea, IdeaInsight } from "@/types";
 
 const idea: Idea = { id: "i", url: "https://vt.tiktok.com/x/", platform: "tiktok", createdAt: "2026-10-01T00:00:00.000Z" };
@@ -96,5 +96,36 @@ describe("with Claude's links", () => {
 
   it("formats a deadline", () => {
     expect(fmtDeadline("2026-09-11")).toBe("antes de Sep 11");
+  });
+});
+
+describe("placedInsights", () => {
+  const video: Idea = { ...idea, id: "v", video: { status: "done", insights: [{ kind: "tip", text: "a" }, { kind: "todo", text: "b" }] } };
+  it("keeps new advice placed on a day, and counts it per activity", () => {
+    const placed = placedInsights([video], [
+      { insightId: "v:i0", dayId: "d1", eventId: "e1", status: "new" },
+      { insightId: "v:i1", dayId: "d1", eventId: "e1", before: true, status: "new" },
+      { insightId: "v:i1", status: "new" },
+      { insightId: "v:i0", dayId: "d1", status: "covered" },
+      { insightId: "v:i7", dayId: "d1", status: "new" },
+      { insightId: "gone:i0", dayId: "d1", status: "new" },
+    ]);
+    expect(placed.map((p) => p.insight.text)).toEqual(["a", "b"]);
+    expect(countByEvent(placed)).toEqual({ e1: 2 });
+    expect(placedInsights([{ ...video, status: "discarded" }], [{ insightId: "v:i0", dayId: "d1", status: "new" }])).toEqual([]);
+  });
+});
+
+describe("insightTask", () => {
+  const item = {
+    id: "v:i0", ideaId: "v", sources: ["v"],
+    insight: { kind: "todo" as const, text: "Reserva los shows", when: "60 días antes" },
+    link: { insightId: "v:i0", deadline: "2026-10-20", status: "new" as const, reason: "Se agotan" },
+  };
+  it("builds the task and knows when it already exists", () => {
+    const t = insightTask(item, "https://tiktok.com/v", new Date("2026-10-10T12:00:00"));
+    expect(t).toEqual({ title: "Reserva los shows", note: "60 días antes · antes de Oct 20\nSe agotan\nDel video: https://tiktok.com/v", priority: "alta" });
+    expect(insightTask({ ...item, link: undefined }, "u").priority).toBe("media");
+    expect(hasTaskFor([{ id: "t", title: "reserva los SHOWS", done: false }], item)).toBe(true);
   });
 });

@@ -18,7 +18,7 @@ import { ideaLinks, matchIdeasToPlan } from "@/utils/ideaPlan";
 import { hideSplitVideos, isAnalyzingVideo } from "@/utils/ideaVideo";
 import { fmtHour } from "@/utils/time";
 import { cn } from "@/lib/utils";
-import type { Day, Idea, IdeaLink, IdeaMoment, IdeaPlanResult, InsightLink } from "@/types";
+import type { Day, Idea, IdeaLink, IdeaMoment, IdeaPlanResult, InsightLink, Task } from "@/types";
 import type { PlaceIndex } from "@/utils/ideas";
 import { isVenue, zonesOf } from "@/utils/places";
 
@@ -55,6 +55,8 @@ interface IdeasViewProps {
   todayIdx?: number;
   sharedText?: string | null;      // a link shared from the phone, to confirm
   onSharedDone?: () => void;
+  tasks?: Task[];
+  onAddTask?: (task: Pick<Task, "title" | "note" | "priority">) => void;
 }
 
 const ALL = "all";
@@ -72,7 +74,7 @@ const GRID = "grid grid-cols-2 gap-2.5 md:grid-cols-[repeat(auto-fill,minmax(150
 export default function IdeasView({
   ideas: allIdeas, index, roomCode, loadingIds, mobile, voter,
   onAdd, onUpdate, onSetPlace, onSetCat, onSetMoment, onRemove, onVote, onApplyClaude, onAcceptAll, onSetNote, onRetry, onRetryVideo, onUploadVideo, onAddPlace, onRemovePlace,
-  days, planLinks, planLinksAt, planIdeaIds, planInsightLinks, onAnalyze, onSavePlan, phase, todayIdx, sharedText, onSharedDone,
+  days, planLinks, planLinksAt, planIdeaIds, planInsightLinks, onAnalyze, onSavePlan, phase, todayIdx, sharedText, onSharedDone, tasks, onAddTask,
 }: IdeasViewProps) {
   // A video split into spot ideas shows as its spots.
   const ideas = useMemo(() => hideSplitVideos(allIdeas), [allIdeas]);
@@ -81,8 +83,9 @@ export default function IdeasView({
   const venues = index.places.filter(isVenue).map((p) => p.name);
   const [filter, setFilter] = useState<string>(ALL);
   const [zone, setZone] = useState<string>(ALL);
-  // The digest when some video already says something concrete.
-  const [view, setView] = useState<"digest" | "place" | "day">(() => (allIdeas.some((i) => i.video?.insights?.length) ? "digest" : "place"));
+  // The digest when some video already says something concrete, until a view is picked.
+  const [picked, setView] = useState<"digest" | "place" | "day" | null>(null);
+  const view = picked ?? (allIdeas.some((i) => i.video?.insights?.length) ? "digest" : "place");
   const [adding, setAdding] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
   // Keeps the last idea on screen while the sheet animates closed.
@@ -239,6 +242,8 @@ export default function IdeasView({
           zoneOf={digestZoneOf}
           days={days}
           links={planInsightLinks}
+          tasks={tasks}
+          onAddTask={onAddTask}
           row={ROW}
           renderCard={(i) => card(i)}
           onOpen={setViewing}

@@ -9,7 +9,7 @@ import { isVenue, tripPlaces } from "@/utils/places";
 import { tripPhase } from "@/utils/tripDays";
 import type { useIdeas } from "@/hooks/useIdeas";
 import { apiFetch } from "@/lib/api";
-import type { Day, IdeaLink, IdeaPlanResult, InsightLink, RoomPayload, TripInfo } from "@/types";
+import type { Day, IdeaLink, IdeaPlanResult, InsightLink, RoomPayload, Task, TripInfo } from "@/types";
 
 interface IdeasTabProps {
   api: ReturnType<typeof useIdeas>;
@@ -25,11 +25,15 @@ interface IdeasTabProps {
   save: (payload: RoomPayload, opts?: { force?: boolean }) => Promise<boolean>;
   sharedText?: string | null;
   onSharedDone?: () => void;
+  tasks: Task[];
+  onAddTask: (task: Pick<Task, "title" | "note" | "priority">) => void;
 }
 
 // Wires the Ideas board to the room: the trip's places, who is voting/adding,
 // and the server call behind "Analizar con Claude".
-export default function IdeasTab({ api, roomCode, localMode, mobile, user, accessToken, days, trip, currentPayload, save, sharedText, onSharedDone }: IdeasTabProps) {
+export default function IdeasTab({
+  api, roomCode, localMode, mobile, user, accessToken, days, trip, currentPayload, save, sharedText, onSharedDone, tasks, onAddTask,
+}: IdeasTabProps) {
   const { customPlaces, reclassify } = api;
   const index = useMemo(
     () => placeIndex(tripPlaces(trip?.destination, days, customPlaces), days),
@@ -104,6 +108,8 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, acces
       todayIdx={phase?.phase === "during" ? phase.dayIdx : undefined}
       sharedText={sharedText}
       onSharedDone={onSharedDone}
+      tasks={tasks}
+      onAddTask={onAddTask}
     />
   );
 }

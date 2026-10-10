@@ -8,6 +8,7 @@ import { chooseOption } from "@/utils/taskDecision";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { snapHour, fmtHour } from "@/utils/time";
 import { extraGroupUSD } from "@/utils/currency";
+import { countByEvent, placedInsights } from "@/utils/insights";
 import CalendarGrid from "@/components/calendar/CalendarGrid";
 import SlotCreateModal from "@/components/calendar/SlotCreateModal";
 import AgentPanel from "@/components/agent/AgentPanel";
@@ -62,6 +63,9 @@ export default function App() {
   const { tasks, addTask, toggleTask, updateTask, deleteTask, swapTaskDays } = taskState;
   const { trip, mockPeople, addMockPerson, removeMockPerson } = tripInfo;
   const { ideas } = ideasApi;
+  // Advice from the videos that "Analizar con Claude" placed on the plan.
+  const placed = useMemo(() => placedInsights(ideas, ideasApi.planInsightLinks), [ideas, ideasApi.planInsightLinks]);
+  const tipsByEvent = useMemo(() => countByEvent(placed), [placed]);
   const { documents, addDocument, updateDocument, removeDocument } = docs;
   const { connected, offlineSince, members } = data.room;
 
@@ -148,6 +152,7 @@ export default function App() {
       key={selectedEvent.ev.id}
       selected={selectedEvent}
       place={geoApi.eventPlaces[selectedEvent.ev.id]}
+      tips={placed.filter((p) => p.link.eventId === selectedEvent.ev.id)}
       days={days}
       extras={extras}
       tripSpans={tripSpans}
@@ -208,6 +213,7 @@ export default function App() {
           people={people}
           exchangeRate={exchangeRate}
           onNavigate={setActiveTab}
+          placed={placed}
           documents={<DocumentsPanel documents={documents} onAdd={addDocument} onUpdate={updateDocument} onRemove={removeDocument} />}
         />
       )}
@@ -243,6 +249,7 @@ export default function App() {
               onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
               onToggleTask={toggleTask}
               onSetDaySub={setDaySub}
+              tipsByEvent={tipsByEvent}
             />
           }
           grid={
@@ -266,6 +273,7 @@ export default function App() {
             onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
             onSwapDays={swapDaysWithTasks}
             onSetDaySub={setDaySub}
+            tipsByEvent={tipsByEvent}
             pendingNew={slotDraft && !slotDraft.task ? { dayId: slotDraft.dayId, hour: slotDraft.hour } : null}
             initialDayIdx={todayIdx}
           />
@@ -301,6 +309,8 @@ export default function App() {
           save={save}
           sharedText={shared.text}
           onSharedDone={shared.clear}
+          tasks={tasks}
+          onAddTask={(task) => addTask(task)}
         />
       )}
 

@@ -23,13 +23,14 @@ interface ItineraryAgendaProps {
   onEditTask: (task: Task, x: number, y: number) => void;
   onToggleTask: (id: string) => void;
   onSetDaySub: (dayId: string, sub: string) => void;
+  tipsByEvent?: Record<string, number>;   // video advice placed on each activity
 }
 
 type Row = { kind: "event"; ev: CalendarEvent; start: number } | { kind: "task"; task: Task; start: number };
 
 // The whole trip as a list of day cards — the default, low-noise itinerary view.
 export default function ItineraryAgenda({
-  days, tripSpans, tasks, selectedId, todayIdx, onSelect, onAdd, onEditTask, onToggleTask, onSetDaySub,
+  days, tripSpans, tasks, selectedId, todayIdx, onSelect, onAdd, onEditTask, onToggleTask, onSetDaySub, tipsByEvent,
 }: ItineraryAgendaProps) {
   const todayRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -88,7 +89,7 @@ export default function ItineraryAgenda({
               <ul className="-mx-2 flex flex-col">
                 {rows.map((r) =>
                   r.kind === "event"
-                    ? <EventRow key={r.ev.id} ev={r.ev} selected={r.ev.id === selectedId} onClick={() => onSelect(r.ev.id)} />
+                    ? <EventRow key={r.ev.id} ev={r.ev} selected={r.ev.id === selectedId} tips={tipsByEvent?.[r.ev.id]} onClick={() => onSelect(r.ev.id)} />
                     : <TaskRow key={r.task.id} task={r.task} onEdit={onEditTask} onToggle={() => onToggleTask(r.task.id)} />,
                 )}
               </ul>
@@ -100,7 +101,7 @@ export default function ItineraryAgenda({
   );
 }
 
-function EventRow({ ev, selected, onClick }: { ev: CalendarEvent; selected: boolean; onClick: () => void }) {
+function EventRow({ ev, selected, tips, onClick }: { ev: CalendarEvent; selected: boolean; tips?: number; onClick: () => void }) {
   const cat = CATEGORIES[ev.cat] ?? CATEGORIES.logist;
   return (
     <li>
@@ -117,7 +118,7 @@ function EventRow({ ev, selected, onClick }: { ev: CalendarEvent; selected: bool
         </span>
         <span className="mt-[7px] h-2 w-2 shrink-0 rounded-full" style={{ background: cat.dot }} />
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium leading-snug text-foreground"><span aria-hidden className="mr-1">{eventIcon(ev)}</span>{ev.title}</span>
+          <span className="block text-sm font-medium leading-snug text-foreground"><span aria-hidden className="mr-1">{eventIcon(ev)}</span>{ev.title}{!!tips && <span className="ml-1.5 text-xs font-semibold text-muted-foreground">💡{tips}</span>}</span>
           {ev.note && <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">{ev.note}</span>}
         </span>
       </button>

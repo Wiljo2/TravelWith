@@ -1,11 +1,11 @@
 "use client";
-import { DigestSection, InsightLine, SpotLine } from "@/components/ideas/DigestSection";
+import { DigestSection, InsightLine, SpotLine, ToTaskButton } from "@/components/ideas/DigestSection";
 import { PANEL } from "@/components/home/shared";
 import { Disclosure } from "@/components/ui/disclosure";
 import { INSIGHT_KINDS } from "@/constants/insightKinds";
-import { collectInsights, momentGroups, type DigestInsight, type ZoneDigest } from "@/utils/insights";
+import { collectInsights, hasTaskFor, insightTask, momentGroups, type DigestInsight, type ZoneDigest } from "@/utils/insights";
 import { cn } from "@/lib/utils";
-import type { Day, Idea, InsightLink, InsightKind } from "@/types";
+import type { Day, Idea, InsightLink, InsightKind, Task } from "@/types";
 
 interface IdeasDigestProps {
   ideas: Idea[];                       // every idea, split videos included
@@ -13,6 +13,8 @@ interface IdeasDigestProps {
   zoneOf: (idea: Idea) => string;
   days: Day[];
   links?: InsightLink[];               // where "Analizar con Claude" placed each insight
+  tasks?: Task[];
+  onAddTask?: (task: Pick<Task, "title" | "note" | "priority">) => void;
   row: string;                         // class of a swipeable row of cards
   renderCard: (idea: Idea) => React.ReactNode;
   onOpen: (ideaId: string) => void;
@@ -21,7 +23,7 @@ interface IdeasDigestProps {
 // "Lo que aportan los videos": per destination, everything its saved videos
 // say, ready to use — what to do before, what to avoid, advice by moment of
 // the trip, useful facts and places — with the videos last, as the source.
-export default function IdeasDigest({ ideas, zones, zoneOf, days, links, row, renderCard, onOpen }: IdeasDigestProps) {
+export default function IdeasDigest({ ideas, zones, zoneOf, days, links, tasks = [], onAddTask, row, renderCard, onOpen }: IdeasDigestProps) {
   const digests = collectInsights(ideas, zoneOf, links);
   // Destinations whose videos say something come first, each group in trip order.
   const useful = (d: ZoneDigest) => d.insights.length + d.spots.length > 0;
@@ -32,15 +34,22 @@ export default function IdeasDigest({ ideas, zones, zoneOf, days, links, row, re
   return (
     <div className="flex flex-col gap-4">
       {shown.map(({ key, title, digest }) => (
-        <ZonePanel key={key} zone={key} title={title} digest={digest} days={days} row={row} renderCard={renderCard} onOpen={onOpen} />
+        <ZonePanel
+          key={key} zone={key} title={title} digest={digest} days={days} row={row} renderCard={renderCard} onOpen={onOpen}
+          toTask={onAddTask && {
+            has: (i: DigestInsight) => hasTaskFor(tasks, i),
+            add: (i: DigestInsight) => onAddTask(insightTask(i, ideas.find((v) => v.id === i.ideaId)?.url ?? "")),
+          }}
+        />
       ))}
     </div>
   );
 }
 
-function ZonePanel({ zone, title, digest, days, row, renderCard, onOpen }: {
+function ZonePanel({ zone, title, digest, days, row, renderCard, onOpen, toTask }: {
   zone: string; title: string; digest: ZoneDigest; days: Day[]; row: string;
   renderCard: (idea: Idea) => React.ReactNode; onOpen: (ideaId: string) => void;
+  toTask?: { has: (i: DigestInsight) => boolean; add: (i: DigestInsight) => void };
 }) {
   // Claude's verdict: what the plan already has, and what isn't for this trip, go last.
   const open = digest.insights.filter((i) => !i.link || i.link.status === "new");
@@ -48,6 +57,7 @@ function ZonePanel({ zone, title, digest, days, row, renderCard, onOpen }: {
   const na = digest.insights.filter((i) => i.link?.status === "na");
   const of = (kind: InsightKind) => open.filter((i) => i.insight.kind === kind);
   const todos = of("todo").sort((a, b) => (a.link?.deadline ?? "9").localeCompare(b.link?.deadline ?? "9"));
+  const pendingTodos = toTask ? todos.filter((i) => !toTask.has(i)) : [];
   const avoid = of("avoid");
   const tips = momentGroups(of("tip"), days, zone);
   const facts = of("fact");
@@ -65,7 +75,20 @@ function ZonePanel({ zone, title, digest, days, row, renderCard, onOpen }: {
       {total + covered.length + na.length === 0 && (
         <p className="text-[13px] text-muted-foreground">Estos videos aún no tienen consejos ni lugares analizados.</p>
       )}
-      {todos.length > 0 && <DigestSection title={`${INSIGHT_KINDS.todo.icon} Por hacer`} count={todos.length}>{lines(todos)}</DigestSection>}
+      {todos.length > 0 && (
+        <DigestSection title={`${INSIGHT_KINDS.todo.icon} Por hacer`} count={todos.length}>
+          {todos.map((i) => (
+            <InsightLine key={i.id} item={i} onOpen={onOpen} action={toTask && <ToTaskButton done={toTask.has(i)} onAdd={() => toTask.add(i)} />} />
+          ))}
+          {toTask && pendingTodos.length > 1 && (
+            <li>
+              <button onClick={() => pendingTodos.forEach(toTask.add)} className="cursor-pointer px-1.5 py-1 text-xs font-medium text-emerald-800 hover:underline">
+                Pasar las {pendingTodos.length} a Pendientes
+              </button>
+            </li>
+          )}
+        </DigestSection>
+      )}
       {avoid.length > 0 && <DigestSection title={`${INSIGHT_KINDS.avoid.icon} Evitar`} count={avoid.length}>{lines(avoid)}</DigestSection>}
       {tips.length > 0 && (
         <DigestSection title="🕐 Consejos por momento" count={tips.reduce((n, g) => n + g.items.length, 0)}>
