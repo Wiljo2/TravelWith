@@ -107,6 +107,25 @@ export function newIdeaRow(args: unknown, position: number): NewRow<"trip_ideas"
   return { id: args.id === undefined ? uid() : checkClientId(args.id), position, data: ideaData(args.idea) };
 }
 
+const MAX_SPOT_IDEAS = 12;
+
+// The video analysis write: the parent's whole data and its spot ideas, whose
+// ids derive from the parent ("<parent>-s<n>").
+export function ideaVideoArgs(args: unknown): { id: string; data: Json; children: { id: string; data: Json }[] } {
+  if (!isObject(args)) throw new DomainError("arguments must be an object");
+  const id = checkClientId(args.id);
+  const data = ideaData(args.idea);
+  const list = args.children ?? [];
+  if (!Array.isArray(list) || list.length > MAX_SPOT_IDEAS) throw new DomainError(`children must be a list of at most ${MAX_SPOT_IDEAS}`);
+  const children = list.map((c: unknown) => {
+    if (!isObject(c)) throw new DomainError("child must be an object");
+    const childId = checkClientId(c.id, "child id");
+    if (!childId.startsWith(`${id.slice(0, 95)}-s`)) throw new DomainError("child id must derive from the parent");
+    return { id: childId, data: ideaData(c.idea) };
+  });
+  return { id, data, children };
+}
+
 // Map places by activity id; null removes the place.
 export function placesArg(args: unknown): Map<string, Json | null> {
   if (!isObject(args) || !isObject(args.places)) throw new DomainError("places must be an object keyed by activity id");

@@ -23,6 +23,10 @@ export function isKnownOp(name: string): boolean {
   return Object.hasOwn(OPS, name);
 }
 
+export function isClientOp(name: string): boolean {
+  return isKnownOp(name) && !OPS[name].internal;
+}
+
 export async function runOp(name: string, ctx: OpContext, input: OpInput): Promise<OpResult> {
   if (!isKnownOp(name)) throw new HttpError(400, "Operación desconocida");
   const op = OPS[name];

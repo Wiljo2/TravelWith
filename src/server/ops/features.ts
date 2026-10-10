@@ -1,10 +1,11 @@
 import { LIMITS } from "@/constants/limits";
 import { DomainError, argId } from "@/server/domain/core";
-import { documentPatch, ideaData, ideaSettingsPatch, newDocumentRow, newIdeaRow, placesArg } from "@/server/domain/featureRows";
+import { documentPatch, ideaData, ideaSettingsPatch, ideaVideoArgs, newDocumentRow, newIdeaRow, placesArg } from "@/server/domain/featureRows";
 import { documentsRepo } from "@/server/repo/documents";
 import { removeEventPlace, upsertEventPlaces } from "@/server/repo/eventPlaces";
 import { eventsRepo } from "@/server/repo/events";
-import { ideasRepo } from "@/server/repo/ideas";
+import { applyIdeaVideo, ideasRepo } from "@/server/repo/ideas";
+import { scheduleVideoAnalysis } from "@/server/video/analyze";
 import { updateTripHeader } from "@/server/repo/trip";
 import type { OpDefinition, RowChange, RowDeletion } from "@/server/ops/types";
 import type { Json } from "@/types/database";
@@ -49,6 +50,7 @@ export const FEATURE_OPS: Record<string, OpDefinition> = {
       if (existing.length >= MAX_IDEAS) throw new DomainError(`The trip already has ${MAX_IDEAS} ideas`);
       const position = existing.length ? Math.max(...existing.map((i) => i.position)) + 1 : 0;
       const row = await ideasRepo.insert(ctx.code, newIdeaRow(args, position), ctx.userId);
+      scheduleVideoAnalysis(ctx, row.id);
       return { changed: [{ table: "trip_ideas", row }], deleted: [] };
     },
   },
@@ -60,6 +62,19 @@ export const FEATURE_OPS: Record<string, OpDefinition> = {
       const data = ideaData((args as { idea?: unknown }).idea);
       const row = await ideasRepo.update(ctx.code, id, { data }, expectedVersion, ctx.userId);
       return { changed: [{ table: "trip_ideas", row }], deleted: [] };
+    },
+  },
+
+  // The video analysis: the parent's new data and its spot ideas, in one
+  // transaction. Written by the server only, after merging onto the latest row.
+  "idea.applyVideo": {
+    internal: true,
+    async run(ctx, { args, expectedVersion }) {
+      const { id, data, children } = ideaVideoArgs(args);
+      if (expectedVersion === undefined) throw new DomainError("expectedVersion is required");
+      const result = await applyIdeaVideo(ctx.code, id, expectedVersion, data, children, ctx.userId);
+      const changed: RowChange[] = [result.parent, ...result.children].map((row) => ({ table: "trip_ideas", row }));
+      return { changed, deleted: [] };
     },
   },
 
