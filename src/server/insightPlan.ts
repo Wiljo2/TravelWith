@@ -16,6 +16,8 @@ También recibes CONSEJOS (n1, n2…) que salieron de esos videos. Para cada con
 - before: true si hay que hacerlo antes del viaje (reservar, comprar, llevar, descargar).
 - deadline: solo para lo que debe hacerse con anticipación ("60 días antes", "una semana antes"): la fecha límite AAAA-MM-DD calculada con las FECHAS del viaje; si no, "".
 - status: "new" si aporta algo que el plan aún no tiene; "covered" si el itinerario ya lo contempla (una actividad, una nota o una reserva lo dice); "na" si no aplica a este viaje: otra naviera, otro barco, otro parque, un puerto o lugar que no visitan, el aeropuerto o la dirección de vuelo equivocada.
+- same: si un consejo anterior (n…) dice lo mismo con otras palabras, su etiqueta; si no, "".
+- contradicts: si otro consejo (n…) recomienda lo contrario, su etiqueta; si no, "".
 - reason: en español, máximo 16 palabras, por qué sirve ahí o por qué no aplica. Sin etiquetas.`;
 
 export const INSIGHT_SCHEMA = {
@@ -29,8 +31,10 @@ export const INSIGHT_SCHEMA = {
       deadline: { type: "string" },
       status: { type: "string", enum: STATUSES },
       reason: { type: "string" },
+      same: { type: "string" },
+      contradicts: { type: "string" },
     },
-    required: ["insight", "target", "before", "deadline", "status", "reason"],
+    required: ["insight", "target", "before", "deadline", "status", "reason", "same", "contradicts"],
     additionalProperties: false,
   },
 };
@@ -74,7 +78,9 @@ export function describeInsights(sources: Idea[]) {
 }
 
 type Target = Omit<IdeaLink, "ideaId" | "reason" | "source" | "before">;
-export type InsightAnswer = { insight: string; target: string; before: boolean; deadline: string; status: string; reason: string };
+export type InsightAnswer = {
+  insight: string; target: string; before: boolean; deadline: string; status: string; reason: string; same?: string; contradicts?: string;
+};
 
 // Unknown labels are dropped; a deadline must be a real date before the trip ends.
 export function readInsightAnswers(
@@ -88,6 +94,11 @@ export function readInsightAnswers(
     const target = status === "na" ? undefined : targets.get(a.target?.trim());
     const deadline = /^\d{4}-\d{2}-\d{2}$/.test(a.deadline ?? "") && !Number.isNaN(Date.parse(a.deadline))
       && (!tripEnd || a.deadline <= tripEnd) ? a.deadline : undefined;
+    // Another insight of this call, never itself.
+    const other = (label?: string) => {
+      const o = labels.get(label?.trim() ?? "");
+      return o && o !== id ? o : undefined;
+    };
     out.push({
       insightId: id,
       ...target,
@@ -95,6 +106,8 @@ export function readInsightAnswers(
       ...(deadline ? { deadline } : {}),
       status,
       ...(a.reason?.trim() ? { reason: cut(a.reason, 160) } : {}),
+      ...(other(a.same) ? { sameAs: other(a.same) } : {}),
+      ...(other(a.contradicts) ? { contradicts: other(a.contradicts) } : {}),
     });
   }
   return out;

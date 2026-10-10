@@ -37,7 +37,7 @@
 - [x] 4.V Verify calendar, Hoy, tasks
 - [x] 5.1 Insight votes and hiding — stored on the video idea (`Idea.insightStates`, same pattern as `Idea.votes`): no table or migration needed
 - [x] 5.2 Triage controls (👍, hide/restore) + "Copiar la guía del grupo"
-- [ ] 5.3 Cross-reel consolidation
+- [x] 5.3 Cross-reel consolidation (Claude `same`/`contradicts` → merged lines, "otro video dice lo contrario")
 - [ ] 5.4 Stop automatic spot children, on-demand "Guardar como idea"
 - [ ] 5.V Verify triage + consolidation
 - [H] F.1 Docs, env example, PR draft, migrations, push

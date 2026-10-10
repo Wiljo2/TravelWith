@@ -40,6 +40,8 @@ export interface DigestInsight {
   insight: IdeaInsight;
   ideaId: string;
   sources: string[];        // ids of the videos that say it
+  ids: string[];            // every insight merged into this one
+  conflicts?: string[];     // what other videos say against it
   link?: InsightLink;        // where "Analizar con Claude" placed it
   index: number;            // position in the first video's insights
   state?: InsightState;     // the group's votes or hiding, kept on that video
@@ -101,10 +103,11 @@ export function collectInsights(ideas: Idea[], zoneOf: (i: Idea) => string, link
       if (same) {
         if (!same.sources.includes(video.id)) same.sources.push(video.id);
         same.link ??= link;
+        same.ids.push(insightId(video.id, n));
         return;
       }
       const state = video.insightStates?.[n];
-      digest.insights.push({ id: insightId(video.id, n), insight, ideaId: video.id, index: n, sources: [video.id], ...(link ? { link } : {}), ...(state ? { state } : {}) });
+      digest.insights.push({ id: insightId(video.id, n), ids: [insightId(video.id, n)], insight, ideaId: video.id, index: n, sources: [video.id], ...(link ? { link } : {}), ...(state ? { state } : {}) });
     });
     for (const spot of v.spots ?? []) {
       const same = digest.spots.find((d) => normalizeText(d.spot.name) === normalizeText(spot.name));
@@ -112,6 +115,7 @@ export function collectInsights(ideas: Idea[], zoneOf: (i: Idea) => string, link
       digest.spots.push({ spot, ideaId: video.id, sources: [video.id] });
     }
   }
+  for (const digest of out.values()) mergeByLinks(digest);
   return out;
 }
 
@@ -233,4 +237,23 @@ export function tripGuideText(zones: { title: string; zone: string; digest: Zone
     return [`📍 ${title}`, ...lines].join("\n");
   });
   return blocks.length ? ["Guía del viaje — lo que el grupo marcó de los videos", ...blocks].join("\n\n") : "";
+}
+
+// Claude's reading across videos: advice that says the same in other words is
+// merged into the earlier one; advice that says the opposite is flagged on both.
+function mergeByLinks(d: ZoneDigest) {
+  const owner = (id: string) => d.insights.find((x) => x.ids.includes(id));
+  for (const item of [...d.insights]) {
+    const target = item.link?.sameAs ? owner(item.link.sameAs) : undefined;
+    if (!target || target === item) continue;
+    for (const s of item.sources) if (!target.sources.includes(s)) target.sources.push(s);
+    target.ids.push(...item.ids);
+    d.insights.splice(d.insights.indexOf(item), 1);
+  }
+  for (const item of d.insights) {
+    const opposite = item.link?.contradicts ? owner(item.link.contradicts) : undefined;
+    if (!opposite || opposite === item) continue;
+    item.conflicts = [...new Set([...(item.conflicts ?? []), opposite.insight.text])];
+    opposite.conflicts = [...new Set([...(opposite.conflicts ?? []), item.insight.text])];
+  }
 }

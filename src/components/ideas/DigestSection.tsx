@@ -43,6 +43,9 @@ export function InsightLine({ item, onOpen, action }: {
           {deadline && <span className="ml-1.5 rounded bg-amber-100 px-1 text-xs font-medium text-amber-900">{fmtDeadline(deadline)}</span>}
           {meta && <span className="ml-1.5 text-xs text-muted-foreground">{meta}</span>}
           {item.link?.reason && <span className="block text-xs text-secondary-foreground">{item.link.reason}</span>}
+          {item.conflicts?.map((c) => (
+            <span key={c} className="block text-xs text-amber-900">⚠️ Otro video dice lo contrario: {c}</span>
+          ))}
         </span>
         <Source sources={item.sources} at={item.insight.at} />
       </button>

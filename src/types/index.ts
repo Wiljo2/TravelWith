@@ -281,6 +281,8 @@ export interface InsightLink {
   before?: boolean;
   deadline?: string;
   status: InsightStatus;
+  sameAs?: string;           // another insight that says the same (from another video)
+  contradicts?: string;      // another insight that says the opposite
   reason?: string;
 }
 

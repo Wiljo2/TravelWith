@@ -118,7 +118,7 @@ describe("placedInsights", () => {
 
 describe("insightTask", () => {
   const item = {
-    id: "v:i0", ideaId: "v", index: 0, sources: ["v"],
+    id: "v:i0", ids: ["v:i0"], ideaId: "v", index: 0, sources: ["v"],
     insight: { kind: "todo" as const, text: "Reserva los shows", when: "60 días antes" },
     link: { insightId: "v:i0", deadline: "2026-10-20", status: "new" as const, reason: "Se agotan" },
   };
@@ -146,5 +146,23 @@ describe("tripGuideText", () => {
       "Guía del viaje — lo que el grupo marcó de los videos\n\n📍 Crucero\nAntes del viaje:\n✅ Reserva los shows",
     );
     expect(tripGuideText([{ title: "Crucero", zone: "Crucero", digest: { ...zone, insights: [] } }], [])).toBe("");
+  });
+});
+
+describe("merging by Claude's links", () => {
+  const a: Idea = { ...idea, id: "a", place: "Crucero", video: { status: "done", insights: [{ kind: "tip", text: "Compra el paquete de bebidas" }] } };
+  const b: Idea = { ...idea, id: "b", place: "Crucero", video: { status: "done", insights: [
+    { kind: "tip", text: "Vale la pena el plan de tragos" },
+    { kind: "tip", text: "No compres el paquete de bebidas, no se paga" },
+  ] } };
+  it("merges what says the same and flags what says the opposite", () => {
+    const cruise = collectInsights([a, b], (i) => i.place ?? "none", [
+      { insightId: "b:i0", sameAs: "a:i0", status: "new" },
+      { insightId: "b:i1", contradicts: "a:i0", status: "new" },
+    ]).get("Crucero")!;
+    expect(cruise.insights.map((i) => [i.id, i.sources, i.conflicts])).toEqual([
+      ["a:i0", ["a", "b"], ["No compres el paquete de bebidas, no se paga"]],
+      ["b:i1", ["b"], ["Compra el paquete de bebidas"]],
+    ]);
   });
 });

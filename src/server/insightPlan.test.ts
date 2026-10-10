@@ -76,3 +76,20 @@ describe("plan prompt with insights", () => {
     expect(b).toEqual({ insightId: "vid-1:i1", status: "covered" });
   });
 });
+
+describe("same and opposite advice", () => {
+  it("keeps references to other insights of the call, never to itself or unknown labels", () => {
+    const labels = new Map([["n1", "a:i0"], ["n2", "b:i0"], ["n3", "c:i0"]]);
+    const base = { target: "none", before: false, deadline: "", status: "new", reason: "" };
+    const links = readInsightAnswers([
+      { ...base, insight: "n1", same: "", contradicts: "" },
+      { ...base, insight: "n2", same: "n1", contradicts: "n2" },
+      { ...base, insight: "n3", same: "n9", contradicts: "n1" },
+    ], labels, new Map());
+    expect(links.map((l) => [l.insightId, l.sameAs, l.contradicts])).toEqual([
+      ["a:i0", undefined, undefined],
+      ["b:i0", "a:i0", undefined],
+      ["c:i0", undefined, "a:i0"],
+    ]);
+  });
+});
