@@ -5,7 +5,7 @@ import { RowConflictError } from "@/server/repo/errors";
 import { ideasRepo } from "@/server/repo/ideas";
 import { getTrip } from "@/server/repo/trip";
 import { VideoTooLargeError } from "@/server/tiktok";
-import { childIdeas, doneVideo, withPostMeta, withVideo, type VideoAnalysis } from "@/server/video/analysis";
+import { doneVideo, withPostMeta, withVideo, type VideoAnalysis } from "@/server/video/analysis";
 import { videoConfig } from "@/server/video/config";
 import { GeminiBusyError, GeminiError, watchVideo, type GeminiUsage } from "@/server/video/gemini";
 import { deleteUpload, resolveVideo, uploadPrefix, type PostMeta, type VideoSource } from "@/server/video/sources";
@@ -182,12 +182,11 @@ async function writeOutcome(ctx: OpContext, ideaId: string, outcome: Outcome, in
       ? doneVideo(outcome.analysis, outcome.model, (current.video?.attempts ?? 0) + 1)
       : outcome.video;
     const next = withVideo(current, video, index);
-    const children = outcome.kind === "done" && index ? childIdeas(current, outcome.analysis, index) : [];
     try {
       await runOp(
         "idea.applyVideo",
         ctx,
-        { args: { id: ideaId, idea: strip(next), children: children.map((c) => ({ id: c.id, idea: strip(c) })) }, expectedVersion: row.version },
+        { args: { id: ideaId, idea: strip(next), children: [] }, expectedVersion: row.version },
       );
       return;
     } catch (e) {

@@ -3,9 +3,8 @@ import { classifyIdeaFields, normalizeText, type PlaceIndex } from "@/utils/idea
 import type { Idea, IdeaInsight, IdeaSpot, IdeaVideo, InsightKind, InsightPhase } from "@/types";
 
 // What Gemini returns for a video, validated, and how it lands on the ideas:
-// the parent keeps the summary, the spots and the insights; with two or more
-// spots, each spot also becomes a child idea the group can place, vote and
-// plan on its own.
+// the video idea keeps the summary, the spots and the insights. A spot becomes
+// an idea of its own only when the group saves it (spotIdea, utils/ideaVideo).
 
 export { MAX_SPOTS, MAX_INSIGHTS };
 const NAME_MAX = 80;
@@ -112,32 +111,6 @@ export function doneVideo(a: VideoAnalysis, model: string, attempts: number): Id
   });
 }
 
-// Child ids derive from the parent, so analyzing again never duplicates them.
-export const childId = (parentId: string, i: number) => `${parentId.slice(0, 95)}-s${i}`;
-
-// Only a travel video with two or more spots is split into ideas.
-export function childIdeas(parent: Idea, analysis: VideoAnalysis, index: PlaceIndex): Idea[] {
-  if (!analysis.relevant || analysis.spots.length < 2 || parent.parentId) return [];
-  const createdAt = new Date().toISOString();
-  return analysis.spots.map((spot, i) => {
-    const child: Idea = strip({
-      id: childId(parent.id, i),
-      url: parent.url,
-      platform: parent.platform,
-      createdAt,
-      title: spot.name,
-      author: parent.author,
-      thumbnail: parent.thumbnail,
-      embedId: parent.embedId,
-      addedBy: parent.addedBy,
-      status: "idea" as const,
-      parentId: parent.id,
-      spot: strip(spot),
-    });
-    const { place, cat } = classifyIdeaFields(child, index);
-    return place || cat ? { ...child, suggestion: strip({ place, cat, source: "rules" as const }) } : child;
-  });
-}
 
 // The caption, author and cover found with the video fill only what the idea
 // lacks (an Instagram post, or an idea the assistant created).

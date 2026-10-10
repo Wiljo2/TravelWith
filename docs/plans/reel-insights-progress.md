@@ -1,7 +1,7 @@
 # Reel insights progress
-- Iteration: 5
+- Iteration: 6
 - Last commit: (see log)
-- Next step: 5.1
+- Next step: F.1
 - Browser checks run on `?local=1` with a generated `public/local-snapshot.json` (gitignored; Florida & Bahamas fixture + sample ideas).
 - Human actions pending: (0.3) provide the Crucero reel links and annotate `evals/reel-insights/cases.json`
 
@@ -38,6 +38,6 @@
 - [x] 5.1 Insight votes and hiding — stored on the video idea (`Idea.insightStates`, same pattern as `Idea.votes`): no table or migration needed
 - [x] 5.2 Triage controls (👍, hide/restore) + "Copiar la guía del grupo"
 - [x] 5.3 Cross-reel consolidation (Claude `same`/`contradicts` → merged lines, "otro video dice lo contrario")
-- [ ] 5.4 Stop automatic spot children, on-demand "Guardar como idea"
-- [ ] 5.V Verify triage + consolidation
+- [x] 5.4 No automatic spot children; on-demand "Guardar como idea" (`spotIdea`, id `<video>-s-<name>`); old `-s<n>` children keep hiding their video
+- [x] 5.V Verify triage + consolidation
 - [H] F.1 Docs, env example, PR draft, migrations, push

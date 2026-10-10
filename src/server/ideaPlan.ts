@@ -4,6 +4,7 @@ import { fmtHour } from "@/utils/time";
 import { freeSlots } from "@/utils/ideaPlan";
 import { normalizeText, vocab } from "@/utils/ideas";
 import { transcriptExcerpt } from "@/utils/excerpt";
+import { isAutoSpotIdea } from "@/utils/ideaVideo";
 import { CRUISE_PLACE, isVenue, tripPlaces, type TripPlace } from "@/utils/places";
 import { INSIGHT_RULES, INSIGHT_SCHEMA, describeInsights, insightSources, readInsightAnswers, type InsightAnswer } from "@/server/insightPlan";
 import type { RoomPayload } from "@/hooks/useRoom";
@@ -131,7 +132,7 @@ export function buildPlanPrompt(payload: RoomPayload, onlyIds?: string[]) {
   const places = tripPlaces(payload.trip?.destination, days, payload.ideaPlaces);
   const areas = places.filter((p) => !isVenue(p));
   // A video split into spot ideas is analyzed through its spots.
-  const split = new Set((payload.ideas ?? []).map((i) => i.parentId).filter(Boolean));
+  const split = new Set((payload.ideas ?? []).filter(isAutoSpotIdea).map((i) => i.parentId));
   const ideas = (payload.ideas ?? [])
     .filter((i) => i.status !== "discarded" && !split.has(i.id) && (i.note || i.title || i.transcript || seen(i)))
     .filter((i) => !onlyIds || onlyIds.includes(i.id))

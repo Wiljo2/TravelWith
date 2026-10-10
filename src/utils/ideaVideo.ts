@@ -1,4 +1,5 @@
-import type { Idea } from "@/types";
+import { classifyIdeaFields, normalizeText, type PlaceIndex } from "@/utils/ideas";
+import type { Idea, IdeaSpot } from "@/types";
 
 // Client view of the server's video analysis (server/video/analyze.ts).
 
@@ -36,7 +37,7 @@ export function videoRetryDue(idea: Idea, now = Date.now()): boolean {
 
 // Ideas a video was split into hide the video itself: the board shows its spots.
 export function hideSplitVideos(ideas: Idea[]): Idea[] {
-  const split = new Set(ideas.map((i) => i.parentId).filter(Boolean));
+  const split = new Set(ideas.filter(isAutoSpotIdea).map((i) => i.parentId));
   return split.size ? ideas.filter((i) => !split.has(i.id)) : ideas;
 }
 
@@ -60,4 +61,36 @@ export function videoFileSeconds(file: File): Promise<number | undefined> {
     video.onerror = () => done();
     video.src = url;
   });
+}
+
+// Spot ideas made by the analysis before spots were saved on demand ("<video>-s0"):
+// their video shows as its spots. A spot the group saves later ("<video>-s-<name>") doesn't.
+export const isAutoSpotIdea = (idea: Idea) => !!idea.parentId && /-s\d+$/.test(idea.id);
+
+const slug = (name: string) =>
+  normalizeText(name).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30) || "lugar";
+
+// Saving a spot twice gives the same id, so it is never duplicated.
+export const spotIdeaId = (parentId: string, spot: IdeaSpot) => `${parentId.slice(0, 64)}-s-${slug(spot.name)}`;
+
+// A place a video recommends, saved by the group as an idea of its own: it can
+// be placed, voted and planned like any idea, and opens its video.
+export function spotIdea(parent: Idea, spot: IdeaSpot, index: PlaceIndex, addedBy?: string): Idea {
+  const clean = <T extends object>(o: T): T => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
+  const idea: Idea = clean({
+    id: spotIdeaId(parent.id, spot),
+    url: parent.url,
+    platform: parent.platform,
+    createdAt: new Date().toISOString(),
+    title: spot.name,
+    author: parent.author,
+    thumbnail: parent.thumbnail,
+    embedId: parent.embedId,
+    addedBy: addedBy ?? parent.addedBy,
+    status: "idea" as const,
+    parentId: parent.id,
+    spot: clean(spot),
+  });
+  const { place, cat } = classifyIdeaFields(idea, index);
+  return place || cat ? { ...idea, suggestion: clean({ place, cat, source: "rules" as const }) } : idea;
 }

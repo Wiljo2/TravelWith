@@ -3,7 +3,8 @@ import { apiFetch } from "@/lib/api";
 import { canonicalUrl, classifyIdeaFields, detectPlatform, findIdeaUrls } from "@/utils/ideas";
 import type { IdeaTextFields, PlaceIndex } from "@/utils/ideas";
 import { tiktokVideoId } from "@/utils/ideaMedia";
-import type { Idea, IdeaLink, IdeaMoment, IdeaPlanResult, IdeaSuggestion, InsightLink, InsightState, RoomPayload } from "@/types";
+import { spotIdea, spotIdeaId } from "@/utils/ideaVideo";
+import type { Idea, IdeaLink, IdeaMoment, IdeaPlanResult, IdeaSpot, IdeaSuggestion, InsightLink, InsightState, RoomPayload } from "@/types";
 import { applyToList, rowToIdea, type Row } from "@/utils/tripRows";
 
 function rulesSuggestion(fields: IdeaTextFields, index: PlaceIndex): IdeaSuggestion | undefined {
@@ -100,6 +101,15 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
       const votes = i.votes ?? [];
       return { ...i, votes: votes.includes(voter) ? votes.filter((v) => v !== voter) : [...votes, voter] };
     }));
+  }
+
+  // A place a video recommends, saved as an idea of its own (once).
+  function saveSpot(parentId: string, spot: IdeaSpot, index: PlaceIndex, addedBy?: string) {
+    setIdeas((prev) => {
+      const parent = prev.find((i) => i.id === parentId);
+      if (!parent || prev.some((i) => i.id === spotIdeaId(parentId, spot))) return prev;
+      return [...prev, spotIdea(parent, spot, index, addedBy)];
+    });
   }
 
   // The group's take on one insight of a video (by its index), kept on the video idea.
@@ -264,7 +274,7 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
   return {
     ideas, loadingIds, customPlaces, setCustomPlaces, renamePlace,
     loadPayload, payload, planLinks, planLinksAt, planIdeaIds, planInsightLinks, savePlan, applyRow, applySettings,
-    toggleInsightVote, setInsightHidden,
+    toggleInsightVote, setInsightHidden, saveSpot,
     updateIdea, removeIdea, toggleVote, applyClaude, setPlaceByHand, setCatByHand, setMomentByHand, acceptAllSuggestions, addFromText, refreshMetadata, setNote, reclassify,
   };
 }

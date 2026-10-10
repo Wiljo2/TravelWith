@@ -1,14 +1,15 @@
 "use client";
 import { useState } from "react";
 import { ClipboardCopy } from "lucide-react";
-import { DigestSection, HideButton, InsightLine, SpotLine, ToTaskButton, VoteButton } from "@/components/ideas/DigestSection";
+import { DigestSection, HideButton, InsightLine, SaveSpotButton, SpotLine, ToTaskButton, VoteButton } from "@/components/ideas/DigestSection";
 import { PANEL } from "@/components/home/shared";
 import { Button } from "@/components/ui/button";
 import { Disclosure } from "@/components/ui/disclosure";
 import { INSIGHT_KINDS } from "@/constants/insightKinds";
-import { collectInsights, hasTaskFor, insightTask, momentGroups, tripGuideText, type DigestInsight, type ZoneDigest } from "@/utils/insights";
+import { collectInsights, hasTaskFor, insightTask, momentGroups, tripGuideText, type DigestInsight, type DigestSpot, type ZoneDigest } from "@/utils/insights";
+import { normalizeText } from "@/utils/ideas";
 import { cn } from "@/lib/utils";
-import type { Day, Idea, InsightLink, InsightKind, InsightState, Task } from "@/types";
+import type { Day, Idea, IdeaSpot, InsightLink, InsightKind, InsightState, Task } from "@/types";
 
 interface IdeasDigestProps {
   ideas: Idea[];                       // every idea, split videos included
@@ -21,6 +22,7 @@ interface IdeasDigestProps {
   onAddTask?: (task: Pick<Task, "title" | "note" | "priority">) => void;
   onVote?: (ideaId: string, index: number) => void;
   onHide?: (ideaId: string, index: number, hidden: InsightState["hidden"]) => void;
+  onSaveSpot?: (videoId: string, spot: IdeaSpot) => void;
   row: string;                         // class of a swipeable row of cards
   renderCard: (idea: Idea) => React.ReactNode;
   onOpen: (ideaId: string) => void;
@@ -32,13 +34,14 @@ interface LineActions {
   vote?: (i: DigestInsight) => void;
   hide?: (i: DigestInsight, hidden: InsightState["hidden"]) => void;
   toTask?: { has: (i: DigestInsight) => boolean; add: (i: DigestInsight) => void };
+  spot?: { saved: (s: DigestSpot) => boolean; save: (s: DigestSpot) => void };
 }
 
 // "Lo que aportan los videos": per destination, everything its saved videos
 // say, ready to use — what to do before, what to avoid, advice by moment of
 // the trip, useful facts and places — with the videos last, as the source.
 export default function IdeasDigest({
-  ideas, zones, zoneOf, days, links, tasks = [], voter, onAddTask, onVote, onHide, row, renderCard, onOpen,
+  ideas, zones, zoneOf, days, links, tasks = [], voter, onAddTask, onVote, onHide, onSaveSpot, row, renderCard, onOpen,
 }: IdeasDigestProps) {
   const [copied, setCopied] = useState(false);
   const digests = collectInsights(ideas, zoneOf, links);
@@ -53,6 +56,10 @@ export default function IdeasDigest({
     voter,
     vote: onVote && ((i) => onVote(i.ideaId, i.index)),
     hide: onHide && ((i, hidden) => onHide(i.ideaId, i.index, hidden)),
+    spot: onSaveSpot && {
+      saved: (s) => ideas.some((i) => i.parentId === s.ideaId && normalizeText(i.spot?.name ?? "") === normalizeText(s.spot.name)),
+      save: (s) => onSaveSpot(s.ideaId, s.spot),
+    },
     toTask: onAddTask && {
       has: (i) => hasTaskFor(tasks, i),
       add: (i) => onAddTask(insightTask(i, ideas.find((v) => v.id === i.ideaId)?.url ?? "")),
@@ -87,7 +94,7 @@ function ZonePanel({ zone, title, digest, days, row, renderCard, onOpen, actions
   zone: string; title: string; digest: ZoneDigest; days: Day[]; row: string;
   renderCard: (idea: Idea) => React.ReactNode; onOpen: (ideaId: string) => void; actions: LineActions;
 }) {
-  const { voter, vote, hide, toTask } = actions;
+  const { voter, vote, hide, toTask, spot } = actions;
   // Hidden by the group, then Claude's verdict: covered by the plan or not for this trip, all last.
   const hidden = digest.insights.filter((i) => i.state?.hidden);
   const visible = digest.insights.filter((i) => !i.state?.hidden);
@@ -157,7 +164,9 @@ function ZonePanel({ zone, title, digest, days, row, renderCard, onOpen, actions
       {facts.length > 0 && <DigestSection title={`${INSIGHT_KINDS.fact.icon} Datos`} count={facts.length}>{lines(facts)}</DigestSection>}
       {digest.spots.length > 0 && (
         <DigestSection title="📍 Lugares" count={digest.spots.length}>
-          {digest.spots.map((s) => <SpotLine key={s.spot.name} item={s} onOpen={onOpen} />)}
+          {digest.spots.map((s) => (
+            <SpotLine key={s.spot.name} item={s} onOpen={onOpen} action={spot && <SaveSpotButton saved={spot.saved(s)} onSave={() => spot.save(s)} />} />
+          ))}
         </DigestSection>
       )}
       {covered.length + na.length + hidden.length > 0 && (

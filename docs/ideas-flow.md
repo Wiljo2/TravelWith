@@ -39,7 +39,7 @@ flowchart TD
     Gemini --> Parse["Validate: summary · on-screen text<br/>relevant · spots (name, city, type, second, price, tip)<br/>insights (todo · tip · avoid · fact, when, hours, second)"]
     Parse --> Write["apply_idea_video (one transaction)<br/>merged onto the latest idea"]
     Write --> Parent["Parent: video = done + summary + spots + insights"]
-    Write --> Children["≥ 2 spots → one child idea per spot<br/>(parentId, own suggestion)"]
+    Parent -. "Guardar como idea (a member, per spot)" .-> Children["Spot idea     Write --> Children["≥ 2 spots → one child idea per spot<br/>(parentId, own suggestion)"]lt;video    Write --> Children["≥ 2 spots → one child idea per spot<br/>(parentId, own suggestion)"]gt;-s-    Write --> Children["≥ 2 spots → one child idea per spot<br/>(parentId, own suggestion)"]lt;name    Write --> Children["≥ 2 spots → one child idea per spot<br/>(parentId, own suggestion)"]gt;<br/>(parentId, own suggestion)"]
     Gemini -. busy / error .-> Failed["video.status = failed<br/>retryAt → any member's app retries (max 3)"]
     Source -. "no video" .-> NeedsFile["video.status = needsFile<br/>→ Subir video"]
     Analyze --> Usage[("video_usage<br/>tokens · cost · time")]
@@ -107,7 +107,7 @@ flowchart TD
   Toggle -- "📅 Por día" --> ByDay["Itinerary days<br/>each idea under its activity, free slot or day<br/>+ Antes del viaje"]
   ByPlace --> Card
   ByDay --> Card
-  Board --> Hidden["A video split into spots is hidden:<br/>its spot ideas show instead"]
+  Board --> Hidden["A video split by the old automatic split (-s0, -s1…)<br/>shows as its spot ideas"]
   Board --> Discarded["Descartadas (collapsed)"]
 
   Card["Card (9:16)<br/>cover · TT/IG/YT · title = note › caption › spot name<br/>type · venue · votes · spinner while analyzing"] -- tap --> Viewer

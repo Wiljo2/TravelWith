@@ -1,4 +1,4 @@
-import { Check, ListPlus, Play, ThumbsUp, Undo2, X } from "lucide-react";
+import { BookmarkPlus, Check, ListPlus, Play, ThumbsUp, Undo2, X } from "lucide-react";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { fmtVideoTime } from "@/utils/ideaVideo";
 import { fmtDeadline, insightMeta, type DigestInsight, type DigestSpot } from "@/utils/insights";
@@ -71,12 +71,12 @@ export function ToTaskButton({ done, onAdd }: { done: boolean; onAdd: () => void
   );
 }
 
-export function SpotLine({ item, onOpen }: { item: DigestSpot; onOpen: (ideaId: string) => void }) {
+export function SpotLine({ item, onOpen, action }: { item: DigestSpot; onOpen: (ideaId: string) => void; action?: React.ReactNode }) {
   const t = item.spot.cat ? IDEA_TYPES[item.spot.cat] : undefined;
   const meta = [item.spot.price, item.spot.tip].filter(Boolean).join(" · ");
   return (
-    <li>
-      <button onClick={() => onOpen(item.ideaId)} className={ROW}>
+    <li className="flex items-start gap-1">
+      <button onClick={() => onOpen(item.ideaId)} className={cn(ROW, "min-w-0 flex-1")}>
         <span className="min-w-0 flex-1">
           {t && <span className="mr-1">{t.icon}</span>}
           <span className="font-medium">{item.spot.name}</span>
@@ -84,6 +84,7 @@ export function SpotLine({ item, onOpen }: { item: DigestSpot; onOpen: (ideaId: 
         </span>
         <Source sources={item.sources} at={item.spot.at} />
       </button>
+      {action}
     </li>
   );
 }
@@ -110,5 +111,17 @@ export function HideButton({ hidden, onHide, onRestore }: { hidden: boolean; onH
     <button onClick={onRestore} title="Volver a mostrar" className={ICON_BTN}><Undo2 className="size-3.5" /></button>
   ) : (
     <button onClick={onHide} title="Ocultar (ya lo sabíamos o no sirve)" aria-label="Ocultar" className={ICON_BTN}><X className="size-3.5" /></button>
+  );
+}
+
+// Saves a place a video recommends as an idea of its own, or says it already is one.
+export function SaveSpotButton({ saved, onSave }: { saved: boolean; onSave: () => void }) {
+  if (saved) {
+    return <span title="Ya está en las ideas" className="flex size-8 shrink-0 items-center justify-center text-emerald-700"><Check className="size-4" /></span>;
+  }
+  return (
+    <button onClick={onSave} title="Guardar como idea" aria-label="Guardar como idea" className={ICON_BTN}>
+      <BookmarkPlus className="size-4" />
+    </button>
   );
 }

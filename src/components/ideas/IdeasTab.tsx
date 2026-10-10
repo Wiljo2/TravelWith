@@ -112,6 +112,7 @@ export default function IdeasTab({
       onAddTask={onAddTask}
       onVoteInsight={(id, index) => api.toggleInsightVote(id, index, voter)}
       onHideInsight={api.setInsightHidden}
+      onSaveSpot={(videoId, spot) => api.saveSpot(videoId, spot, index, addedBy)}
     />
   );
 }
