@@ -4,7 +4,7 @@
 - Next step: none (loop done; HUMAN items below)
 - Browser checks run on `?local=1` with a generated `public/local-snapshot.json` (gitignored; Florida & Bahamas fixture + sample ideas).
 - Deviations from the plan: no migrations. Insight links live in the existing `rooms.idea_plan` jsonb (spread by `get_trip`) and the group's votes/hiding on the video idea (`Idea.insightStates`, like `Idea.votes`), so 023/024 were not needed.
-- Human actions pending: (0.3) provide the Crucero reel links and annotate `evals/reel-insights/cases.json`, then run the eval and tune the prompt; (1) if `VIDEO_MAX_SECONDS` is set in Vercel, set it to 90 or remove it; (2) on a preview, re-analyze a few short reels (Ver el video con IA / Reintentar; uses Gemini quota) and run "Analizar con Claude → todo de nuevo" once, checking the placements make sense (the real Gemini and Claude calls were not run locally); (3) push the branch and open the PR
+- Human actions pending: (0.3) provide the Crucero reel links and annotate `evals/reel-insights/cases.json`, then run the eval and tune the prompt; (1) if `VIDEO_MAX_SECONDS` is set in Vercel, set it to 90 or remove it; (2) on a preview, re-analyze a few short reels (Ver el video con IA / Reintentar; uses Gemini quota) and run "Analizar con Claude → todo de nuevo" once, checking the placements make sense (the real Gemini and Claude calls were not run locally); (3) review and merge PR #19
 
 ## Steps
 - [x] 0.1 Branch, plan copy, progress file
@@ -42,7 +42,7 @@
 - [x] 5.4 No automatic spot children; on-demand "Guardar como idea" (`spotIdea`, id `<video>-s-<name>`); old `-s<n>` children keep hiding their video
 - [x] 5.V Verify triage + consolidation
 - [x] F.1 Docs (`docs/ideas-flow.md`, `GUIDELINES.md`), `.env.example` (`VIDEO_MAX_SECONDS=90`), PR draft below
-- [H] F.2 Push and PR (human)
+- [x] F.2 Branch pushed, PR #19 opened
 
 ## PR description (draft)
 # Reel insights: what each short video brings to the trip
