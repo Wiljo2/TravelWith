@@ -1,7 +1,8 @@
 # Reel insights progress
-- Iteration: 2
+- Iteration: 3
 - Last commit: (see log)
-- Next step: 2.1 (browser checks A.V, 1.V batched with 2.V)
+- Next step: 3.1
+- Browser checks run on `?local=1` with a generated `public/local-snapshot.json` (gitignored; Florida & Bahamas fixture + sample ideas).
 - Human actions pending: (0.3) provide the Crucero reel links and annotate `evals/reel-insights/cases.json`
 
 ## Steps
@@ -12,19 +13,19 @@
 - [x] A.2 YouTube not analyzed (server + client)
 - [x] A.3 `IdeaVideo.skip`, panel without Reintentar, upload duration check, form hint, agent tool text
 - [x] A.4 Tests + `docs/ideas-flow.md`
-- [ ] A.V Verify limit and YouTube in the browser
+- [x] A.V Verify limit and YouTube in the browser
 - [x] 1.1 Insight constants + types
 - [x] 1.2 Schema, parser, `doneVideo`
 - [x] 1.3 Prompt for short reels + caption/transcript context
 - [x] 1.4 Viewer insight list
 - [x] 1.5 Card "aporta" chips + agent `get_ideas`
 - [x] 1.6 Tests (eval tuning re-runs when 0.3 is done)
-- [ ] 1.V Verify extraction in the browser
-- [ ] 2.1 `utils/insights.ts` collect + dedupe
-- [ ] 2.2 Moment grouping (`dayPhases` to utils)
-- [ ] 2.3 `IdeasDigest` + `DigestSection`
-- [ ] 2.4 "✨ Resumen" view toggle
-- [ ] 2.V Verify digest
+- [x] 1.V Verify extraction in the browser
+- [x] 2.1 `utils/insights.ts` collect + dedupe
+- [x] 2.2 Moment grouping (`byMoment` + `momentLabel`; cruise first/last = Embarque/Desembarque; real days come with 3.3)
+- [x] 2.3 `IdeasDigest` + `DigestSection`
+- [x] 2.4 "✨ Resumen" view toggle
+- [x] 2.V Verify digest
 - [ ] 3.1 Claude anchoring of insights
 - [ ] 3.2 `insight_links` persistence (migration 023)
 - [ ] 3.3 Digest uses links (new / covered / n.a., deadlines)

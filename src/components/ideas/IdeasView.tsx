@@ -4,6 +4,7 @@ import { Check, Lightbulb, Plus } from "lucide-react";
 import IdeaCard from "@/components/ideas/IdeaCard";
 import IdeaViewer from "@/components/ideas/IdeaViewer";
 import IdeasByDay from "@/components/ideas/IdeasByDay";
+import IdeasDigest from "@/components/ideas/IdeasDigest";
 import AddIdeaForm from "@/components/ideas/AddIdeaForm";
 import AnalyzeWithClaude from "@/components/ideas/AnalyzeWithClaude";
 import PlacesEditor from "@/components/ideas/PlacesEditor";
@@ -79,7 +80,8 @@ export default function IdeasView({
   const venues = index.places.filter(isVenue).map((p) => p.name);
   const [filter, setFilter] = useState<string>(ALL);
   const [zone, setZone] = useState<string>(ALL);
-  const [view, setView] = useState<"place" | "day">("place");
+  // The digest when some video already says something concrete.
+  const [view, setView] = useState<"digest" | "place" | "day">(() => (allIdeas.some((i) => i.video?.insights?.length) ? "digest" : "place"));
   const [adding, setAdding] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
   // Keeps the last idea on screen while the sheet animates closed.
@@ -107,6 +109,11 @@ export default function IdeasView({
   const placeOf = (i: Idea) => (i.place && places.includes(i.place) ? i.place : undefined);
   const zones = zonesOf(index.places);
   const zoneOf = (i: Idea) => { const p = placeOf(i); return p ? zones.get(p) ?? p : NONE; };
+  // The digest also trusts a pending suggestion: it only reads the videos.
+  const digestZoneOf = (i: Idea) => {
+    const p = placeOf(i) ?? (i.suggestion?.place && places.includes(i.suggestion.place) ? i.suggestion.place : undefined);
+    return p ? zones.get(p) ?? p : NONE;
+  };
   const byType = filter === ALL ? active : filter === REVIEW ? toReview : active.filter((i) => validCat(i) === filter);
   const zoneNames = [...new Set(index.places.map((p) => zones.get(p.name) ?? p.name))];
   const zoneChips = [...zoneNames, NONE]
@@ -194,7 +201,7 @@ export default function IdeasView({
 
       {active.length > 0 && (
         <div className="inline-flex gap-1 self-start rounded-full bg-muted p-1">
-          {([["place", "📍 Por lugar"], ["day", "📅 Por día"]] as const).map(([id, label]) => (
+          {([["digest", "✨ Resumen"], ["place", "📍 Por lugar"], ["day", "📅 Por día"]] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setView(id)}
@@ -219,6 +226,15 @@ export default function IdeasView({
           roomCode={roomCode}
           phase={phase}
           todayIdx={todayIdx}
+          onOpen={setViewing}
+        />
+      ) : view === "digest" && active.length > 0 ? (
+        <IdeasDigest
+          ideas={allIdeas}
+          zones={[...zoneNames, NONE].map((z) => ({ key: z, title: z === NONE ? "Sin lugar" : z }))}
+          zoneOf={digestZoneOf}
+          row={ROW}
+          renderCard={(i) => card(i)}
           onOpen={setViewing}
         />
       ) : ideas.length === 0 ? (
