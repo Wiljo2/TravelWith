@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { Idea, IdeaLink, IdeaPlanResult } from "@/types";
+import { insightIdeaId } from "@/utils/insights";
+import type { Idea, IdeaLink, IdeaPlanResult, InsightLink } from "@/types";
 
 interface AnalyzeWithClaudeProps {
   ideas: Idea[];               // active ideas
@@ -10,21 +11,26 @@ interface AnalyzeWithClaudeProps {
   planLinks?: IdeaLink[];
   planLinksAt?: string;
   planIdeaIds?: string[];      // ideas the last analysis read
+  planInsightLinks?: InsightLink[];
   // Runs the analysis on the server (only `ideaIds` when given).
   onAnalyze: (ideaIds?: string[]) => Promise<IdeaPlanResult>;
-  onSavePlan: (links: IdeaLink[], at: string, ideaIds: string[]) => void;
+  onSavePlan: (links: IdeaLink[], at: string, ideaIds: string[], insightLinks: InsightLink[]) => void;
   onApplyClaude: (classes: IdeaPlanResult["classes"]) => void;
 }
 
 // "Analizar con Claude": one pass that gives every idea its place, type and
 // moment in the plan. Both views (by place, by day) read from its answer.
 export default function AnalyzeWithClaude({
-  ideas, reading, planLinks, planLinksAt, planIdeaIds, onAnalyze, onSavePlan, onApplyClaude,
+  ideas, reading, planLinks, planLinksAt, planIdeaIds, planInsightLinks, onAnalyze, onSavePlan, onApplyClaude,
 }: AnalyzeWithClaudeProps) {
   const [state, setState] = useState<"idle" | "running" | { error: string }>("idle");
   // Analyses saved before the ids were recorded fall back to the linked ideas.
   const analyzedIds = new Set(planIdeaIds ?? (planLinks ?? []).map((l) => l.ideaId));
-  const fresh = planLinksAt ? ideas.filter((i) => !analyzedIds.has(i.id)) : ideas;
+  // A video whose advice arrived after it was analyzed counts as new too.
+  const placedVideos = new Set((planInsightLinks ?? []).map((l) => insightIdeaId(l.insightId)));
+  const fresh = planLinksAt
+    ? ideas.filter((i) => !analyzedIds.has(i.id) || (!!i.video?.insights?.length && !placedVideos.has(i.id)))
+    : ideas;
   const onlyNew = !!planLinksAt && fresh.length > 0;
 
   // With a previous analysis, only the new ideas are sent (cheaper); the rest
@@ -33,9 +39,11 @@ export default function AnalyzeWithClaude({
     setState("running");
     try {
       const ids = newOnly ? fresh.map((i) => i.id) : undefined;
-      const { links: next, classes, at, ideaIds: read } = await onAnalyze(ids);
+      const { links: next, classes, at, ideaIds: read, insightLinks = [] } = await onAnalyze(ids);
       const kept = ids ? (planLinks ?? []).filter((l) => !ids.includes(l.ideaId)) : [];
-      onSavePlan([...kept, ...next], at, ids ? [...new Set([...analyzedIds, ...read])] : read);
+      // A video read again replaces all its insight links.
+      const keptInsights = ids ? (planInsightLinks ?? []).filter((l) => !read.includes(insightIdeaId(l.insightId))) : [];
+      onSavePlan([...kept, ...next], at, ids ? [...new Set([...analyzedIds, ...read])] : read, [...keptInsights, ...insightLinks]);
       onApplyClaude(classes);
       setState("idle");
     } catch (e) {

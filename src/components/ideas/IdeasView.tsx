@@ -18,7 +18,7 @@ import { ideaLinks, matchIdeasToPlan } from "@/utils/ideaPlan";
 import { hideSplitVideos, isAnalyzingVideo } from "@/utils/ideaVideo";
 import { fmtHour } from "@/utils/time";
 import { cn } from "@/lib/utils";
-import type { Day, Idea, IdeaLink, IdeaMoment, IdeaPlanResult } from "@/types";
+import type { Day, Idea, IdeaLink, IdeaMoment, IdeaPlanResult, InsightLink } from "@/types";
 import type { PlaceIndex } from "@/utils/ideas";
 import { isVenue, zonesOf } from "@/utils/places";
 
@@ -48,8 +48,9 @@ interface IdeasViewProps {
   planLinks?: IdeaLink[];
   planLinksAt?: string;
   planIdeaIds?: string[];
+  planInsightLinks?: InsightLink[];
   onAnalyze: (ideaIds?: string[]) => Promise<IdeaPlanResult>;
-  onSavePlan: (links: IdeaLink[], at: string, ideaIds: string[]) => void;
+  onSavePlan: (links: IdeaLink[], at: string, ideaIds: string[], insightLinks: InsightLink[]) => void;
   phase?: "before" | "during" | "after";
   todayIdx?: number;
   sharedText?: string | null;      // a link shared from the phone, to confirm
@@ -71,7 +72,7 @@ const GRID = "grid grid-cols-2 gap-2.5 md:grid-cols-[repeat(auto-fill,minmax(150
 export default function IdeasView({
   ideas: allIdeas, index, roomCode, loadingIds, mobile, voter,
   onAdd, onUpdate, onSetPlace, onSetCat, onSetMoment, onRemove, onVote, onApplyClaude, onAcceptAll, onSetNote, onRetry, onRetryVideo, onUploadVideo, onAddPlace, onRemovePlace,
-  days, planLinks, planLinksAt, planIdeaIds, onAnalyze, onSavePlan, phase, todayIdx, sharedText, onSharedDone,
+  days, planLinks, planLinksAt, planIdeaIds, planInsightLinks, onAnalyze, onSavePlan, phase, todayIdx, sharedText, onSharedDone,
 }: IdeasViewProps) {
   // A video split into spot ideas shows as its spots.
   const ideas = useMemo(() => hideSplitVideos(allIdeas), [allIdeas]);
@@ -102,6 +103,8 @@ export default function IdeasView({
   };
 
   const active = ideas.filter((i) => i.status !== "discarded");
+  // Videos shown as their spots still have their own advice for Claude to place.
+  const withAdvice = allIdeas.filter((i) => !ideas.includes(i) && i.status !== "discarded" && i.video?.insights?.length);
   const discarded = ideas.filter((i) => i.status === "discarded");
   const validCat = (i: Idea) => (i.cat && IDEA_TYPES[i.cat] ? i.cat : undefined);
   const toReview = active.filter((i) => !i.place || !validCat(i));
@@ -183,11 +186,12 @@ export default function IdeasView({
           <Plus className="size-4" /> Agregar idea
         </Button>
         <AnalyzeWithClaude
-          ideas={active}
+          ideas={[...active, ...withAdvice]}
           reading={active.filter((i) => loadingIds.has(i.id)).length}
           planLinks={planLinks}
           planLinksAt={planLinksAt}
           planIdeaIds={planIdeaIds}
+          planInsightLinks={planInsightLinks}
           onAnalyze={onAnalyze}
           onSavePlan={onSavePlan}
           onApplyClaude={onApplyClaude}

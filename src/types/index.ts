@@ -256,6 +256,24 @@ export interface IdeaPlanResult {
   classes: { ideaId: string; place?: string; cat?: string }[];
   at: string;
   ideaIds: string[];
+  insightLinks?: InsightLink[];
+}
+
+// Whether a video's advice adds to this trip: new, already in the plan, or not
+// for this trip (another cruise line, a port they don't visit…).
+export type InsightStatus = "new" | "covered" | "na";
+
+// Where one insight of a video fits the plan, from "Analizar con Claude".
+// Same targets as IdeaLink; `deadline` (yyyy-mm-dd) for todos with a lead time.
+export interface InsightLink {
+  insightId: string;         // `${ideaId}:i${index}`
+  dayId?: string;
+  eventId?: string;
+  slot?: { start: number; end: number };
+  before?: boolean;
+  deadline?: string;
+  status: InsightStatus;
+  reason?: string;
 }
 
 export type DocumentKind = "flight" | "lodging" | "insurance" | "ticket" | "other";
@@ -295,6 +313,7 @@ export interface RoomPayload {
   ideaLinks?: IdeaLink[];  // last "Analizar con Claude" result (free matches are computed live)
   ideaLinksAt?: string;    // ISO time of that analysis
   ideaLinksIds?: string[]; // ideas that analysis read (the others are "new")
+  insightLinks?: InsightLink[]; // where each video insight fits, from that same analysis
   eventPlaces?: Record<string, EventPlace>; // trip map: where each activity happens, by event id
   documents?: TripDocument[];
 }

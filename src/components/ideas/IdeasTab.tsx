@@ -9,7 +9,7 @@ import { isVenue, tripPlaces } from "@/utils/places";
 import { tripPhase } from "@/utils/tripDays";
 import type { useIdeas } from "@/hooks/useIdeas";
 import { apiFetch } from "@/lib/api";
-import type { Day, IdeaLink, IdeaPlanResult, RoomPayload, TripInfo } from "@/types";
+import type { Day, IdeaLink, IdeaPlanResult, InsightLink, RoomPayload, TripInfo } from "@/types";
 
 interface IdeasTabProps {
   api: ReturnType<typeof useIdeas>;
@@ -66,6 +66,7 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, acces
       classes: (data.classes ?? []) as IdeaPlanResult["classes"],
       at: data.at as string,
       ideaIds: (data.ideaIds ?? []) as string[],
+      insightLinks: (Array.isArray(data.insightLinks) ? data.insightLinks : []) as InsightLink[],
     };
   }
 
@@ -96,6 +97,7 @@ export default function IdeasTab({ api, roomCode, localMode, mobile, user, acces
       planLinks={api.planLinks}
       planLinksAt={api.planLinksAt}
       planIdeaIds={api.planIdeaIds}
+      planInsightLinks={api.planInsightLinks}
       onAnalyze={analyze}
       onSavePlan={api.savePlan}
       phase={phase?.phase}

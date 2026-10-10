@@ -1,4 +1,4 @@
-import type { EventPlace, Idea, IdeaLink, TripDocument } from "@/types";
+import type { EventPlace, Idea, IdeaLink, InsightLink, TripDocument } from "@/types";
 import type { TripTable } from "@/utils/tripRows";
 
 // Ideas, Drive documents, map places and the idea settings are edited by many
@@ -10,6 +10,7 @@ export interface IdeaPlan {
   ideaLinks?: IdeaLink[];
   ideaLinksAt?: string;
   ideaLinksIds?: string[];
+  insightLinks?: InsightLink[];
 }
 
 export interface FeatureState {
@@ -107,11 +108,14 @@ export function markSettings(synced: Synced, settings: Pick<FeatureState, "ideaP
 }
 
 // The analysis fields as stored in rooms.idea_plan; null when there is none.
-export function ideaPlanOf(links: IdeaLink[] | undefined, at: string | undefined, ids: string[] | undefined): IdeaPlan | null {
-  if (links === undefined && at === undefined && ids === undefined) return null;
+export function ideaPlanOf(
+  links: IdeaLink[] | undefined, at: string | undefined, ids: string[] | undefined, insightLinks?: InsightLink[],
+): IdeaPlan | null {
+  if (links === undefined && at === undefined && ids === undefined && insightLinks === undefined) return null;
   return {
     ...(links !== undefined ? { ideaLinks: links } : {}),
     ...(at !== undefined ? { ideaLinksAt: at } : {}),
     ...(ids !== undefined ? { ideaLinksIds: ids } : {}),
+    ...(insightLinks !== undefined ? { insightLinks } : {}),
   };
 }

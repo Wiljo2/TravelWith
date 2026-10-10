@@ -5,6 +5,7 @@ import { freeSlots } from "@/utils/ideaPlan";
 import { normalizeText, vocab } from "@/utils/ideas";
 import { transcriptExcerpt } from "@/utils/excerpt";
 import { CRUISE_PLACE, isVenue, tripPlaces, type TripPlace } from "@/utils/places";
+import { INSIGHT_RULES, INSIGHT_SCHEMA, describeInsights, insightSources, readInsightAnswers, type InsightAnswer } from "@/server/insightPlan";
 import type { RoomPayload } from "@/hooks/useRoom";
 import type { Day, Idea, IdeaLink, IdeaPlanResult } from "@/types";
 
@@ -42,7 +43,8 @@ Cómo decidir:
 - Un video sobre un destino que no visitan: place "none" y target "none".
 - No inventes datos: menciona solo lo que dicen la idea o el itinerario.
 
-En "reason" escribe en español, máximo 16 palabras, qué hacer, probar o saber ahí (ej. "Con el contrato de Avis o Budget, el parqueo prime de Universal es gratis"). La app ya muestra el día y la actividad junto a la razón: no repitas el día, la fecha ni la actividad, y nunca uses etiquetas (D3, e12). Si no aplica, di por qué.`;
+En "reason" escribe en español, máximo 16 palabras, qué hacer, probar o saber ahí (ej. "Con el contrato de Avis o Budget, el parqueo prime de Universal es gratis"). La app ya muestra el día y la actividad junto a la razón: no repitas el día, la fecha ni la actividad, y nunca uses etiquetas (D3, e12). Si no aplica, di por qué.
+${INSIGHT_RULES}`;
 
 const SCHEMA = {
   type: "object",
@@ -63,8 +65,9 @@ const SCHEMA = {
         additionalProperties: false,
       },
     },
+    insights: INSIGHT_SCHEMA,
   },
-  required: ["ideas"],
+  required: ["ideas", "insights"],
   additionalProperties: false,
 };
 
@@ -173,10 +176,21 @@ export function buildPlanPrompt(payload: RoomPayload, onlyIds?: string[]) {
   ].join(" ")));
   const ideaIds = new Map(ideas.map((i, n) => [`i${n + 1}`, i.id]));
   const ideaText = ideas.map((i, n) => describeIdea(i, `i${n + 1}`, keywords)).join("\n\n");
+  const sources = insightSources(payload.ideas ?? [], onlyIds);
+  const insights = describeInsights(sources);
 
-  const trip = `LUGARES DEL VIAJE\n${placeText}\n\nITINERARIO\n${itinerary}`;
-  const user = `IDEAS\n${ideaText}\n\nDevuelve un elemento en "ideas" por cada idea (idea = su etiqueta: i1, i2…).`;
-  return { system: SYSTEM, trip, user, ideaIds, placeLabels, targets, count: ideas.length };
+  const t = payload.trip;
+  const dates = t?.startDate && t.endDate ? `FECHAS: del ${t.startDate} al ${t.endDate}\n\n` : "";
+  const trip = `${dates}LUGARES DEL VIAJE\n${placeText}\n\nITINERARIO\n${itinerary}`;
+  const user = [
+    `IDEAS\n${ideaText || "(ninguna)"}`,
+    insights.labels.size > 0 && `CONSEJOS\n${insights.text}`,
+    `Devuelve un elemento en "ideas" por cada idea (idea = su etiqueta: i1, i2…) y uno en "insights" por cada consejo (insight = su etiqueta: n1, n2…).`,
+  ].filter(Boolean).join("\n\n");
+  return {
+    system: SYSTEM, trip, user, ideaIds, placeLabels, targets, count: ideas.length,
+    insightLabels: insights.labels, insightCount: insights.labels.size, insightSourceIds: sources.map((i) => i.id), tripEnd: t?.endDate,
+  };
 }
 
 type Answer = { idea: string; reason: string; place: string; cat: string; before: boolean; target: string };
@@ -205,14 +219,16 @@ export async function planIdeasWithClaude(
 ): Promise<Omit<IdeaPlanResult, "at"> & { usage: { input: number; cached: number; output: number } }> {
   if (!process.env.ANTHROPIC_API_KEY) throw new IdeaPlanError("Falta ANTHROPIC_API_KEY en el servidor.");
   const prompt = buildPlanPrompt(payload, onlyIds);
-  // The ideas actually sent: the client marks exactly these as analyzed.
-  const sent = [...prompt.ideaIds.values()];
-  if (prompt.count === 0) return { links: [], classes: [], ideaIds: sent, usage: { input: 0, cached: 0, output: 0 } };
+  // The ideas (and videos with advice) actually sent: the client marks exactly these as analyzed.
+  const sent = [...new Set([...prompt.ideaIds.values(), ...prompt.insightSourceIds])];
+  if (prompt.count === 0 && prompt.insightCount === 0) {
+    return { links: [], classes: [], ideaIds: sent, insightLinks: [], usage: { input: 0, cached: 0, output: 0 } };
+  }
 
   const client = new Anthropic();
   const response = await client.messages.create({
     model,
-    max_tokens: 1000 + prompt.count * 200,
+    max_tokens: 1000 + prompt.count * 200 + prompt.insightCount * 120,
     system: [
       { type: "text", text: prompt.system },
       { type: "text", text: prompt.trip, cache_control: { type: "ephemeral" } },
@@ -227,11 +243,12 @@ export async function planIdeasWithClaude(
   const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text")?.text;
   if (!text) throw new IdeaPlanError("Respuesta vacía del modelo.");
 
-  const parsed = JSON.parse(text) as { ideas?: Answer[] };
+  const parsed = JSON.parse(text) as { ideas?: Answer[]; insights?: InsightAnswer[] };
   const { links, classes } = readAnswer(parsed.ideas ?? [], prompt);
+  const insightLinks = readInsightAnswers(parsed.insights ?? [], prompt.insightLabels, prompt.targets, prompt.tripEnd);
   const u = response.usage;
   return {
-    links, classes, ideaIds: sent,
+    links, classes, ideaIds: sent, insightLinks,
     usage: { input: u.input_tokens + (u.cache_creation_input_tokens ?? 0), cached: u.cache_read_input_tokens ?? 0, output: u.output_tokens },
   };
 }

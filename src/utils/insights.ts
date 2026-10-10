@@ -54,6 +54,7 @@ export interface ZoneDigest {
 }
 
 export const insightId = (ideaId: string, index: number) => `${ideaId}:i${index}`;
+export const insightIdeaId = (id: string) => id.slice(0, id.lastIndexOf(":i"));
 
 const SAME_TEXT = 0.6;
 
