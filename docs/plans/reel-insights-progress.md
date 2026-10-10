@@ -1,7 +1,7 @@
 # Reel insights progress
-- Iteration: 1
+- Iteration: 2
 - Last commit: (see log)
-- Next step: A.V + 1.V (browser), then 2.1
+- Next step: 2.1 (browser checks A.V, 1.V batched with 2.V)
 - Human actions pending: (0.3) provide the Crucero reel links and annotate `evals/reel-insights/cases.json`
 
 ## Steps
@@ -18,7 +18,7 @@
 - [x] 1.3 Prompt for short reels + caption/transcript context
 - [x] 1.4 Viewer insight list
 - [x] 1.5 Card "aporta" chips + agent `get_ideas`
-- [ ] 1.6 Tests (+ eval tuning when 0.3 is done)
+- [x] 1.6 Tests (eval tuning re-runs when 0.3 is done)
 - [ ] 1.V Verify extraction in the browser
 - [ ] 2.1 `utils/insights.ts` collect + dedupe
 - [ ] 2.2 Moment grouping (`dayPhases` to utils)
