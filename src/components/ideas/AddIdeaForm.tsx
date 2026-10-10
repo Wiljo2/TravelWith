@@ -5,15 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { findIdeaUrls } from "@/utils/ideas";
+import { VIDEO_ANALYSIS_ON } from "@/utils/ideaVideo";
 
 interface AddIdeaFormProps {
   // Returns how many new ideas were added (duplicates are skipped).
   onSubmit: (text: string, note: string) => number;
   onDone: () => void;
+  initialText?: string;   // a link shared to the app from the phone
 }
 
-export default function AddIdeaForm({ onSubmit, onDone }: AddIdeaFormProps) {
-  const [text, setText] = useState("");
+export default function AddIdeaForm({ onSubmit, onDone, initialText }: AddIdeaFormProps) {
+  const [text, setText] = useState(initialText ?? "");
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
   const found = findIdeaUrls(text).length;
@@ -64,7 +66,9 @@ export default function AddIdeaForm({ onSubmit, onDone }: AddIdeaFormProps) {
         className="bg-secondary text-sm"
       />
       <p className="text-xs text-muted-foreground">
-        La nota ayuda mucho a clasificarla: de Instagram no podemos leer el texto del post.
+        {VIDEO_ANALYSIS_ON
+          ? "La app ve el video y saca los lugares que recomienda. La nota ayuda a ubicarla."
+          : "La nota ayuda mucho a clasificarla: de Instagram no podemos leer el texto del post."}
       </p>
       {message && <p className="text-xs text-destructive">{message}</p>}
       {/* Keep focus in the field on press: otherwise the first tap only closes the
