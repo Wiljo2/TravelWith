@@ -237,6 +237,8 @@ export default function IdeasView({
           ideas={allIdeas}
           zones={[...zoneNames, NONE].map((z) => ({ key: z, title: z === NONE ? "Sin lugar" : z }))}
           zoneOf={digestZoneOf}
+          days={days}
+          links={planInsightLinks}
           row={ROW}
           renderCard={(i) => card(i)}
           onOpen={setViewing}

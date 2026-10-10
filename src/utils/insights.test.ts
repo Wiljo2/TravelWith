@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { byMoment, collectInsights, momentLabel, videoContribution } from "@/utils/insights";
+import { collectInsights, fmtDeadline, momentGroups, momentLabel, videoContribution } from "@/utils/insights";
 import type { Idea, IdeaInsight } from "@/types";
 
 const idea: Idea = { id: "i", url: "https://vt.tiktok.com/x/", platform: "tiktok", createdAt: "2026-10-01T00:00:00.000Z" };
@@ -60,8 +60,41 @@ describe("collectInsights", () => {
 
   it("orders advice by moment and hour", () => {
     const cruise = collectInsights([v1, v2], zoneOf).get("Crucero")!;
-    const groups = byMoment(cruise.insights.filter((i) => i.insight.kind === "tip"));
-    expect(groups.map((g) => [momentLabel(g.phase, "Crucero"), g.items.map((i) => i.insight.start)])).toEqual([["Embarque", [8, 12]]]);
+    const groups = momentGroups(cruise.insights.filter((i) => i.insight.kind === "tip"), [], "Crucero");
+    expect(groups.map((g) => [g.label, g.items.map((i) => i.insight.start)])).toEqual([["Embarque", [8, 12]]]);
     expect(momentLabel("first", "Miami")).toBe("Primer día");
+  });
+});
+
+describe("with Claude's links", () => {
+  const days = [
+    { id: "d1", label: "Sáb · Nov 14", sub: "Embarque", flexible: false, events: [{ id: "e1", start: 12, end: 13, title: "Almuerzo", cat: "comida", note: "" }] },
+    { id: "d2", label: "Dom · Nov 15", sub: "Día en el mar", flexible: false, events: [] },
+  ];
+  const video: Idea = { ...idea, id: "v", place: "Crucero", video: { status: "done", insights: [
+    { kind: "tip", text: "Piscina temprano", phase: "during", start: 7 },
+    { kind: "tip", text: "Buffet del piso 15", phase: "first" },
+    { kind: "tip", text: "Lleva protector solar", phase: "before" },
+    { kind: "tip", text: "Usa la app", phase: "anytime" },
+  ] } };
+  const links = [
+    { insightId: "v:i0", dayId: "d2", status: "new" as const },
+    { insightId: "v:i1", dayId: "d1", eventId: "e1", status: "new" as const },
+    { insightId: "v:i2", status: "covered" as const, reason: "Ya está en la lista" },
+  ];
+
+  it("attaches each link and groups by the real day, in trip order", () => {
+    const cruise = collectInsights([video], (i) => i.place ?? "none", links).get("Crucero")!;
+    expect(cruise.insights[2].link?.status).toBe("covered");
+    const groups = momentGroups(cruise.insights.filter((i) => i.link?.status !== "covered"), days, "Crucero");
+    expect(groups.map((g) => [g.label, g.items.map((i) => i.insight.text)])).toEqual([
+      ["Sáb · Nov 14 · Embarque", ["Buffet del piso 15"]],
+      ["Dom · Nov 15 · Día en el mar", ["Piscina temprano"]],
+      ["Cuando sea", ["Usa la app"]],
+    ]);
+  });
+
+  it("formats a deadline", () => {
+    expect(fmtDeadline("2026-09-11")).toBe("antes de Sep 11");
   });
 });

@@ -1,7 +1,7 @@
 # Reel insights progress
-- Iteration: 3
+- Iteration: 4
 - Last commit: (see log)
-- Next step: 3.1
+- Next step: 4.1
 - Browser checks run on `?local=1` with a generated `public/local-snapshot.json` (gitignored; Florida & Bahamas fixture + sample ideas).
 - Human actions pending: (0.3) provide the Crucero reel links and annotate `evals/reel-insights/cases.json`
 
@@ -26,11 +26,11 @@
 - [x] 2.3 `IdeasDigest` + `DigestSection`
 - [x] 2.4 "✨ Resumen" view toggle
 - [x] 2.V Verify digest
-- [ ] 3.1 Claude anchoring of insights
-- [ ] 3.2 `insight_links` persistence (migration 023)
-- [ ] 3.3 Digest uses links (new / covered / n.a., deadlines)
-- [ ] 3.4 Tests
-- [ ] 3.V Verify anchoring
+- [x] 3.1 Claude anchoring of insights
+- [x] 3.2 `insightLinks` persistence — inside the existing `rooms.idea_plan` jsonb (get_trip already spreads it): no migration needed
+- [x] 3.3 Digest uses links (new / covered / n.a., deadlines)
+- [x] 3.4 Tests
+- [x] 3.V Verify anchoring
 - [ ] 4.1 Calendar 💡 badges
 - [ ] 4.2 "Consejos para hoy"
 - [ ] 4.3 Todos → tasks

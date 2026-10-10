@@ -1,7 +1,7 @@
 import { Play } from "lucide-react";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { fmtVideoTime } from "@/utils/ideaVideo";
-import { insightMeta, type DigestInsight, type DigestSpot } from "@/utils/insights";
+import { fmtDeadline, insightMeta, type DigestInsight, type DigestSpot } from "@/utils/insights";
 
 // A titled list of a destination's digest ("✅ Por hacer", "📍 Lugares").
 export function DigestSection({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
@@ -29,12 +29,15 @@ const ROW = "flex w-full cursor-pointer items-start gap-2 rounded-lg px-1.5 py-1
 
 export function InsightLine({ item, onOpen }: { item: DigestInsight; onOpen: (ideaId: string) => void }) {
   const meta = insightMeta(item.insight);
+  const deadline = item.link?.deadline;
   return (
     <li>
       <button onClick={() => onOpen(item.ideaId)} className={ROW}>
         <span className="min-w-0 flex-1">
           {item.insight.text}
+          {deadline && <span className="ml-1.5 rounded bg-amber-100 px-1 text-xs font-medium text-amber-900">{fmtDeadline(deadline)}</span>}
           {meta && <span className="ml-1.5 text-xs text-muted-foreground">{meta}</span>}
+          {item.link?.reason && <span className="block text-xs text-secondary-foreground">{item.link.reason}</span>}
         </span>
         <Source sources={item.sources} at={item.insight.at} />
       </button>

@@ -1,7 +1,8 @@
 import { INSIGHT_KINDS, INSIGHT_KIND_ORDER, INSIGHT_PHASES } from "@/constants/insightKinds";
 import { CRUISE_PLACE, normalizeText, vocab } from "@/utils/ideas";
+import { MONTHS } from "@/utils/tripDays";
 import { fmtHour } from "@/utils/time";
-import type { Idea, IdeaInsight, IdeaSpot, InsightPhase } from "@/types";
+import type { Day, Idea, IdeaInsight, IdeaSpot, InsightLink, InsightPhase } from "@/types";
 
 export interface Contribution {
   icon: string;
@@ -39,6 +40,7 @@ export interface DigestInsight {
   insight: IdeaInsight;
   ideaId: string;
   sources: string[];        // ids of the videos that say it
+  link?: InsightLink;        // where "Analizar con Claude" placed it
 }
 
 export interface DigestSpot {
@@ -78,7 +80,8 @@ function videoZone(video: Idea, children: Idea[], zoneOf: (i: Idea) => string): 
 
 // Everything the saved videos say, by zone: their insights (the same advice
 // said by several videos counted once) and the places they recommend.
-export function collectInsights(ideas: Idea[], zoneOf: (i: Idea) => string): Map<string, ZoneDigest> {
+export function collectInsights(ideas: Idea[], zoneOf: (i: Idea) => string, links: InsightLink[] = []): Map<string, ZoneDigest> {
+  const linkOf = new Map(links.map((l) => [l.insightId, l]));
   const active = ideas.filter((i) => i.status !== "discarded");
   const children = new Map<string, Idea[]>();
   for (const i of active) if (i.parentId) children.set(i.parentId, [...(children.get(i.parentId) ?? []), i]);
@@ -92,8 +95,13 @@ export function collectInsights(ideas: Idea[], zoneOf: (i: Idea) => string): Map
     if (v?.status !== "done" || v.relevant === false) continue;
     (v.insights ?? []).forEach((insight, n) => {
       const same = digest.insights.find((d) => d.insight.kind === insight.kind && sameText(d.insight.text, insight.text));
-      if (same) { if (!same.sources.includes(video.id)) same.sources.push(video.id); return; }
-      digest.insights.push({ id: insightId(video.id, n), insight, ideaId: video.id, sources: [video.id] });
+      const link = linkOf.get(insightId(video.id, n));
+      if (same) {
+        if (!same.sources.includes(video.id)) same.sources.push(video.id);
+        same.link ??= link;
+        return;
+      }
+      digest.insights.push({ id: insightId(video.id, n), insight, ideaId: video.id, sources: [video.id], ...(link ? { link } : {}) });
     });
     for (const spot of v.spots ?? []) {
       const same = digest.spots.find((d) => normalizeText(d.spot.name) === normalizeText(spot.name));
@@ -114,14 +122,48 @@ export function momentLabel(phase: InsightPhase, zone: string): string {
   return INSIGHT_PHASES[phase];
 }
 
-// Advice grouped by moment, each group in time-of-day order.
-export function byMoment(items: DigestInsight[]): { phase: InsightPhase; items: DigestInsight[] }[] {
-  return MOMENT_ORDER
-    .map((phase) => ({
-      phase,
-      items: items
-        .filter((d) => (d.insight.phase ?? "anytime") === phase)
-        .sort((a, b) => (a.insight.start ?? 99) - (b.insight.start ?? 99)),
-    }))
-    .filter((g) => g.items.length > 0);
+
+export interface MomentGroup {
+  key: string;
+  label: string;
+  items: DigestInsight[];
+}
+
+// Advice grouped where Claude placed it — before the trip, then each day of
+// the itinerary in order — or, before any analysis, by the moment the video
+// names. Within a group, by hour (its own, or its activity's).
+export function momentGroups(items: DigestInsight[], days: Day[], zone: string): MomentGroup[] {
+  const groups = new Map<string, MomentGroup & { order: number }>();
+  const startOf = (d: DigestInsight) => {
+    const ev = d.link?.eventId ? days.find((day) => day.id === d.link!.dayId)?.events.find((e) => e.id === d.link!.eventId) : undefined;
+    return d.insight.start ?? d.link?.slot?.start ?? ev?.start ?? 99;
+  };
+  for (const item of items) {
+    const l = item.link;
+    const dayIdx = l?.dayId ? days.findIndex((d) => d.id === l.dayId) : -1;
+    let key: string;
+    let label: string;
+    let order: number;
+    if (l?.before || (dayIdx < 0 && item.insight.phase === "before")) {
+      [key, label, order] = ["before", INSIGHT_PHASES.before, -1];
+    } else if (dayIdx >= 0) {
+      const day = days[dayIdx];
+      [key, label, order] = [`d:${day.id}`, [day.label, day.sub].filter(Boolean).join(" · "), dayIdx];
+    } else {
+      const phase = item.insight.phase ?? "anytime";
+      [key, label, order] = [`p:${phase}`, momentLabel(phase, zone), 1000 + MOMENT_ORDER.indexOf(phase)];
+    }
+    const group = groups.get(key) ?? { key, label, order, items: [] };
+    groups.set(key, group);
+    group.items.push(item);
+  }
+  return [...groups.values()]
+    .sort((a, b) => a.order - b.order)
+    .map(({ key, label, items: list }) => ({ key, label, items: [...list].sort((a, b) => startOf(a) - startOf(b)) }));
+}
+
+// "antes de Sep 11": a todo's deadline, written like the itinerary's dates.
+export function fmtDeadline(iso: string): string {
+  const [, m, d] = iso.split("-").map(Number);
+  return `antes de ${MONTHS[m - 1]} ${d}`;
 }
