@@ -198,6 +198,7 @@ export interface Idea {
   suggestion?: IdeaSuggestion;
   status?: IdeaStatus;      // default "idea"
   votes?: string[];         // voter keys
+  insightStates?: Record<string, InsightState>; // the group's take on each video insight, by its index
   placesKey?: string;       // the place list its suggestion was computed with
   dayId?: string;           // legacy, ignored
   eventId?: string;         // legacy, ignored
@@ -257,6 +258,13 @@ export interface IdeaPlanResult {
   at: string;
   ideaIds: string[];
   insightLinks?: InsightLink[];
+}
+
+// What the group did with one video insight: votes, or hidden as already known
+// or not useful. Kept on the video idea, like its votes.
+export interface InsightState {
+  votes?: string[];
+  hidden?: "known" | "dismissed";
 }
 
 // Whether a video's advice adds to this trip: new, already in the plan, or not

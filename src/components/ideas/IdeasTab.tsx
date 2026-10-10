@@ -110,6 +110,8 @@ export default function IdeasTab({
       onSharedDone={onSharedDone}
       tasks={tasks}
       onAddTask={onAddTask}
+      onVoteInsight={(id, index) => api.toggleInsightVote(id, index, voter)}
+      onHideInsight={api.setInsightHidden}
     />
   );
 }

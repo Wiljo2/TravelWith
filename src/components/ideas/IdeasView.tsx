@@ -18,7 +18,7 @@ import { ideaLinks, matchIdeasToPlan } from "@/utils/ideaPlan";
 import { hideSplitVideos, isAnalyzingVideo } from "@/utils/ideaVideo";
 import { fmtHour } from "@/utils/time";
 import { cn } from "@/lib/utils";
-import type { Day, Idea, IdeaLink, IdeaMoment, IdeaPlanResult, InsightLink, Task } from "@/types";
+import type { Day, Idea, IdeaLink, IdeaMoment, IdeaPlanResult, InsightLink, InsightState, Task } from "@/types";
 import type { PlaceIndex } from "@/utils/ideas";
 import { isVenue, zonesOf } from "@/utils/places";
 
@@ -57,6 +57,8 @@ interface IdeasViewProps {
   onSharedDone?: () => void;
   tasks?: Task[];
   onAddTask?: (task: Pick<Task, "title" | "note" | "priority">) => void;
+  onVoteInsight?: (ideaId: string, index: number) => void;
+  onHideInsight?: (ideaId: string, index: number, hidden: InsightState["hidden"]) => void;
 }
 
 const ALL = "all";
@@ -74,7 +76,7 @@ const GRID = "grid grid-cols-2 gap-2.5 md:grid-cols-[repeat(auto-fill,minmax(150
 export default function IdeasView({
   ideas: allIdeas, index, roomCode, loadingIds, mobile, voter,
   onAdd, onUpdate, onSetPlace, onSetCat, onSetMoment, onRemove, onVote, onApplyClaude, onAcceptAll, onSetNote, onRetry, onRetryVideo, onUploadVideo, onAddPlace, onRemovePlace,
-  days, planLinks, planLinksAt, planIdeaIds, planInsightLinks, onAnalyze, onSavePlan, phase, todayIdx, sharedText, onSharedDone, tasks, onAddTask,
+  days, planLinks, planLinksAt, planIdeaIds, planInsightLinks, onAnalyze, onSavePlan, phase, todayIdx, sharedText, onSharedDone, tasks, onAddTask, onVoteInsight, onHideInsight,
 }: IdeasViewProps) {
   // A video split into spot ideas shows as its spots.
   const ideas = useMemo(() => hideSplitVideos(allIdeas), [allIdeas]);
@@ -244,6 +246,9 @@ export default function IdeasView({
           links={planInsightLinks}
           tasks={tasks}
           onAddTask={onAddTask}
+          voter={voter}
+          onVote={onVoteInsight}
+          onHide={onHideInsight}
           row={ROW}
           renderCard={(i) => card(i)}
           onOpen={setViewing}

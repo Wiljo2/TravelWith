@@ -151,7 +151,8 @@ export function withPostMeta(idea: Idea, meta: { title?: string; author?: string
 // decided (Claude's suggestion is kept), so a note, votes or a place set
 // meanwhile survive.
 export function withVideo(current: Idea, video: IdeaVideo, index: PlaceIndex | null): Idea {
-  const next: Idea = { ...current, video };
+  // A new analysis renumbers the insights: what the group said about the old ones goes.
+  const next: Idea = { ...current, video, ...(video.status === "done" ? { insightStates: undefined } : {}) };
   if (!index || video.status !== "done" || (current.place && current.cat)) return next;
   if (current.suggestion?.source === "claude") return next;
   const { place, cat } = classifyIdeaFields(next, index);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectInsights, countByEvent, fmtDeadline, hasTaskFor, insightTask, momentGroups, momentLabel, placedInsights, videoContribution } from "@/utils/insights";
+import { collectInsights, countByEvent, fmtDeadline, hasTaskFor, insightTask, momentGroups, momentLabel, placedInsights, tripGuideText, videoContribution } from "@/utils/insights";
 import type { Idea, IdeaInsight } from "@/types";
 
 const idea: Idea = { id: "i", url: "https://vt.tiktok.com/x/", platform: "tiktok", createdAt: "2026-10-01T00:00:00.000Z" };
@@ -118,7 +118,7 @@ describe("placedInsights", () => {
 
 describe("insightTask", () => {
   const item = {
-    id: "v:i0", ideaId: "v", sources: ["v"],
+    id: "v:i0", ideaId: "v", index: 0, sources: ["v"],
     insight: { kind: "todo" as const, text: "Reserva los shows", when: "60 días antes" },
     link: { insightId: "v:i0", deadline: "2026-10-20", status: "new" as const, reason: "Se agotan" },
   };
@@ -127,5 +127,24 @@ describe("insightTask", () => {
     expect(t).toEqual({ title: "Reserva los shows", note: "60 días antes · antes de Oct 20\nSe agotan\nDel video: https://tiktok.com/v", priority: "alta" });
     expect(insightTask({ ...item, link: undefined }, "u").priority).toBe("media");
     expect(hasTaskFor([{ id: "t", title: "reserva los SHOWS", done: false }], item)).toBe(true);
+  });
+});
+
+describe("tripGuideText", () => {
+  it("lists only voted advice, by destination and moment", () => {
+    const video: Idea = {
+      ...idea, id: "v", place: "Crucero",
+      insightStates: { 0: { votes: ["ana"] }, 1: { votes: ["ana"], hidden: "dismissed" } },
+      video: { status: "done", insights: [
+        { kind: "todo", text: "Reserva los shows", phase: "before" },
+        { kind: "tip", text: "Oculto" },
+        { kind: "tip", text: "Sin votos" },
+      ] },
+    };
+    const zone = collectInsights([video], (i) => i.place ?? "none").get("Crucero")!;
+    expect(tripGuideText([{ title: "Crucero", zone: "Crucero", digest: zone }], [])).toBe(
+      "Guía del viaje — lo que el grupo marcó de los videos\n\n📍 Crucero\nAntes del viaje:\n✅ Reserva los shows",
+    );
+    expect(tripGuideText([{ title: "Crucero", zone: "Crucero", digest: { ...zone, insights: [] } }], [])).toBe("");
   });
 });

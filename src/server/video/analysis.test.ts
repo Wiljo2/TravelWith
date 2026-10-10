@@ -184,3 +184,11 @@ describe("analysisPrompt", () => {
     expect(analysisPrompt({ places: [] })).not.toContain("Texto del post");
   });
 });
+
+describe("withVideo and the group's take on insights", () => {
+  it("drops votes on the old insights when a new analysis renumbers them", () => {
+    const voted: Idea = { ...parent, insightStates: { 0: { votes: ["ana"] } } };
+    expect(withVideo(voted, { status: "done", insights: [] }, null).insightStates).toBeUndefined();
+    expect(withVideo(voted, { status: "failed" }, null).insightStates).toEqual({ 0: { votes: ["ana"] } });
+  });
+});

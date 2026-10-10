@@ -1,4 +1,4 @@
-import { Check, ListPlus, Play } from "lucide-react";
+import { Check, ListPlus, Play, ThumbsUp, Undo2, X } from "lucide-react";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { fmtVideoTime } from "@/utils/ideaVideo";
 import { fmtDeadline, insightMeta, type DigestInsight, type DigestSpot } from "@/utils/insights";
@@ -82,5 +82,30 @@ export function SpotLine({ item, onOpen }: { item: DigestSpot; onOpen: (ideaId: 
         <Source sources={item.sources} at={item.spot.at} />
       </button>
     </li>
+  );
+}
+
+const ICON_BTN = "flex h-8 shrink-0 cursor-pointer items-center justify-center gap-0.5 rounded-lg px-1.5 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground";
+
+// "Me sirve": the group's votes on one piece of advice.
+export function VoteButton({ count, mine, onToggle }: { count: number; mine: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-pressed={mine}
+      title={mine ? "Quitar mi voto" : "Me sirve"}
+      className={cn(ICON_BTN, mine && "font-semibold text-emerald-800")}
+    >
+      <ThumbsUp className={cn("size-3.5", mine && "fill-current")} />{count > 0 && count}
+    </button>
+  );
+}
+
+// Hides advice the group already knew or doesn't want; restores it when hidden.
+export function HideButton({ hidden, onHide, onRestore }: { hidden: boolean; onHide: () => void; onRestore: () => void }) {
+  return hidden ? (
+    <button onClick={onRestore} title="Volver a mostrar" className={ICON_BTN}><Undo2 className="size-3.5" /></button>
+  ) : (
+    <button onClick={onHide} title="Ocultar (ya lo sabíamos o no sirve)" aria-label="Ocultar" className={ICON_BTN}><X className="size-3.5" /></button>
   );
 }

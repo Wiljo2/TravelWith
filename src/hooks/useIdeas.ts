@@ -3,7 +3,7 @@ import { apiFetch } from "@/lib/api";
 import { canonicalUrl, classifyIdeaFields, detectPlatform, findIdeaUrls } from "@/utils/ideas";
 import type { IdeaTextFields, PlaceIndex } from "@/utils/ideas";
 import { tiktokVideoId } from "@/utils/ideaMedia";
-import type { Idea, IdeaLink, IdeaMoment, IdeaPlanResult, IdeaSuggestion, InsightLink, RoomPayload } from "@/types";
+import type { Idea, IdeaLink, IdeaMoment, IdeaPlanResult, IdeaSuggestion, InsightLink, InsightState, RoomPayload } from "@/types";
 import { applyToList, rowToIdea, type Row } from "@/utils/tripRows";
 
 function rulesSuggestion(fields: IdeaTextFields, index: PlaceIndex): IdeaSuggestion | undefined {
@@ -101,6 +101,24 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
       return { ...i, votes: votes.includes(voter) ? votes.filter((v) => v !== voter) : [...votes, voter] };
     }));
   }
+
+  // The group's take on one insight of a video (by its index), kept on the video idea.
+  function updateInsightState(id: string, index: number, change: (s: InsightState) => InsightState) {
+    setIdeas((prev) => prev.map((i) => {
+      if (i.id !== id) return i;
+      const states = { ...i.insightStates };
+      const next = change(states[index] ?? {});
+      if (!next.votes?.length && !next.hidden) delete states[index];
+      else states[index] = next;
+      return { ...i, insightStates: Object.keys(states).length ? states : undefined };
+    }));
+  }
+  const toggleInsightVote = (id: string, index: number, voter: string) => updateInsightState(id, index, (s) => {
+    const votes = s.votes ?? [];
+    return { ...s, votes: votes.includes(voter) ? votes.filter((v) => v !== voter) : [...votes, voter] };
+  });
+  const setInsightHidden = (id: string, index: number, hidden: InsightState["hidden"]) =>
+    updateInsightState(id, index, (s) => ({ ...s, hidden }));
 
   // Claude's reading of each idea's place and type is applied right away: one
   // analysis updates both views. What a member set by hand stays as it is.
@@ -246,6 +264,7 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
   return {
     ideas, loadingIds, customPlaces, setCustomPlaces, renamePlace,
     loadPayload, payload, planLinks, planLinksAt, planIdeaIds, planInsightLinks, savePlan, applyRow, applySettings,
+    toggleInsightVote, setInsightHidden,
     updateIdea, removeIdea, toggleVote, applyClaude, setPlaceByHand, setCatByHand, setMomentByHand, acceptAllSuggestions, addFromText, refreshMetadata, setNote, reclassify,
   };
 }

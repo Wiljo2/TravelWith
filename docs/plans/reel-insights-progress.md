@@ -35,8 +35,8 @@
 - [x] 4.2 "Consejos para hoy" (during) + "Antes del viaje" todos by deadline (before)
 - [x] 4.3 Todos → tasks
 - [x] 4.V Verify calendar, Hoy, tasks
-- [ ] 5.1 `trip_insight_states` (migration 024) full path
-- [ ] 5.2 Triage controls + "Guía del viaje"
+- [x] 5.1 Insight votes and hiding — stored on the video idea (`Idea.insightStates`, same pattern as `Idea.votes`): no table or migration needed
+- [x] 5.2 Triage controls (👍, hide/restore) + "Copiar la guía del grupo"
 - [ ] 5.3 Cross-reel consolidation
 - [ ] 5.4 Stop automatic spot children, on-demand "Guardar como idea"
 - [ ] 5.V Verify triage + consolidation

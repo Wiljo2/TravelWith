@@ -2,7 +2,7 @@ import { INSIGHT_KINDS, INSIGHT_KIND_ORDER, INSIGHT_PHASES } from "@/constants/i
 import { CRUISE_PLACE, normalizeText, vocab } from "@/utils/ideas";
 import { MONTHS } from "@/utils/tripDays";
 import { fmtHour } from "@/utils/time";
-import type { Day, Idea, IdeaInsight, IdeaSpot, InsightLink, InsightPhase, Task } from "@/types";
+import type { Day, Idea, IdeaInsight, IdeaSpot, InsightLink, InsightPhase, InsightState, Task } from "@/types";
 
 export interface Contribution {
   icon: string;
@@ -41,6 +41,8 @@ export interface DigestInsight {
   ideaId: string;
   sources: string[];        // ids of the videos that say it
   link?: InsightLink;        // where "Analizar con Claude" placed it
+  index: number;            // position in the first video's insights
+  state?: InsightState;     // the group's votes or hiding, kept on that video
 }
 
 export interface DigestSpot {
@@ -101,7 +103,8 @@ export function collectInsights(ideas: Idea[], zoneOf: (i: Idea) => string, link
         same.link ??= link;
         return;
       }
-      digest.insights.push({ id: insightId(video.id, n), insight, ideaId: video.id, sources: [video.id], ...(link ? { link } : {}) });
+      const state = video.insightStates?.[n];
+      digest.insights.push({ id: insightId(video.id, n), insight, ideaId: video.id, index: n, sources: [video.id], ...(link ? { link } : {}), ...(state ? { state } : {}) });
     });
     for (const spot of v.spots ?? []) {
       const same = digest.spots.find((d) => normalizeText(d.spot.name) === normalizeText(spot.name));
@@ -213,3 +216,21 @@ export function insightTask(item: DigestInsight, videoUrl: string, now = new Dat
 
 export const hasTaskFor = (tasks: Task[], item: DigestInsight) =>
   tasks.some((t) => normalizeText(t.title) === normalizeText(item.insight.text));
+
+// The group's guide, to paste in a chat: the advice someone voted, by
+// destination and moment of the trip. "" when nobody has voted yet.
+export function tripGuideText(zones: { title: string; zone: string; digest: ZoneDigest }[], days: Day[]): string {
+  const blocks = zones.flatMap(({ title, zone, digest }) => {
+    const voted = digest.insights.filter((i) => (i.state?.votes?.length ?? 0) > 0 && !i.state?.hidden && i.link?.status !== "na");
+    if (!voted.length) return [];
+    const lines = momentGroups(voted, days, zone).flatMap((g) => [
+      `${g.label}:`,
+      ...g.items.map((i) => {
+        const meta = [insightMeta(i.insight), i.link?.deadline && fmtDeadline(i.link.deadline)].filter(Boolean).join(" · ");
+        return `${INSIGHT_KINDS[i.insight.kind].icon} ${i.insight.text}${meta ? ` (${meta})` : ""}`;
+      }),
+    ]);
+    return [`📍 ${title}`, ...lines].join("\n");
+  });
+  return blocks.length ? ["Guía del viaje — lo que el grupo marcó de los videos", ...blocks].join("\n\n") : "";
+}
