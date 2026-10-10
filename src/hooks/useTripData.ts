@@ -31,6 +31,7 @@ function ideaSettings(p: Partial<RoomPayload>): Pick<FeatureState, "ideaPlaces" 
       Array.isArray(p.ideaLinks) ? p.ideaLinks : undefined,
       p.ideaLinksAt || undefined,
       Array.isArray(p.ideaLinksIds) ? p.ideaLinksIds : undefined,
+      Array.isArray(p.insightLinks) ? p.insightLinks : undefined,
     ),
   };
 }
@@ -51,8 +52,8 @@ export function useTripData(roomCode: string | null, accessToken: string | undef
   const geoApi = useTripGeo();
   const docs = useDocuments();
   const ideaPlan = useMemo<IdeaPlan | null>(
-    () => ideaPlanOf(ideasApi.planLinks, ideasApi.planLinksAt, ideasApi.planIdeaIds),
-    [ideasApi.planLinks, ideasApi.planLinksAt, ideasApi.planIdeaIds],
+    () => ideaPlanOf(ideasApi.planLinks, ideasApi.planLinksAt, ideasApi.planIdeaIds, ideasApi.planInsightLinks),
+    [ideasApi.planLinks, ideasApi.planLinksAt, ideasApi.planIdeaIds, ideasApi.planInsightLinks],
   );
   const sync = useFeatureSync(!!roomCode && !localMode, ops.send, {
     ideas: ideasApi.ideas,

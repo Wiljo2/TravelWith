@@ -3,7 +3,8 @@ import { apiFetch } from "@/lib/api";
 import { canonicalUrl, classifyIdeaFields, detectPlatform, findIdeaUrls } from "@/utils/ideas";
 import type { IdeaTextFields, PlaceIndex } from "@/utils/ideas";
 import { tiktokVideoId } from "@/utils/ideaMedia";
-import type { Idea, IdeaLink, IdeaMoment, IdeaPlanResult, IdeaSuggestion, RoomPayload } from "@/types";
+import { spotIdea, spotIdeaId } from "@/utils/ideaVideo";
+import type { Idea, IdeaLink, IdeaMoment, IdeaPlanResult, IdeaSpot, IdeaSuggestion, InsightLink, InsightState, RoomPayload } from "@/types";
 import { applyToList, rowToIdea, type Row } from "@/utils/tripRows";
 
 function rulesSuggestion(fields: IdeaTextFields, index: PlaceIndex): IdeaSuggestion | undefined {
@@ -49,6 +50,8 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
   const [planLinksAt, setPlanLinksAt] = useState<string | undefined>();
   // Ideas that analysis actually read (with or without a link).
   const [planIdeaIds, setPlanIdeaIds] = useState<string[] | undefined>();
+  // Where each video insight fits the plan, from that same analysis.
+  const [planInsightLinks, setPlanInsightLinks] = useState<InsightLink[] | undefined>();
 
   // The ideas part of the room payload, in and out. Stable: safe in callbacks.
   // A missing field means "none": otherwise the previous room's ideas would stay
@@ -59,8 +62,9 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
     setPlanLinks(Array.isArray(p.ideaLinks) ? p.ideaLinks : undefined);
     setPlanLinksAt(p.ideaLinksAt || undefined);
     setPlanIdeaIds(Array.isArray(p.ideaLinksIds) ? p.ideaLinksIds : undefined);
+    setPlanInsightLinks(Array.isArray(p.insightLinks) ? p.insightLinks : undefined);
   }, []);
-  const payload = { ideas, ideaPlaces: customPlaces, ideaLinks: planLinks, ideaLinksAt: planLinksAt, ideaLinksIds: planIdeaIds };
+  const payload = { ideas, ideaPlaces: customPlaces, ideaLinks: planLinks, ideaLinksAt: planLinksAt, ideaLinksIds: planIdeaIds, insightLinks: planInsightLinks };
 
   // One idea as the server has it (trip channel or a lost conflict); null removes it.
   const applyRow = useCallback((id: string, row: Row | null) => {
@@ -75,12 +79,14 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
     setPlanLinks(Array.isArray(plan.ideaLinks) ? plan.ideaLinks : undefined);
     setPlanLinksAt(plan.ideaLinksAt || undefined);
     setPlanIdeaIds(Array.isArray(plan.ideaLinksIds) ? plan.ideaLinksIds : undefined);
+    setPlanInsightLinks(Array.isArray(plan.insightLinks) ? plan.insightLinks : undefined);
   }, []);
 
-  function savePlan(links: IdeaLink[], at: string, ideaIds: string[]) {
+  function savePlan(links: IdeaLink[], at: string, ideaIds: string[], insightLinks?: InsightLink[]) {
     setPlanLinks(links);
     setPlanLinksAt(at);
     setPlanIdeaIds(ideaIds);
+    if (insightLinks) setPlanInsightLinks(insightLinks);
   }
 
   function updateIdea(id: string, patch: Partial<Idea>) {
@@ -96,6 +102,33 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
       return { ...i, votes: votes.includes(voter) ? votes.filter((v) => v !== voter) : [...votes, voter] };
     }));
   }
+
+  // A place a video recommends, saved as an idea of its own (once).
+  function saveSpot(parentId: string, spot: IdeaSpot, index: PlaceIndex, addedBy?: string) {
+    setIdeas((prev) => {
+      const parent = prev.find((i) => i.id === parentId);
+      if (!parent || prev.some((i) => i.id === spotIdeaId(parentId, spot))) return prev;
+      return [...prev, spotIdea(parent, spot, index, addedBy)];
+    });
+  }
+
+  // The group's take on one insight of a video (by its index), kept on the video idea.
+  function updateInsightState(id: string, index: number, change: (s: InsightState) => InsightState) {
+    setIdeas((prev) => prev.map((i) => {
+      if (i.id !== id) return i;
+      const states = { ...i.insightStates };
+      const next = change(states[index] ?? {});
+      if (!next.votes?.length && !next.hidden) delete states[index];
+      else states[index] = next;
+      return { ...i, insightStates: Object.keys(states).length ? states : undefined };
+    }));
+  }
+  const toggleInsightVote = (id: string, index: number, voter: string) => updateInsightState(id, index, (s) => {
+    const votes = s.votes ?? [];
+    return { ...s, votes: votes.includes(voter) ? votes.filter((v) => v !== voter) : [...votes, voter] };
+  });
+  const setInsightHidden = (id: string, index: number, hidden: InsightState["hidden"]) =>
+    updateInsightState(id, index, (s) => ({ ...s, hidden }));
 
   // Claude's reading of each idea's place and type is applied right away: one
   // analysis updates both views. What a member set by hand stays as it is.
@@ -240,7 +273,8 @@ export function useIdeas(roomCode: string | null, accessToken: string | undefine
 
   return {
     ideas, loadingIds, customPlaces, setCustomPlaces, renamePlace,
-    loadPayload, payload, planLinks, planLinksAt, planIdeaIds, savePlan, applyRow, applySettings,
+    loadPayload, payload, planLinks, planLinksAt, planIdeaIds, planInsightLinks, savePlan, applyRow, applySettings,
+    toggleInsightVote, setInsightHidden, saveSpot,
     updateIdea, removeIdea, toggleVote, applyClaude, setPlaceByHand, setCatByHand, setMomentByHand, acceptAllSuggestions, addFromText, refreshMetadata, setNote, reclassify,
   };
 }

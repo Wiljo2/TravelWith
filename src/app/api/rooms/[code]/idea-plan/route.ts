@@ -46,9 +46,9 @@ export async function POST(req: Request, { params }: { params: Params }) {
   }
 
   try {
-    const { links, classes, ideaIds: analyzed, usage } = await planIdeasWithClaude(payload, ideaIds);
+    const { links, classes, ideaIds: analyzed, insightLinks, usage } = await planIdeasWithClaude(payload, ideaIds);
     if (userId) await recordUsage(userId, code, usage);
-    return NextResponse.json({ links, classes, ideaIds: analyzed, at: new Date().toISOString(), usage });
+    return NextResponse.json({ links, classes, ideaIds: analyzed, insightLinks, at: new Date().toISOString(), usage });
   } catch (e) {
     if (e instanceof IdeaPlanError) return NextResponse.json({ error: e.message }, { status: 503 });
     if (e instanceof Anthropic.RateLimitError) return NextResponse.json({ error: "Claude está ocupado, intenta en un minuto." }, { status: 429 });

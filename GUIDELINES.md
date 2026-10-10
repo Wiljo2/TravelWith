@@ -59,13 +59,14 @@ rooms (code PK, name, destination, start_date, end_date, exchange_rate, members 
    │     └── trip_task_options
    ├── trip_travelers     (mockPeople in the client)
    ├── trip_documents     (drive_file_id, title, kind)
-   ├── trip_ideas         (data = the Idea without its id)
+   ├── trip_ideas         (data = the Idea without its id; video.insights + insightStates live here)
    └── trip_changes       (audit log: table, row, op, before, after, user)
 
 Every item row has version (int), updated_at and updated_by.
 Ideas, documents, map places and the idea settings are sent by diffing each
 collection against what the server last confirmed (useFeatureSync), not by an
-op per function.
+op per function. rooms.idea_plan holds the last "Analizar con Claude" result:
+ideaLinks and insightLinks (where each video insight fits the plan).
 ```
 
 Notes and known trade-offs:

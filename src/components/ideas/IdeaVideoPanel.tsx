@@ -1,13 +1,15 @@
 "use client";
 import { useRef, useState } from "react";
-import { Loader2, RotateCw, Sparkles, Upload } from "lucide-react";
+import { Loader2, RotateCw, Sparkles, Timer, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import InsightList from "@/components/ideas/InsightList";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
-import { VIDEO_ANALYSIS_ON, fmtVideoTime, isAnalyzingVideo } from "@/utils/ideaVideo";
+import { VIDEO_ANALYSIS_ON, VIDEO_MAX_SECONDS, fmtVideoTime, isAnalyzablePlatform, isAnalyzingVideo, videoFileSeconds } from "@/utils/ideaVideo";
 import type { Idea, IdeaSpot } from "@/types";
 
 // What the video shows, as the server's analysis saw it: for a spot idea, its
-// spot first; then the summary of the whole video and every spot in it.
+// spot first; then the advice it gives; then the summary of the whole video
+// and every spot in it.
 export default function IdeaVideoPanel({ idea, parent, onRetry, onUpload }: {
   idea: Idea;
   parent?: Idea;           // the video this spot idea came from
@@ -26,6 +28,11 @@ export default function IdeaVideoPanel({ idea, parent, onRetry, onUpload }: {
 
   async function upload(file: File | undefined) {
     if (!file) return;
+    const seconds = await videoFileSeconds(file);
+    if (seconds !== undefined && seconds > VIDEO_MAX_SECONDS) {
+      setUploadError(`El video dura más de ${VIDEO_MAX_SECONDS} s; recórtalo o sube uno más corto`);
+      return;
+    }
     setUploading(true);
     setUploadError(null);
     const error = await onUpload(file);
@@ -43,7 +50,7 @@ export default function IdeaVideoPanel({ idea, parent, onRetry, onUpload }: {
   }
   // Ideas saved before the analysis existed, or while it was off.
   if (!video) {
-    if (!VIDEO_ANALYSIS_ON || source.platform === "other") return null;
+    if (!VIDEO_ANALYSIS_ON || !isAnalyzablePlatform(source)) return null;
     return (
       <Button
         variant="secondary"
@@ -56,9 +63,10 @@ export default function IdeaVideoPanel({ idea, parent, onRetry, onUpload }: {
   }
 
   if (video.status !== "done") {
-    const canRetry = video.status !== "pending";
+    const canRetry = video.status !== "pending" && !video.skip;
     return (
       <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary px-3 py-2 text-[13px] text-secondary-foreground">
+        {video.skip && <Timer className="size-4 shrink-0 text-muted-foreground" />}
         <span className="min-w-0 flex-1">{uploadError ?? video.reason ?? "No se pudo ver el video"}</span>
         {video.status === "needsFile" && (
           <>
@@ -83,14 +91,17 @@ export default function IdeaVideoPanel({ idea, parent, onRetry, onUpload }: {
   }
 
   const spots = video.spots ?? [];
+  const insights = video.insights ?? [];
+  const folded = !!idea.spot || insights.length > 0;
   return (
     <div className="flex flex-col gap-2.5 rounded-xl bg-secondary px-3 py-2.5 text-[13px]">
       {idea.spot && <SpotLine spot={idea.spot} strong />}
-      <details className="group" open={!idea.spot}>
+      {insights.length > 0 && <InsightList insights={insights} />}
+      <details className="group" open={!folded}>
         <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-secondary-foreground [&::-webkit-details-marker]:hidden">
           <Sparkles className="size-3.5 text-amber-500" />
-          {video.relevant === false ? "Este video no parece ser del viaje" : "Lo que muestra el video"}
-          {idea.spot && <span className="text-muted-foreground group-open:hidden">· ver</span>}
+          {video.relevant === false ? "Este video no parece ser del viaje" : insights.length > 0 ? "Resumen y lugares del video" : "Lo que muestra el video"}
+          {folded && <span className="text-muted-foreground group-open:hidden">· ver</span>}
         </summary>
         <p className="mt-1.5 leading-relaxed text-secondary-foreground">{video.summary}</p>
         {spots.length > 0 && (

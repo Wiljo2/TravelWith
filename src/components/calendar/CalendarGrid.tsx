@@ -43,6 +43,7 @@ interface CalendarGridProps {
   onSwapDays: (aId: string, bId: string) => void;
   onSetDaySub: (dayId: string, sub: string) => void;
   pendingNew?: { dayId: string; hour: number } | null;
+  tipsByEvent?: Record<string, number>;   // video advice placed on each activity
   // Day to open on first render, e.g. today while the trip is underway.
   initialDayIdx?: number;
 }
@@ -50,7 +51,7 @@ interface CalendarGridProps {
 export default function CalendarGrid({
   days, tripSpans, tasks, onDragStart, onTouchDragStart, onTouchDragCancel, onDragEnter, onDragMove, onDrop, onDragEnd,
   onSelect, selectedId, dragTarget, dragPreview, onAddEvent, onToggleTask, onEditTask, onSwapDays, onSetDaySub, pendingNew,
-  initialDayIdx,
+  initialDayIdx, tipsByEvent,
 }: CalendarGridProps) {
   const mobile = useIsMobile();
   const touch = useIsTouch();
@@ -155,6 +156,7 @@ export default function CalendarGrid({
         pendingHour={pendingNew?.dayId === day.id ? pendingNew.hour : null}
         onTouchPress={touch ? touchDrag.startPress : undefined}
         touchDraggingId={touchDrag.draggingId}
+        tipsByEvent={tipsByEvent}
       />
     );
   });

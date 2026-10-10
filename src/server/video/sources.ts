@@ -1,13 +1,15 @@
 import { createServerClient } from "@/lib/supabase-server";
-import { fetchTikTokVideo, resolveTikTokUrl } from "@/server/tiktok";
+import { fetchTikTokVideo, resolveTikTokUrl, VideoTooLongError } from "@/server/tiktok";
 import type { VideoInput } from "@/server/video/gemini";
 import { fetchInstagramPost, instagramProviderEnabled } from "@/server/video/instagram";
 import { isHostOf } from "@/utils/ideas";
-import type { Idea } from "@/types";
+import { tooLongReason } from "@/utils/ideaVideo";
+import type { Idea, IdeaVideoSkip } from "@/types";
 
 // Where the video of an idea comes from. TikTok: downloaded from its page;
-// YouTube: Gemini reads the link itself; Instagram: through the scraping
-// provider; any of them: a file a member uploaded (see upload-url route).
+// Instagram: through the scraping provider; either: a file a member uploaded
+// (see upload-url route). Only short videos are analyzed, and YouTube isn't:
+// its length can't be known before Gemini watches the whole video.
 
 export const VIDEO_MAX_BYTES = 60 * 1024 * 1024;
 export const UPLOAD_MAX_BYTES = 100 * 1024 * 1024;
@@ -24,14 +26,18 @@ export interface PostMeta {
 
 export type ResolvedVideo =
   | { ok: true; input: VideoInput; source: VideoSource; seconds?: number; bytes?: number; meta?: PostMeta; providerCalls?: number }
-  | { ok: false; status: "needsFile" | "skipped"; reason: string; source: VideoSource; providerCalls?: number };
+  | { ok: false; status: "needsFile" | "skipped"; reason: string; source: VideoSource; providerCalls?: number; skip?: IdeaVideoSkip };
 
 const NEEDS_FILE = "No se pudo descargar el video; súbelo para analizarlo";
+export const YOUTUBE_REASON = "Por ahora no analizamos videos de YouTube";
 
 // Uploads live under <room>/<idea>/ so a member can't point at another trip's file.
 export const uploadPrefix = (code: string, ideaId: string) => `${code}/${ideaId}/`;
 
-export async function resolveVideo(idea: Idea, code: string, uploadPath?: string): Promise<ResolvedVideo> {
+const tooLong = (source: VideoSource, maxSeconds: number, providerCalls?: number): ResolvedVideo =>
+  ({ ok: false, status: "skipped", reason: tooLongReason(maxSeconds), skip: "tooLong", source, providerCalls });
+
+export async function resolveVideo(idea: Idea, code: string, maxSeconds: number, uploadPath?: string): Promise<ResolvedVideo> {
   if (uploadPath) return fromUpload(code, idea.id, uploadPath);
 
   let url: URL;
@@ -41,12 +47,18 @@ export async function resolveVideo(idea: Idea, code: string, uploadPath?: string
     return { ok: false, status: "skipped", reason: "Enlace inválido", source: "other" };
   }
 
-  if (idea.platform === "youtube" && (isHostOf(url.hostname, "youtube.com") || isHostOf(url.hostname, "youtu.be"))) {
-    return { ok: true, input: { kind: "youtube", url: url.toString() }, source: "youtube" };
+  if (idea.platform === "youtube") {
+    return { ok: false, status: "skipped", reason: YOUTUBE_REASON, skip: "platform", source: "youtube" };
   }
 
   if (idea.platform === "tiktok" && isHostOf(url.hostname, "tiktok.com")) {
-    const video = await fetchTikTokVideo(await resolveTikTokUrl(url), VIDEO_MAX_BYTES);
+    let video;
+    try {
+      video = await fetchTikTokVideo(await resolveTikTokUrl(url), VIDEO_MAX_BYTES, maxSeconds);
+    } catch (e) {
+      if (e instanceof VideoTooLongError) return tooLong("tiktok", maxSeconds);
+      throw e;
+    }
     if (!video) return { ok: false, status: "needsFile", reason: NEEDS_FILE, source: "tiktok" };
     const { data, mime, seconds, ...meta } = video;
     return { ok: true, input: { kind: "bytes", data, mime }, source: "tiktok", seconds, bytes: data.byteLength, meta };
@@ -56,16 +68,19 @@ export async function resolveVideo(idea: Idea, code: string, uploadPath?: string
     if (!instagramProviderEnabled()) {
       return { ok: false, status: "needsFile", reason: "Instagram no deja descargar el video; súbelo para analizarlo", source: "instagram" };
     }
-    const post = await fetchInstagramPost(idea.url, VIDEO_MAX_BYTES).catch((e) => {
-      console.error("[video] instagram", e);
+    let long = false;
+    const post = await fetchInstagramPost(idea.url, VIDEO_MAX_BYTES, maxSeconds).catch((e) => {
+      if (e instanceof VideoTooLongError) long = true;
+      else console.error("[video] instagram", e);
       return null;
     });
+    if (long) return tooLong("instagram", maxSeconds, 1);
     if (!post) return { ok: false, status: "needsFile", reason: NEEDS_FILE, source: "instagram", providerCalls: 1 };
     const { data, mime, seconds, ...meta } = post;
     return { ok: true, input: { kind: "bytes", data, mime }, source: "instagram", seconds, bytes: data.byteLength, meta, providerCalls: 1 };
   }
 
-  return { ok: false, status: "skipped", reason: "Solo se analizan videos de TikTok, Instagram y YouTube", source: "other" };
+  return { ok: false, status: "skipped", reason: "Solo se analizan videos de TikTok e Instagram", skip: "platform", source: "other" };
 }
 
 async function fromUpload(code: string, ideaId: string, path: string): Promise<ResolvedVideo> {

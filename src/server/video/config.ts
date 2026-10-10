@@ -1,10 +1,12 @@
+import { VIDEO_MAX_SECONDS } from "@/utils/ideaVideo";
+
 // Video analysis settings, from the server environment. Without
 // GEMINI_API_KEY the feature is off and ideas behave exactly as before.
 
 const DEFAULT_MODEL = "gemini-3.8-flash";
 const DEFAULT_FALLBACK_MODEL = "gemini-3.5-flash";
 const DEFAULT_DAILY_LIMIT = 30;
-const DEFAULT_MAX_SECONDS = 300;
+const DEFAULT_MAX_SECONDS = VIDEO_MAX_SECONDS;
 
 function intEnv(name: string, fallback: number): number {
   const raw = process.env[name]?.trim();

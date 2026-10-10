@@ -1,4 +1,4 @@
-import { readCapped } from "@/server/tiktok";
+import { readCapped, VideoTooLongError } from "@/server/tiktok";
 import { isHostOf } from "@/utils/ideas";
 
 // Instagram blocks anonymous requests from datacenter IPs, so a scraping
@@ -42,7 +42,7 @@ export function instagramPostUrl(raw: string): string | null {
   }
 }
 
-export async function fetchInstagramPost(rawUrl: string, maxBytes: number): Promise<InstagramPost | null> {
+export async function fetchInstagramPost(rawUrl: string, maxBytes: number, maxSeconds?: number): Promise<InstagramPost | null> {
   const token = process.env.INSTAGRAM_PROVIDER_TOKEN?.trim();
   const postUrl = instagramPostUrl(rawUrl);
   if (!token || !postUrl) return null;
@@ -59,13 +59,15 @@ export async function fetchInstagramPost(rawUrl: string, maxBytes: number): Prom
   }
   const [item] = (await res.json().catch(() => [])) as Record<string, unknown>[];
   if (!item || !isCdnUrl(item.videoUrl)) return null;
+  const seconds = typeof item.videoDuration === "number" ? item.videoDuration : undefined;
+  if (maxSeconds && seconds && seconds > maxSeconds) throw new VideoTooLongError(seconds);
 
   const video = await fetch(item.videoUrl, { redirect: "error", signal: AbortSignal.timeout(45_000) });
   if (!video.ok || !video.body) return null;
   return {
     data: await readCapped(video, maxBytes),
     mime: video.headers.get("content-type")?.split(";")[0] || "video/mp4",
-    seconds: typeof item.videoDuration === "number" ? item.videoDuration : undefined,
+    seconds,
     title: typeof item.caption === "string" && item.caption ? item.caption.slice(0, 2000) : undefined,
     author: typeof item.ownerUsername === "string" ? item.ownerUsername : undefined,
     thumbnail: isCdnUrl(item.displayUrl) ? item.displayUrl : undefined,

@@ -144,13 +144,35 @@ export interface IdeaSpot {
 // analyzed (daily limit, too long, feature off).
 export type IdeaVideoStatus = "pending" | "done" | "failed" | "needsFile" | "skipped";
 
+// Why a video is never analyzed, so retrying is pointless: longer than the
+// limit, or a platform that isn't analyzed (YouTube).
+export type IdeaVideoSkip = "tooLong" | "platform";
+
+// A piece of advice a video gives, other than a place (places are spots).
+export type InsightKind = "todo" | "tip" | "avoid" | "fact";
+export type InsightPhase = "before" | "first" | "during" | "last" | "anytime";
+
+export interface IdeaInsight {
+  kind: InsightKind;
+  text: string;             // one actionable sentence
+  phase?: InsightPhase;     // when in the trip it matters
+  when?: string;            // as the video says it: "60 días antes", "el día de embarque al mediodía"
+  start?: number;           // decimal hours, when the video gives a time
+  end?: number;
+  place?: string;           // the trip place or venue it's about
+  brand?: string;           // company, ship or park it is specific to
+  at?: number;              // second of the video where it's said
+}
+
 export interface IdeaVideo {
   status: IdeaVideoStatus;
   reason?: string;
+  skip?: IdeaVideoSkip;
   relevant?: boolean;       // false = the video isn't travel inspiration
   summary?: string;
   onScreen?: string;        // key text shown on screen (names, prices, addresses)
   spots?: IdeaSpot[];
+  insights?: IdeaInsight[]; // advice beyond places; absent on videos analyzed before it existed
   attempts?: number;
   retryAt?: string;         // ISO; a failed analysis is tried again after this
   analyzedAt?: string;
@@ -176,6 +198,7 @@ export interface Idea {
   suggestion?: IdeaSuggestion;
   status?: IdeaStatus;      // default "idea"
   votes?: string[];         // voter keys
+  insightStates?: Record<string, InsightState>; // the group's take on each video insight, by its index
   placesKey?: string;       // the place list its suggestion was computed with
   dayId?: string;           // legacy, ignored
   eventId?: string;         // legacy, ignored
@@ -234,6 +257,33 @@ export interface IdeaPlanResult {
   classes: { ideaId: string; place?: string; cat?: string }[];
   at: string;
   ideaIds: string[];
+  insightLinks?: InsightLink[];
+}
+
+// What the group did with one video insight: votes, or hidden as already known
+// or not useful. Kept on the video idea, like its votes.
+export interface InsightState {
+  votes?: string[];
+  hidden?: "known" | "dismissed";
+}
+
+// Whether a video's advice adds to this trip: new, already in the plan, or not
+// for this trip (another cruise line, a port they don't visit…).
+export type InsightStatus = "new" | "covered" | "na";
+
+// Where one insight of a video fits the plan, from "Analizar con Claude".
+// Same targets as IdeaLink; `deadline` (yyyy-mm-dd) for todos with a lead time.
+export interface InsightLink {
+  insightId: string;         // `${ideaId}:i${index}`
+  dayId?: string;
+  eventId?: string;
+  slot?: { start: number; end: number };
+  before?: boolean;
+  deadline?: string;
+  status: InsightStatus;
+  sameAs?: string;           // another insight that says the same (from another video)
+  contradicts?: string;      // another insight that says the opposite
+  reason?: string;
 }
 
 export type DocumentKind = "flight" | "lodging" | "insurance" | "ticket" | "other";
@@ -273,6 +323,7 @@ export interface RoomPayload {
   ideaLinks?: IdeaLink[];  // last "Analizar con Claude" result (free matches are computed live)
   ideaLinksAt?: string;    // ISO time of that analysis
   ideaLinksIds?: string[]; // ideas that analysis read (the others are "new")
+  insightLinks?: InsightLink[]; // where each video insight fits, from that same analysis
   eventPlaces?: Record<string, EventPlace>; // trip map: where each activity happens, by event id
   documents?: TripDocument[];
 }

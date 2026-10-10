@@ -1,4 +1,5 @@
-import { ANALYSIS_SCHEMA, analysisPrompt, parseAnalysis, type VideoAnalysis } from "@/server/video/analysis";
+import { parseAnalysis, type VideoAnalysis } from "@/server/video/analysis";
+import { ANALYSIS_SCHEMA, analysisPrompt, type PromptContext } from "@/server/video/analysisPrompt";
 import { videoConfig } from "@/server/video/config";
 
 // Gemini watches the video (image + audio) through the REST API. Non-YouTube
@@ -77,12 +78,12 @@ async function deleteFile(file: GeminiFile) {
   await fetch(`${API}/v1beta/${file.name}?key=${key()}`, { method: "DELETE" }).catch(() => {});
 }
 
-async function generate(model: string, part: object, places: string[], timeoutMs: number) {
+async function generate(model: string, part: object, prompt: string, timeoutMs: number) {
   const res = await fetch(`${API}/v1beta/models/${model}:generateContent?key=${key()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ role: "user", parts: [part, { text: analysisPrompt(places) }] }],
+      contents: [{ role: "user", parts: [part, { text: prompt }] }],
       generationConfig: { responseMimeType: "application/json", responseSchema: ANALYSIS_SCHEMA },
     }),
     signal: AbortSignal.timeout(timeoutMs),
@@ -112,9 +113,10 @@ const MIN_CALL_MS = 30_000;
 
 // Tries the main model twice with backoff, then the fallback model once, while
 // time remains before `deadline` (epoch ms); out of time counts as busy.
-export async function watchVideo(input: VideoInput, places: string[], deadline: number): Promise<GeminiResult> {
+export async function watchVideo(input: VideoInput, context: PromptContext, deadline: number): Promise<GeminiResult> {
   const { model, fallbackModel } = videoConfig();
   const plan = [model, model, fallbackModel].filter((m): m is string => !!m);
+  const prompt = analysisPrompt(context);
   let file: GeminiFile | null = null;
   let attempts = 0;
   let lastError = "";
@@ -126,7 +128,7 @@ export async function watchVideo(input: VideoInput, places: string[], deadline: 
       const left = deadline - Date.now();
       if (left < MIN_CALL_MS) break;
       attempts++;
-      const r = await generate(m, part, places, left);
+      const r = await generate(m, part, prompt, left);
       if (r.status === 200) {
         if (!r.analysis) throw new GeminiError("unreadable answer");
         return { analysis: r.analysis, model: m, attempts, usage: r.usage };

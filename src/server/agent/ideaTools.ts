@@ -5,6 +5,7 @@ import type { OpContext } from "@/server/ops/types";
 import { ideasRepo } from "@/server/repo/ideas";
 import { videoConfig } from "@/server/video/config";
 import { canonicalUrl, detectPlatform, findIdeaUrls } from "@/utils/ideas";
+import { isAnalyzablePlatform } from "@/utils/ideaVideo";
 import { rowToIdea, type Row } from "@/utils/tripRows";
 import type { Idea } from "@/types";
 
@@ -20,13 +21,13 @@ export const IDEA_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_ideas",
     description:
-      "List the ideas the group saved (TikToks, reels, YouTube): caption, note, place, type, votes and, when the video was analyzed, its summary and the spots it recommends. Ideas with parentId are the spots of one video. Call this before recommending plans, restaurants or tips from the group's saved videos.",
+      "List the ideas the group saved (TikToks, reels, YouTube): caption, note, place, type, votes and, when the video was analyzed, its summary, the spots it recommends and its insights (todo, tip, avoid, fact: concrete advice beyond places). Ideas with parentId are the spots of one video. Call this before recommending plans, restaurants or tips from the group's saved videos.",
     input_schema: schema({}),
   },
   {
     name: "add_idea",
     description:
-      "Save a TikTok, Instagram or YouTube link to the trip's ideas board. Its video is analyzed automatically in about a minute (summary and spots); you don't need to wait for it. Call when the user shares a video link or asks to save one.",
+      "Save a TikTok, Instagram or YouTube link to the trip's ideas board. TikTok and Instagram videos up to 90 seconds are analyzed automatically in about a minute (summary and spots); longer videos and YouTube are saved but not analyzed. You don't need to wait for it. Call when the user shares a video link or asks to save one.",
     input_schema: schema(
       {
         url: { type: "string", description: "The video link exactly as the user gave it" },
@@ -64,6 +65,7 @@ function describe(i: Idea) {
       relevant: v.relevant,
       summary: cut(v.summary, 400),
       spots: v.spots?.map((s) => [s.name, s.city, s.price].filter(Boolean).join(" · ")),
+      insights: v.insights?.map((n) => [n.kind, n.text, n.when, n.brand && `(${n.brand})`].filter(Boolean).join(" · ")),
     },
   };
 }
@@ -91,5 +93,5 @@ export async function runIdeaTool(ctx: OpContext, name: string, input: Record<st
   const idea = { url, platform: detectPlatform(url), createdAt: new Date().toISOString(), status: "idea", ...(note ? { note } : {}) };
   const result = await runOp("idea.create", ctx, { args: { idea } });
   const id = result.changed[0]?.row.id;
-  return { ok: true, id, url, analyzingVideo: videoConfig().enabled && idea.platform !== "other" };
+  return { ok: true, id, url, analyzingVideo: videoConfig().enabled && isAnalyzablePlatform(idea) };
 }

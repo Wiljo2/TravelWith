@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import DayAgenda from "@/components/itinerary/DayAgenda";
 import TodayCard from "@/components/home/TodayCard";
+import VideoTipsPanel from "@/components/home/VideoTipsPanel";
 import { PANEL, SectionTitle } from "@/components/home/shared";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT } from "@/constants/taskCategories";
 import { fmtUSD, optionGroupUSD, fmtUSDNum } from "@/utils/currency";
@@ -14,6 +15,7 @@ import { useNow } from "@/hooks/useNow";
 import { cn } from "@/lib/utils";
 import type { Day, Idea, Task, TripInfo } from "@/types";
 import type { Tab } from "@/components/TabBar";
+import type { PlacedInsight } from "@/utils/insights";
 
 interface HomeViewProps {
   trip: TripInfo | null;
@@ -25,6 +27,7 @@ interface HomeViewProps {
   exchangeRate: number;
   onNavigate: (tab: Tab) => void;
   documents?: ReactNode;
+  placed?: PlacedInsight[];   // video advice placed on the plan
 }
 
 function heroCopy(phase: TripPhase | null, dayCount: number) {
@@ -39,7 +42,7 @@ function heroCopy(phase: TripPhase | null, dayCount: number) {
 
 // Adapts to the moment: countdown and decisions before the trip, "now / next"
 // while it's underway, and a wrap-up once it's over.
-export default function HomeView({ trip, days, tasks, ideas, grandTotal, people, exchangeRate, onNavigate, documents }: HomeViewProps) {
+export default function HomeView({ trip, days, tasks, ideas, grandTotal, people, exchangeRate, onNavigate, documents, placed = [] }: HomeViewProps) {
   const now = useNow();
   const phase = trip ? tripPhase(trip.startDate, days.length, now) : null;
   const during = phase?.phase === "during" ? phase : null;
@@ -74,6 +77,8 @@ export default function HomeView({ trip, days, tasks, ideas, grandTotal, people,
         ) : (
           <Hero phase={phase} days={days} people={people} />
         )}
+
+        {!after && <VideoTipsPanel placed={placed} days={days} today={today} onOpenIdeas={() => onNavigate("ideas")} />}
 
         {!after && (
           <section className={PANEL}>

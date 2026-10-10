@@ -169,8 +169,8 @@ export function ideaSettingsPatch(args: unknown): IdeaSettingsPatch {
   if (args.ideaPlan !== undefined) {
     const plan = args.ideaPlan;
     if (plan !== null) {
-      if (!isObject(plan) || Object.keys(plan).some((k) => !["ideaLinks", "ideaLinksAt", "ideaLinksIds"].includes(k))) {
-        throw new DomainError("ideaPlan may only hold ideaLinks, ideaLinksAt and ideaLinksIds");
+      if (!isObject(plan) || Object.keys(plan).some((k) => !["ideaLinks", "ideaLinksAt", "ideaLinksIds", "insightLinks"].includes(k))) {
+        throw new DomainError("ideaPlan may only hold ideaLinks, ideaLinksAt, ideaLinksIds and insightLinks");
       }
       if (jsonBytes(plan) > IDEA_PLAN_BYTES) throw new DomainError("ideaPlan is too large");
     }

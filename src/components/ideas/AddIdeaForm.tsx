@@ -67,7 +67,7 @@ export default function AddIdeaForm({ onSubmit, onDone, initialText }: AddIdeaFo
       />
       <p className="text-xs text-muted-foreground">
         {VIDEO_ANALYSIS_ON
-          ? "La app ve el video y saca los lugares que recomienda. La nota ayuda a ubicarla."
+          ? "La app ve los TikToks y reels de hasta 90 s y saca lo que recomiendan. YouTube no se analiza. La nota ayuda a ubicarla."
           : "La nota ayuda mucho a clasificarla: de Instagram no podemos leer el texto del post."}
       </p>
       {message && <p className="text-xs text-destructive">{message}</p>}

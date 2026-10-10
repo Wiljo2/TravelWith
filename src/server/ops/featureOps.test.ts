@@ -51,6 +51,8 @@ describe("feature row validation", () => {
   it("idea settings accept only their own keys", () => {
     expect(ideaSettingsPatch({ ideaPlaces: ["Miami"], ideaPlan: null })).toEqual({ idea_places: ["Miami"], idea_plan: null });
     expect(() => ideaSettingsPatch({ ideaPlan: { payload: {} } })).toThrow(/only hold/);
+    const insightLinks = [{ insightId: "v:i0", status: "new" }];
+    expect(ideaSettingsPatch({ ideaPlan: { ideaLinks: [], insightLinks } })).toEqual({ idea_plan: { ideaLinks: [], insightLinks } });
     expect(() => ideaSettingsPatch({ ideaPlaces: [1] })).toThrow(/place names/);
   });
 

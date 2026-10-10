@@ -1,0 +1,13 @@
+[
+  {
+    "url": "https://www.tiktok.com/@user/video/0000000000000000000",
+    "places": ["Crucero", "Miami", "Orlando"],
+    "caption": "",
+    "expected": {
+      "insights": [
+        { "kind": "todo", "text": "Reservar los shows en la app antes de embarcar", "phase": "before" }
+      ],
+      "spots": ["Windjammer"]
+    }
+  }
+]

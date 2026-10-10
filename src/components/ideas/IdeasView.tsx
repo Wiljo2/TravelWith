@@ -4,6 +4,7 @@ import { Check, Lightbulb, Plus } from "lucide-react";
 import IdeaCard from "@/components/ideas/IdeaCard";
 import IdeaViewer from "@/components/ideas/IdeaViewer";
 import IdeasByDay from "@/components/ideas/IdeasByDay";
+import IdeasDigest from "@/components/ideas/IdeasDigest";
 import AddIdeaForm from "@/components/ideas/AddIdeaForm";
 import AnalyzeWithClaude from "@/components/ideas/AnalyzeWithClaude";
 import PlacesEditor from "@/components/ideas/PlacesEditor";
@@ -17,7 +18,7 @@ import { ideaLinks, matchIdeasToPlan } from "@/utils/ideaPlan";
 import { hideSplitVideos, isAnalyzingVideo } from "@/utils/ideaVideo";
 import { fmtHour } from "@/utils/time";
 import { cn } from "@/lib/utils";
-import type { Day, Idea, IdeaLink, IdeaMoment, IdeaPlanResult } from "@/types";
+import type { Day, Idea, IdeaLink, IdeaMoment, IdeaPlanResult, IdeaSpot, InsightLink, InsightState, Task } from "@/types";
 import type { PlaceIndex } from "@/utils/ideas";
 import { isVenue, zonesOf } from "@/utils/places";
 
@@ -47,12 +48,18 @@ interface IdeasViewProps {
   planLinks?: IdeaLink[];
   planLinksAt?: string;
   planIdeaIds?: string[];
+  planInsightLinks?: InsightLink[];
   onAnalyze: (ideaIds?: string[]) => Promise<IdeaPlanResult>;
-  onSavePlan: (links: IdeaLink[], at: string, ideaIds: string[]) => void;
+  onSavePlan: (links: IdeaLink[], at: string, ideaIds: string[], insightLinks: InsightLink[]) => void;
   phase?: "before" | "during" | "after";
   todayIdx?: number;
   sharedText?: string | null;      // a link shared from the phone, to confirm
   onSharedDone?: () => void;
+  tasks?: Task[];
+  onAddTask?: (task: Pick<Task, "title" | "note" | "priority">) => void;
+  onVoteInsight?: (ideaId: string, index: number) => void;
+  onHideInsight?: (ideaId: string, index: number, hidden: InsightState["hidden"]) => void;
+  onSaveSpot?: (videoId: string, spot: IdeaSpot) => void;
 }
 
 const ALL = "all";
@@ -70,7 +77,7 @@ const GRID = "grid grid-cols-2 gap-2.5 md:grid-cols-[repeat(auto-fill,minmax(150
 export default function IdeasView({
   ideas: allIdeas, index, roomCode, loadingIds, mobile, voter,
   onAdd, onUpdate, onSetPlace, onSetCat, onSetMoment, onRemove, onVote, onApplyClaude, onAcceptAll, onSetNote, onRetry, onRetryVideo, onUploadVideo, onAddPlace, onRemovePlace,
-  days, planLinks, planLinksAt, planIdeaIds, onAnalyze, onSavePlan, phase, todayIdx, sharedText, onSharedDone,
+  days, planLinks, planLinksAt, planIdeaIds, planInsightLinks, onAnalyze, onSavePlan, phase, todayIdx, sharedText, onSharedDone, tasks, onAddTask, onVoteInsight, onHideInsight, onSaveSpot,
 }: IdeasViewProps) {
   // A video split into spot ideas shows as its spots.
   const ideas = useMemo(() => hideSplitVideos(allIdeas), [allIdeas]);
@@ -79,7 +86,9 @@ export default function IdeasView({
   const venues = index.places.filter(isVenue).map((p) => p.name);
   const [filter, setFilter] = useState<string>(ALL);
   const [zone, setZone] = useState<string>(ALL);
-  const [view, setView] = useState<"place" | "day">("place");
+  // The digest when some video already says something concrete, until a view is picked.
+  const [picked, setView] = useState<"digest" | "place" | "day" | null>(null);
+  const view = picked ?? (allIdeas.some((i) => i.video?.insights?.length) ? "digest" : "place");
   const [adding, setAdding] = useState(false);
   const [viewing, setViewing] = useState<string | null>(null);
   // Keeps the last idea on screen while the sheet animates closed.
@@ -100,6 +109,8 @@ export default function IdeasView({
   };
 
   const active = ideas.filter((i) => i.status !== "discarded");
+  // Videos shown as their spots still have their own advice for Claude to place.
+  const withAdvice = allIdeas.filter((i) => !ideas.includes(i) && i.status !== "discarded" && i.video?.insights?.length);
   const discarded = ideas.filter((i) => i.status === "discarded");
   const validCat = (i: Idea) => (i.cat && IDEA_TYPES[i.cat] ? i.cat : undefined);
   const toReview = active.filter((i) => !i.place || !validCat(i));
@@ -107,6 +118,11 @@ export default function IdeasView({
   const placeOf = (i: Idea) => (i.place && places.includes(i.place) ? i.place : undefined);
   const zones = zonesOf(index.places);
   const zoneOf = (i: Idea) => { const p = placeOf(i); return p ? zones.get(p) ?? p : NONE; };
+  // The digest also trusts a pending suggestion: it only reads the videos.
+  const digestZoneOf = (i: Idea) => {
+    const p = placeOf(i) ?? (i.suggestion?.place && places.includes(i.suggestion.place) ? i.suggestion.place : undefined);
+    return p ? zones.get(p) ?? p : NONE;
+  };
   const byType = filter === ALL ? active : filter === REVIEW ? toReview : active.filter((i) => validCat(i) === filter);
   const zoneNames = [...new Set(index.places.map((p) => zones.get(p.name) ?? p.name))];
   const zoneChips = [...zoneNames, NONE]
@@ -176,11 +192,12 @@ export default function IdeasView({
           <Plus className="size-4" /> Agregar idea
         </Button>
         <AnalyzeWithClaude
-          ideas={active}
+          ideas={[...active, ...withAdvice]}
           reading={active.filter((i) => loadingIds.has(i.id)).length}
           planLinks={planLinks}
           planLinksAt={planLinksAt}
           planIdeaIds={planIdeaIds}
+          planInsightLinks={planInsightLinks}
           onAnalyze={onAnalyze}
           onSavePlan={onSavePlan}
           onApplyClaude={onApplyClaude}
@@ -194,7 +211,7 @@ export default function IdeasView({
 
       {active.length > 0 && (
         <div className="inline-flex gap-1 self-start rounded-full bg-muted p-1">
-          {([["place", "📍 Por lugar"], ["day", "📅 Por día"]] as const).map(([id, label]) => (
+          {([["digest", "✨ Resumen"], ["place", "📍 Por lugar"], ["day", "📅 Por día"]] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => setView(id)}
@@ -219,6 +236,23 @@ export default function IdeasView({
           roomCode={roomCode}
           phase={phase}
           todayIdx={todayIdx}
+          onOpen={setViewing}
+        />
+      ) : view === "digest" && active.length > 0 ? (
+        <IdeasDigest
+          ideas={allIdeas}
+          zones={[...zoneNames, NONE].map((z) => ({ key: z, title: z === NONE ? "Sin lugar" : z }))}
+          zoneOf={digestZoneOf}
+          days={days}
+          links={planInsightLinks}
+          tasks={tasks}
+          onAddTask={onAddTask}
+          voter={voter}
+          onVote={onVoteInsight}
+          onHide={onHideInsight}
+          onSaveSpot={onSaveSpot}
+          row={ROW}
+          renderCard={(i) => card(i)}
           onOpen={setViewing}
         />
       ) : ideas.length === 0 ? (

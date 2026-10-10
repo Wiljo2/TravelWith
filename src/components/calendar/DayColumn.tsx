@@ -106,6 +106,7 @@ interface DayColumnProps {
   pendingHour: number | null;
   onTouchPress?: (e: React.TouchEvent<HTMLElement>, ev: CalendarEvent, dayId: string) => void;
   touchDraggingId?: string | null;
+  tipsByEvent?: Record<string, number>;
 }
 
 const DAY_SWAP_MIME = "application/x-day-swap";
@@ -113,7 +114,7 @@ const DAY_SWAP_MIME = "application/x-day-swap";
 export default function DayColumn({
   day, tasks, onDragStart, onDragEnter, onDragMove, onDrop, onDragEnd,
   onSelect, onAddEvent, onToggleTask, onEditTask, onSwapDays, onSetDaySub, selectedId, isDragTarget, dragPreview, pendingHour,
-  onTouchPress, touchDraggingId,
+  onTouchPress, touchDraggingId, tipsByEvent,
 }: DayColumnProps) {
   const touch = !!onTouchPress;
   const gridStart = useGridStart();
@@ -260,6 +261,7 @@ export default function DayColumn({
                 onMouseLeave={(e) => { if (!touch) setHoverY(getHour(e.clientY)); }}
                 onTouchPress={onTouchPress}
                 touchDragging={touchDraggingId === ev.id}
+                tips={tipsByEvent?.[ev.id]}
               />
             );
           });

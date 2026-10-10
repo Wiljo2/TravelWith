@@ -127,13 +127,22 @@ export interface FetchedVideo {
 
 export class VideoTooLargeError extends Error {}
 
+// The post says the video is longer than what is analyzed: thrown before the
+// download, so a long video costs no bandwidth.
+export class VideoTooLongError extends Error {
+  constructor(readonly seconds: number) {
+    super("video too long");
+  }
+}
+
 // The MP4 of a video, downloaded with the page's cookies. Only TikTok's own
 // CDNs are requested, redirects included (SSRF).
-export async function fetchTikTokVideo(url: URL, maxBytes: number): Promise<FetchedVideo | null> {
+export async function fetchTikTokVideo(url: URL, maxBytes: number, maxSeconds?: number): Promise<FetchedVideo | null> {
   const found = await fetchItem(url);
   const play: unknown = found?.item.video?.playAddr || found?.item.video?.downloadAddr;
   if (!found || typeof play !== "string" || !isTikTokCdnUrl(play)) return null;
   const seconds = Number(found.item.video?.duration) || undefined;
+  if (maxSeconds && seconds && seconds > maxSeconds) throw new VideoTooLongError(seconds);
   let target = play;
   for (let hop = 0; hop < 3; hop++) {
     const res = await fetch(target, {

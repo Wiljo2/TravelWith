@@ -26,12 +26,13 @@ interface EventCardProps {
   selected: boolean;
   cat: Category;
   conflict?: boolean;
+  tips?: number;
   style?: CSSProperties;
 }
 
 // Shared card renderer used by both real blocks and the drag ghost.
 // Category colors are data-driven, so they stay as inline styles.
-export function EventCard({ ev, start, end, height, selected, cat, conflict, style = {} }: EventCardProps) {
+export function EventCard({ ev, start, end, height, selected, cat, conflict, tips, style = {} }: EventCardProps) {
   const c = conflict ? CONFLICT_CAT : cat;
   const punctual = end <= start;
   return (
@@ -58,6 +59,11 @@ export function EventCard({ ev, start, end, height, selected, cat, conflict, sty
         style={{ color: c.text }}
       >
         <span aria-hidden className="mr-1">{eventIcon(ev)}</span>{ev.title}
+        {!!tips && (
+          <span title={`${tips} ${tips === 1 ? "consejo" : "consejos"} de los videos`} className="ml-1 rounded bg-card/80 px-1 text-[10px] font-semibold">
+            💡{tips}
+          </span>
+        )}
       </div>
       {height >= 40 && (
         <div className="mt-0.5 text-[10.5px] tabular-nums" style={{ color: c.border }}>
@@ -99,12 +105,13 @@ interface EventBlockProps {
   // Set on touch screens: long-press drag replaces HTML5 drag and drop.
   onTouchPress?: (e: React.TouchEvent<HTMLElement>, ev: CalendarEvent, dayId: string) => void;
   touchDragging?: boolean;
+  tips?: number;            // video advice placed on this activity
 }
 
 export default function EventBlock({
   ev, dayId, col, total, conflict,
   onDragStart, onDragEnd, onSelect, selected,
-  onMouseEnter, onMouseLeave, onTouchPress, touchDragging,
+  onMouseEnter, onMouseLeave, onTouchPress, touchDragging, tips,
 }: EventBlockProps) {
   const [dragging, setDragging] = useState(false);
   const gridStart = useGridStart();
@@ -153,6 +160,7 @@ export default function EventBlock({
         ev={ev}
         start={ev.start}
         end={ev.end}
+        tips={tips}
         height={height}
         selected={selected}
         cat={cat}

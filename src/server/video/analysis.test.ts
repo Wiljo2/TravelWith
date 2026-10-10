@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { initialDays } from "@/test/fixtures/initialDays";
 import { ideaVideoArgs } from "@/server/domain/featureRows";
 import { DomainError } from "@/server/domain/core";
-import { childId, childIdeas, doneVideo, parseAnalysis, withVideo, MAX_SPOTS } from "@/server/video/analysis";
+import { doneVideo, parseAnalysis, withVideo, MAX_INSIGHTS, MAX_SPOTS } from "@/server/video/analysis";
+import { hideSplitVideos, isAutoSpotIdea, spotIdea, spotIdeaId } from "@/utils/ideaVideo";
+import { analysisPrompt } from "@/server/video/analysisPrompt";
 import { placeIndex } from "@/utils/ideas";
 import { tripPlaces } from "@/utils/places";
 import type { Idea } from "@/types";
@@ -56,25 +58,30 @@ describe("parseAnalysis", () => {
   });
 });
 
-describe("childIdeas", () => {
+describe("spotIdea", () => {
   const analysis = parseAnalysis(raw)!;
 
-  it("makes one idea per spot, with ids derived from the parent", () => {
-    const children = childIdeas(parent, analysis, index);
-    expect(children.map((c) => c.id)).toEqual(["idea-1-s0", "idea-1-s1", "idea-1-s2"]);
-    expect(children[0]).toMatchObject({ parentId: "idea-1", title: "D-Luxe Burger", url: parent.url, addedBy: "ana" });
-    expect(children[0].spot?.price).toBe("$8.99");
-    expect(children[0].suggestion?.cat).toBe("comida");
+  it("saves a spot as an idea of its own, with an id from the parent and the spot name", () => {
+    const spot = spotIdea(parent, analysis.spots[0], index, "beto");
+    expect(spot.id).toBe("idea-1-s-d-luxe-burger");
+    expect(spot).toMatchObject({ parentId: "idea-1", title: "D-Luxe Burger", url: parent.url, addedBy: "beto" });
+    expect(spot.spot?.price).toBe("$8.99");
+    expect(spot.suggestion?.cat).toBe("comida");
   });
 
-  it("doesn't split one-spot, off-topic or child videos", () => {
-    expect(childIdeas(parent, { ...analysis, spots: analysis.spots.slice(0, 1) }, index)).toEqual([]);
-    expect(childIdeas(parent, { ...analysis, relevant: false }, index)).toEqual([]);
-    expect(childIdeas({ ...parent, parentId: "x" }, analysis, index)).toEqual([]);
+  it("keeps ids within the id limit and allowed characters", () => {
+    const id = spotIdeaId("a".repeat(100), { name: "Café Ñandú & Co. — 2º piso, súper largo nombre de lugar" });
+    expect(id.length).toBeLessThanOrEqual(100);
+    expect(id).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
-  it("keeps child ids within the id limit", () => {
-    expect(childId("a".repeat(100), 11).length).toBeLessThanOrEqual(100);
+  it("only spot ideas made by the old automatic split hide their video", () => {
+    const saved = spotIdea(parent, analysis.spots[0], index);
+    expect(isAutoSpotIdea(saved)).toBe(false);
+    expect(hideSplitVideos([parent, saved]).map((i) => i.id)).toEqual(["idea-1", saved.id]);
+    const auto: Idea = { ...saved, id: "idea-1-s0" };
+    expect(isAutoSpotIdea(auto)).toBe(true);
+    expect(hideSplitVideos([parent, auto]).map((i) => i.id)).toEqual(["idea-1-s0"]);
   });
 });
 
@@ -116,20 +123,72 @@ describe("ideaVideoArgs", () => {
 
 describe("spot ideas' place", () => {
   it("trusts the spot's city over a passing word in its name", () => {
-    const [c] = childIdeas(parent, { relevant: true, summary: "x", spots: [
-      { name: "Crucero de True Crime", city: "Miami", cat: "actividad" },
-      { name: "Isla de los Mapaches", city: "Miami", cat: "actividad" },
-    ] }, index);
+    const c = spotIdea(parent, { name: "Crucero de True Crime", city: "Miami", cat: "actividad" }, index);
     expect(c.suggestion?.place).toBe("Miami");
   });
 
   it("prefers a venue of the plan named by the spot", () => {
     const venues = index.places.filter((p) => p.eventIds.length > 0).map((p) => p.name);
     expect(venues).toContain("Disney Springs");
-    const c = childIdeas(parent, { relevant: true, summary: "x", spots: [
-      { name: "Sunshine Churros en Disney Springs", city: "Orlando", cat: "comida" },
-      { name: "Otro", city: "Orlando", cat: "comida" },
-    ] }, index)[0];
+    const c = spotIdea(parent, { name: "Sunshine Churros en Disney Springs", city: "Orlando", cat: "comida" }, index);
     expect(c.suggestion?.place).toBe("Disney Springs");
+  });
+});
+
+describe("insights", () => {
+  const base = { relevant: true, summary: "Consejos de crucero", spots: [] };
+
+  it("keeps valid insights and cleans them", () => {
+    const a = parseAnalysis({
+      ...base,
+      insights: [
+        { kind: "todo", text: " Reserva los shows   en la app ", phase: "before", when: "60 días antes", at: 4.6 },
+        { kind: "tip", text: "Almuerza en el buffet del piso 14", phase: "first", start: 11.5, end: 13, place: "Crucero" },
+        { kind: "tip", text: "reserva los shows en la app" },
+        { kind: "souvenir", text: "Compra imanes" },
+        { kind: "avoid", text: "" },
+        { kind: "fact", text: "El wifi cuesta $25 al día", phase: "sometime", start: 30, end: 2 },
+      ],
+    })!;
+    expect(a.insights).toEqual([
+      { kind: "todo", text: "Reserva los shows en la app", phase: "before", when: "60 días antes", at: 5, start: undefined, end: undefined, place: undefined, brand: undefined },
+      { kind: "tip", text: "Almuerza en el buffet del piso 14", phase: "first", start: 11.5, end: 13, place: "Crucero", when: undefined, brand: undefined, at: undefined },
+      { kind: "fact", text: "El wifi cuesta $25 al día", phase: undefined, start: undefined, end: undefined, when: undefined, place: undefined, brand: undefined, at: undefined },
+    ]);
+  });
+
+  it("drops an end hour that isn't after the start", () => {
+    const a = parseAnalysis({ ...base, insights: [{ kind: "tip", text: "Piscina temprano", start: 9, end: 8 }] })!;
+    expect(a.insights?.[0]).toMatchObject({ start: 9, end: undefined });
+  });
+
+  it("caps the list and stores it on the video", () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ kind: "fact", text: `Dato número ${i}` }));
+    const a = parseAnalysis({ ...base, insights: many })!;
+    expect(a.insights).toHaveLength(MAX_INSIGHTS);
+    const video = doneVideo(a, "m", 1);
+    expect(video.insights?.[0]).toEqual({ kind: "fact", text: "Dato número 0" });
+  });
+
+  it("reads videos analyzed before insights existed", () => {
+    expect(parseAnalysis(base)?.insights).toEqual([]);
+  });
+});
+
+describe("analysisPrompt", () => {
+  it("passes the post text and the trip places", () => {
+    const p = analysisPrompt({ places: ["Crucero", "Miami"], caption: "5 errores en tu primer crucero", transcript: "hola" });
+    expect(p).toContain("Lugares del viaje: Crucero, Miami.");
+    expect(p).toContain("Texto del post: 5 errores en tu primer crucero");
+    expect(p).toContain("Subtítulos automáticos: hola");
+    expect(analysisPrompt({ places: [] })).not.toContain("Texto del post");
+  });
+});
+
+describe("withVideo and the group's take on insights", () => {
+  it("drops votes on the old insights when a new analysis renumbers them", () => {
+    const voted: Idea = { ...parent, insightStates: { 0: { votes: ["ana"] } } };
+    expect(withVideo(voted, { status: "done", insights: [] }, null).insightStates).toBeUndefined();
+    expect(withVideo(voted, { status: "failed" }, null).insightStates).toEqual({ 0: { votes: ["ana"] } });
   });
 });
