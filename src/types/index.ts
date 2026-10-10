@@ -144,9 +144,14 @@ export interface IdeaSpot {
 // analyzed (daily limit, too long, feature off).
 export type IdeaVideoStatus = "pending" | "done" | "failed" | "needsFile" | "skipped";
 
+// Why a video is never analyzed, so retrying is pointless: longer than the
+// limit, or a platform that isn't analyzed (YouTube).
+export type IdeaVideoSkip = "tooLong" | "platform";
+
 export interface IdeaVideo {
   status: IdeaVideoStatus;
   reason?: string;
+  skip?: IdeaVideoSkip;
   relevant?: boolean;       // false = the video isn't travel inspiration
   summary?: string;
   onScreen?: string;        // key text shown on screen (names, prices, addresses)

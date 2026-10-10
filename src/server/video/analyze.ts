@@ -10,7 +10,7 @@ import { videoConfig } from "@/server/video/config";
 import { GeminiBusyError, GeminiError, watchVideo, type GeminiUsage } from "@/server/video/gemini";
 import { deleteUpload, resolveVideo, uploadPrefix, type PostMeta, type VideoSource } from "@/server/video/sources";
 import { recordVideoUsage, videosAnalyzedToday } from "@/server/video/usage";
-import { MAX_VIDEO_ATTEMPTS } from "@/utils/ideaVideo";
+import { MAX_VIDEO_ATTEMPTS, tooLongReason } from "@/utils/ideaVideo";
 import { placeIndex, type PlaceIndex } from "@/utils/ideas";
 import { tripPlaces } from "@/utils/places";
 import { rowToIdea, type Row } from "@/utils/tripRows";
@@ -97,14 +97,15 @@ async function analyze(ctx: OpContext, ideaId: string, manual: boolean, first: b
     if ((await videosAnalyzedToday(ctx.userId)) >= cfg.dailyLimit) {
       outcome = { kind: "status", video: { status: "skipped", reason: "Llegaste al límite diario de videos analizados" } };
     } else {
-      const resolved = await resolveVideo(idea, ctx.code, uploadPath);
+      const resolved = await resolveVideo(idea, ctx.code, cfg.maxSeconds, uploadPath);
       source = resolved.source;
       providerCalls = resolved.providerCalls ?? 0;
       if (resolved.ok) meta = resolved.meta;
       if (!resolved.ok) {
-        outcome = { kind: "status", video: { status: resolved.status, reason: resolved.reason } };
+        const { status, reason, skip } = resolved;
+        outcome = { kind: "status", video: skip ? { status, reason, skip } : { status, reason } };
       } else if (resolved.seconds && resolved.seconds > cfg.maxSeconds) {
-        outcome = { kind: "status", video: { status: "skipped", reason: `El video dura más de ${Math.round(cfg.maxSeconds / 60)} minutos` } };
+        outcome = { kind: "status", video: { status: "skipped", reason: tooLongReason(cfg.maxSeconds), skip: "tooLong" } };
       } else {
         ({ seconds, bytes } = resolved);
         const trip = await getTrip(ctx.code);

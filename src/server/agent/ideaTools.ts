@@ -26,7 +26,7 @@ export const IDEA_TOOLS: Anthropic.Tool[] = [
   {
     name: "add_idea",
     description:
-      "Save a TikTok, Instagram or YouTube link to the trip's ideas board. Its video is analyzed automatically in about a minute (summary and spots); you don't need to wait for it. Call when the user shares a video link or asks to save one.",
+      "Save a TikTok, Instagram or YouTube link to the trip's ideas board. TikTok and Instagram videos up to 90 seconds are analyzed automatically in about a minute (summary and spots); longer videos and YouTube are saved but not analyzed. You don't need to wait for it. Call when the user shares a video link or asks to save one.",
     input_schema: schema(
       {
         url: { type: "string", description: "The video link exactly as the user gave it" },

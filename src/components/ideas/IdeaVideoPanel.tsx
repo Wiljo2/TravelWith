@@ -1,9 +1,9 @@
 "use client";
 import { useRef, useState } from "react";
-import { Loader2, RotateCw, Sparkles, Upload } from "lucide-react";
+import { Loader2, RotateCw, Sparkles, Timer, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
-import { VIDEO_ANALYSIS_ON, fmtVideoTime, isAnalyzingVideo } from "@/utils/ideaVideo";
+import { VIDEO_ANALYSIS_ON, VIDEO_MAX_SECONDS, fmtVideoTime, isAnalyzablePlatform, isAnalyzingVideo, videoFileSeconds } from "@/utils/ideaVideo";
 import type { Idea, IdeaSpot } from "@/types";
 
 // What the video shows, as the server's analysis saw it: for a spot idea, its
@@ -26,6 +26,11 @@ export default function IdeaVideoPanel({ idea, parent, onRetry, onUpload }: {
 
   async function upload(file: File | undefined) {
     if (!file) return;
+    const seconds = await videoFileSeconds(file);
+    if (seconds !== undefined && seconds > VIDEO_MAX_SECONDS) {
+      setUploadError(`El video dura más de ${VIDEO_MAX_SECONDS} s; recórtalo o sube uno más corto`);
+      return;
+    }
     setUploading(true);
     setUploadError(null);
     const error = await onUpload(file);
@@ -43,7 +48,7 @@ export default function IdeaVideoPanel({ idea, parent, onRetry, onUpload }: {
   }
   // Ideas saved before the analysis existed, or while it was off.
   if (!video) {
-    if (!VIDEO_ANALYSIS_ON || source.platform === "other") return null;
+    if (!VIDEO_ANALYSIS_ON || !isAnalyzablePlatform(source)) return null;
     return (
       <Button
         variant="secondary"
@@ -56,9 +61,10 @@ export default function IdeaVideoPanel({ idea, parent, onRetry, onUpload }: {
   }
 
   if (video.status !== "done") {
-    const canRetry = video.status !== "pending";
+    const canRetry = video.status !== "pending" && !video.skip;
     return (
       <div className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary px-3 py-2 text-[13px] text-secondary-foreground">
+        {video.skip && <Timer className="size-4 shrink-0 text-muted-foreground" />}
         <span className="min-w-0 flex-1">{uploadError ?? video.reason ?? "No se pudo ver el video"}</span>
         {video.status === "needsFile" && (
           <>
