@@ -1,7 +1,8 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useDragDrop } from "@/hooks/useDragDrop";
 import { useTripSession } from "@/hooks/useTripSession";
 import { useTripData } from "@/hooks/useTripData";
+import { useSharedLink } from "@/hooks/useSharedLink";
 import DocumentsPanel from "@/components/documents/DocumentsPanel";
 import { chooseOption } from "@/utils/taskDecision";
 import { HOUR_START, HOUR_END } from "@/constants/time";
@@ -45,6 +46,9 @@ export default function App() {
   const canUseAgent = isOwner;
 
   const [activeTab, setActiveTab] = useState<Tab>("home");
+  const shared = useSharedLink();
+  // A link shared from the phone lands on the ideas of the open trip.
+  useEffect(() => { if (shared.text && roomCode) setActiveTab("ideas"); }, [shared.text, roomCode]); // eslint-disable-line react-hooks/set-state-in-effect -- follows the shared link
   const [slotDraft, setSlotDraft] = useState<{ dayId: string; hour: number; x: number; y: number; task: Task | null } | null>(null);
   const isMobile = useIsMobile();
   const [sheet, setSheet] = useState<ItinerarySheet | null>(null);
@@ -295,6 +299,8 @@ export default function App() {
           trip={trip}
           currentPayload={payloadNow}
           save={save}
+          sharedText={shared.text}
+          onSharedDone={shared.clear}
         />
       )}
 
