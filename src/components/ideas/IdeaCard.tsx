@@ -9,10 +9,11 @@ import type { Idea } from "@/types";
 
 // An idea as a vertical cover card (like a feed of reels): the cover fills it,
 // the caption sits on a dark fade at the bottom. Tapping opens the viewer.
-export default function IdeaCard({ idea, roomCode, loading, spot, onOpen, className }: {
+export default function IdeaCard({ idea, roomCode, loading, analyzing, spot, onOpen, className }: {
   idea: Idea;
   roomCode: string;
   loading: boolean;
+  analyzing?: boolean;   // the server is watching the video
   spot?: string;     // the exact place, when the card sits under a wider zone
   onOpen: () => void;
   className?: string;
@@ -35,7 +36,7 @@ export default function IdeaCard({ idea, roomCode, loading, spot, onOpen, classN
         {IDEA_PLATFORMS[idea.platform].short}
       </span>
       <span className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur">
-        {loading ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5 fill-current" />}
+        {loading || analyzing ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5 fill-current" />}
       </span>
       <span className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-linear-to-t from-black/85 via-black/45 to-transparent p-2.5 pt-10">
         <span className="line-clamp-2 text-[12.5px] font-semibold leading-snug text-white">

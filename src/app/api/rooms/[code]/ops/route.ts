@@ -3,10 +3,14 @@ import { requireMember } from "@/server/auth";
 import { DomainError } from "@/server/domain/core";
 import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
 import { assertWritable } from "@/server/maintenance";
-import { runOp } from "@/server/ops";
+import { isClientOp, runOp } from "@/server/ops";
 import { RowConflictError } from "@/server/repo/errors";
 
 type Params = Promise<{ code: string }>;
+
+// idea.create schedules the video analysis after the response (see
+// server/video/analyze.ts); it needs the function alive that long.
+export const maxDuration = 300;
 
 const MAX_BODY_BYTES = 32 * 1024;
 
@@ -43,6 +47,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
     assertWritable();
     const { user, role } = await requireMember(req, code);
     const { op, args, expectedVersion } = parseBody(await req.text());
+    if (!isClientOp(op)) throw new HttpError(400, "Operación desconocida");
     const result = await runOp(op, { code, userId: user.id, role }, { args, expectedVersion });
     return NextResponse.json(result);
   } catch (e) {

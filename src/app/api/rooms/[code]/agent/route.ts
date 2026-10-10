@@ -20,6 +20,9 @@ interface ChatTurn {
 
 type Params = Promise<{ code: string }>;
 
+// Long conversations, plus the video analysis add_idea schedules after the response.
+export const maxDuration = 300;
+
 // POST /api/rooms/[code]/agent — runs the agentic loop and streams SSE frames:
 // {type:"text",delta} | {type:"tool",name,label} | {type:"confirm",token,actions}
 // | {type:"done",usage} | {type:"error",message}

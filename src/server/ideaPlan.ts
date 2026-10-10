@@ -23,6 +23,7 @@ const MODEL = process.env.IDEAS_MODEL ?? "claude-sonnet-5-5";
 const MAX_IDEAS = 60;
 const TRANSCRIPT_CHARS = 900;     // ~220 tokens per video
 const TRANSCRIPT_WITH_NOTE = 500; // the member's note already says what it's about
+const VIDEO_CHARS = 700;          // Gemini's summary + on-screen text
 
 const SYSTEM = `Eres el asistente de un grupo que planea un viaje. Tienen un itinerario armado y guardan ideas (TikToks, reels) sobre comida, planes, compras y tips. Para cada idea decides, sin cambiar el plan:
 
@@ -75,6 +76,9 @@ function cut(text: string | undefined, max: number) {
   return t.length > max ? `${t.slice(0, max)}…` : t;
 }
 
+const seen = (i: Idea) =>
+  i.video?.status === "done" ? [i.video.summary, i.video.onScreen && `en pantalla: ${i.video.onScreen}`].filter(Boolean).join(" ") : "";
+
 function describeIdea(i: Idea, label: string, keywords: Set<string>): string {
   const title = cut(i.title, 300);
   // Hashtags the caption already contains add nothing.
@@ -85,7 +89,10 @@ function describeIdea(i: Idea, label: string, keywords: Set<string>): string {
     i.note && ` nota del grupo: ${cut(i.note, 200)}`,
     title && ` post: ${title}`,
     tags.length > 0 && ` tags: ${tags.join(", ")}`,
-    i.transcript && ` video: ${transcriptExcerpt(i.transcript, keywords, i.note ? TRANSCRIPT_WITH_NOTE : TRANSCRIPT_CHARS)}`,
+    i.spot && ` lugar del video: ${[i.spot.name, i.spot.city, i.spot.price, cut(i.spot.tip, 160)].filter(Boolean).join(" · ")}`,
+    // What the video shows beats its transcript: it also reads on-screen text.
+    seen(i) ? ` video: ${cut(seen(i), VIDEO_CHARS)}`
+      : i.transcript && ` video: ${transcriptExcerpt(i.transcript, keywords, i.note ? TRANSCRIPT_WITH_NOTE : TRANSCRIPT_CHARS)}`,
   ];
   return lines.filter(Boolean).join("\n");
 }
@@ -120,8 +127,10 @@ export function buildPlanPrompt(payload: RoomPayload, onlyIds?: string[]) {
   const days = payload.days ?? [];
   const places = tripPlaces(payload.trip?.destination, days, payload.ideaPlaces);
   const areas = places.filter((p) => !isVenue(p));
+  // A video split into spot ideas is analyzed through its spots.
+  const split = new Set((payload.ideas ?? []).map((i) => i.parentId).filter(Boolean));
   const ideas = (payload.ideas ?? [])
-    .filter((i) => i.status !== "discarded" && (i.note || i.title || i.transcript))
+    .filter((i) => i.status !== "discarded" && !split.has(i.id) && (i.note || i.title || i.transcript || seen(i)))
     .filter((i) => !onlyIds || onlyIds.includes(i.id))
     .slice(0, MAX_IDEAS);
 

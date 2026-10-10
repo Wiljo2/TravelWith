@@ -8,6 +8,7 @@ export const TOOL_KIND: Record<string, ToolKind> = {
   get_trip_overview: "read",
   get_day_detail: "read",
   get_budget: "read",
+  get_ideas: "read",
   create_event: "write",
   update_event: "write",
   create_task: "write",
@@ -15,6 +16,7 @@ export const TOOL_KIND: Record<string, ToolKind> = {
   add_expense: "write",
   update_expense: "write",
   set_exchange_rate: "write",
+  add_idea: "write",
   delete_event: "delete",
   delete_task: "delete",
   remove_expense: "delete",
@@ -192,6 +194,10 @@ function describe(trip: RoomPayload | null, name: string, input: Input): string 
     case "set_exchange_rate": {
       const rate = num(input.rate);
       return rate === undefined ? "Cambiar la TRM" : `Cambiar la TRM a ${rate.toLocaleString("es-CO")} COP por USD`;
+    }
+    case "add_idea": {
+      const note = quoted(input.note);
+      return [`Guardar idea ${clip(str(input.url) ?? "", MAX_TITLE)}`.trim(), note].filter(Boolean).join(" · ");
     }
     default:
       return `Ejecutar ${name}`;

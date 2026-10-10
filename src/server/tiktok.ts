@@ -66,8 +66,9 @@ async function fetchTikTokPage(url: URL, hops = 3): Promise<Response | null> {
 }
 
 // The video page embeds its data as JSON (`__UNIVERSAL_DATA_FOR_REHYDRATION__`):
-// caption, author, cover, hashtags, keywords and subtitle tracks.
-export async function fetchTikTokData(url: URL): Promise<TikTokData | null> {
+// caption, author, cover, hashtags, keywords, subtitle tracks and the video file.
+// The page also sets the cookies its video URL requires.
+async function fetchItem(url: URL) {
   if (!isTikTokUrl(url) || !url.pathname.includes("/video/")) return null;
   const res = await fetchTikTokPage(url);
   if (!res?.ok) return null;
@@ -75,6 +76,14 @@ export async function fetchTikTokData(url: URL): Promise<TikTokData | null> {
   if (!json) return null;
   const item = JSON.parse(json)?.__DEFAULT_SCOPE__?.["webapp.video-detail"]?.itemInfo?.itemStruct;
   if (!item?.desc && !item?.author?.uniqueId) return null;
+  const cookies = res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+  return { item, cookies };
+}
+
+export async function fetchTikTokData(url: URL): Promise<TikTokData | null> {
+  const found = await fetchItem(url);
+  if (!found) return null;
+  const { item } = found;
 
   const hashtags: string[] = (item.textExtra ?? []).map((t: { hashtagName?: string }) => t.hashtagName).filter(Boolean);
   const keywords: string[] = Array.isArray(item.suggestedWords) ? item.suggestedWords : [];
@@ -105,4 +114,66 @@ async function fetchTranscript(tracks: SubtitleInfo[]): Promise<string> {
   } catch {
     return "";
   }
+}
+
+export interface FetchedVideo {
+  data: Uint8Array<ArrayBuffer>;
+  mime: string;
+  seconds?: number;
+  title?: string;
+  author?: string;
+  thumbnail?: string;
+}
+
+export class VideoTooLargeError extends Error {}
+
+// The MP4 of a video, downloaded with the page's cookies. Only TikTok's own
+// CDNs are requested, redirects included (SSRF).
+export async function fetchTikTokVideo(url: URL, maxBytes: number): Promise<FetchedVideo | null> {
+  const found = await fetchItem(url);
+  const play: unknown = found?.item.video?.playAddr || found?.item.video?.downloadAddr;
+  if (!found || typeof play !== "string" || !isTikTokCdnUrl(play)) return null;
+  const seconds = Number(found.item.video?.duration) || undefined;
+  let target = play;
+  for (let hop = 0; hop < 3; hop++) {
+    const res = await fetch(target, {
+      headers: { "User-Agent": BROWSER_UA, Referer: "https://www.tiktok.com/", Cookie: found.cookies },
+      redirect: "manual",
+      signal: AbortSignal.timeout(45_000),
+    });
+    const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
+    if (location) {
+      target = new URL(location, target).toString();
+      if (!isTikTokCdnUrl(target)) return null;
+      continue;
+    }
+    if (!res.ok || !res.body) return null;
+    return {
+      data: await readCapped(res, maxBytes),
+      mime: res.headers.get("content-type")?.split(";")[0] || "video/mp4",
+      seconds,
+      title: found.item.desc || undefined,
+      author: found.item.author?.uniqueId,
+      thumbnail: found.item.video?.cover || undefined,
+    };
+  }
+  return null;
+}
+
+export async function readCapped(res: Response, max: number): Promise<Uint8Array<ArrayBuffer>> {
+  if (Number(res.headers.get("content-length")) > max) throw new VideoTooLargeError("video too large");
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+    size += chunk.byteLength;
+    if (size > max) throw new VideoTooLargeError("video too large");
+    chunks.push(chunk);
+  }
+  const out = new Uint8Array(size);
+  let offset = 0;
+  for (const c of chunks) {
+    out.set(c, offset);
+    offset += c.byteLength;
+  }
+  return out;
 }

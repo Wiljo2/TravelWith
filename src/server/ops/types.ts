@@ -34,5 +34,7 @@ export interface OpResult {
 
 export interface OpDefinition {
   minRole?: "owner";
+  // Server-side only (e.g. the video analysis): the ops route rejects it.
+  internal?: true;
   run(ctx: OpContext, input: OpInput): Promise<OpResult>;
 }

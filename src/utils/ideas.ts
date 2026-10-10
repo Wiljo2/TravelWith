@@ -1,4 +1,4 @@
-import type { Day, IdeaPlatform } from "@/types";
+import type { Day, IdeaPlatform, IdeaSpot } from "@/types";
 import type { TripPlace } from "@/utils/places";
 import { IDEA_TYPES, IDEA_TYPE_PRIORITY } from "@/constants/ideaTypes";
 import { extractUrls } from "@/utils/linkify";
@@ -251,7 +251,11 @@ export interface IdeaTextFields {
   title?: string;
   tags?: string[];
   transcript?: string;
+  video?: { summary?: string; onScreen?: string };
+  spot?: IdeaSpot;
 }
+
+const spotText = (s: IdeaSpot) => [s.name, s.city, s.tip].filter(Boolean).join(". ");
 
 // Classifies from the most intentional source to the noisiest: the member's note,
 // then the caption + hashtags, then what the video says. Each field (place, type)
@@ -261,11 +265,19 @@ export function classifyIdeaFields(fields: IdeaTextFields, index: PlaceIndex) {
   // The member's note states the intent: it wins alone.
   const note = fields.note?.trim();
   const fromNote = note ? classifyIdea(note, index) : { place: undefined, cat: undefined };
+  // A spot idea is about that one place: it comes right after the note. A venue
+  // of the plan in its name wins ("Disney Springs"); then its city, when it is
+  // a trip place (a word like "crucero" in "Crucero de True Crime" is not).
+  const fromSpot = fields.spot ? classifyIdea(spotText(fields.spot), index) : { place: undefined, cat: undefined };
+  const spotVenue = fields.spot && index.places.find((p) => p.name === suggestPlace(fields.spot!.name, index.places) && p.eventIds.length > 0)?.name;
+  const spotCity = fields.spot?.city && index.places.find((p) => normalizeText(p.name) === normalizeText(fields.spot!.city!))?.name;
+  const spotCat = fields.spot?.cat && Object.hasOwn(IDEA_TYPES, fields.spot.cat) ? fields.spot.cat : undefined;
+  const seen = [fields.video?.summary, fields.video?.onScreen].filter(Boolean).join(". ");
 
   // Otherwise every source adds evidence. TikTok's extra keywords are search
   // suggestions ("universal studios orlando" on an outlets video), so they weigh
   // less than what the creator wrote or said.
-  let place = fromNote.place;
+  let place = fromNote.place ?? spotVenue ?? spotCity ?? fromSpot.place;
   if (!place) {
     const caption = fields.title ?? "";
     const hashtags = caption.match(/#[\p{L}\p{N}_]+/gu)?.map((h) => h.slice(1)) ?? [];
@@ -273,13 +285,14 @@ export function classifyIdeaFields(fields: IdeaTextFields, index: PlaceIndex) {
       { weight: 1, scores: placeScores(caption, index.places, hashtags) },
       { weight: 0.5, scores: placeScores("", index.places, fields.tags ?? []) },
       { weight: 1, scores: placeScores(fields.transcript ?? "", index.places) },
+      { weight: 1, scores: placeScores(seen, index.places) },
     ];
     const total = new Map<string, number>();
     for (const { weight, scores } of sources) for (const [p, sc] of scores) total.set(p, (total.get(p) ?? 0) + weight * sc);
     place = pickPlace(total, index.places);
   }
   if (!place) {
-    for (const text of [fields.title, fields.transcript]) {
+    for (const text of [fields.title, fields.transcript, seen]) {
       place = text ? classifyIdea(text, index, text === fields.title ? fields.tags : []).place : undefined;
       if (place) break;
     }
@@ -287,7 +300,10 @@ export function classifyIdeaFields(fields: IdeaTextFields, index: PlaceIndex) {
 
   // The type: first source that answers, from the most intentional.
   const cat = fromNote.cat
+    ?? spotCat
+    ?? fromSpot.cat
     ?? suggestType(`${fields.title ?? ""} ${(fields.tags ?? []).join(" ")}`)
-    ?? suggestType(fields.transcript ?? "");
+    ?? suggestType(fields.transcript ?? "")
+    ?? suggestType(seen);
   return { place, cat };
 }

@@ -129,6 +129,34 @@ export interface IdeaSuggestion {
   source: "rules" | "ai" | "claude";
 }
 
+// A concrete place or business a video recommends, as Gemini saw it.
+export interface IdeaSpot {
+  name: string;
+  city?: string;
+  cat?: string;             // key of IDEA_TYPES
+  at?: number;              // second of the video where it appears
+  price?: string;
+  tip?: string;
+}
+
+// The server's analysis of the video itself (image + audio). "needsFile": the
+// video couldn't be downloaded and a member can upload it; "skipped": not
+// analyzed (daily limit, too long, feature off).
+export type IdeaVideoStatus = "pending" | "done" | "failed" | "needsFile" | "skipped";
+
+export interface IdeaVideo {
+  status: IdeaVideoStatus;
+  reason?: string;
+  relevant?: boolean;       // false = the video isn't travel inspiration
+  summary?: string;
+  onScreen?: string;        // key text shown on screen (names, prices, addresses)
+  spots?: IdeaSpot[];
+  attempts?: number;
+  retryAt?: string;         // ISO; a failed analysis is tried again after this
+  analyzedAt?: string;
+  model?: string;
+}
+
 // Inspiration a member shared (reel, TikTok, link) about places of the trip.
 // Lives apart from the itinerary: organized by place and type, never scheduled.
 export interface Idea {
@@ -155,6 +183,9 @@ export interface Idea {
   placeManual?: boolean;    // place set by hand: "Analizar con Claude" leaves it alone
   catManual?: boolean;      // type set by hand: likewise
   moment?: IdeaMoment;      // moment in the plan set by hand: wins over the analysis and the rules
+  video?: IdeaVideo;        // what the video shows and says (server analysis)
+  parentId?: string;        // set on the ideas created for each spot of a video
+  spot?: IdeaSpot;          // the spot this child idea is about
   version?: number;
 }
 

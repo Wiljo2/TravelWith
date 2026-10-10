@@ -4,6 +4,7 @@ import { Check, ExternalLink, Loader2, ThumbsUp, Trash2, Undo2, X } from "lucide
 import IdeaMomentSelect from "@/components/ideas/IdeaMomentSelect";
 import IdeaNote from "@/components/ideas/IdeaNote";
 import IdeaThumb from "@/components/ideas/IdeaThumb";
+import IdeaVideoPanel from "@/components/ideas/IdeaVideoPanel";
 import { IDEA_PLATFORMS } from "@/constants/ideaPlatforms";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { ideaEmbedUrl, tiktokVideoId } from "@/utils/ideaMedia";
@@ -15,6 +16,7 @@ const ACTION = "flex h-10 cursor-pointer items-center gap-1.5 rounded-full px-3.
 
 interface IdeaViewerProps {
   idea: Idea;
+  parent?: Idea;     // the video a spot idea came from
   roomCode: string;
   placeGroups: { zone: string; names: string[] }[];   // the trip's places, by zone
   days: Day[];
@@ -29,12 +31,14 @@ interface IdeaViewerProps {
   onRemove: () => void;
   onSetNote: (note: string) => void;
   onRetry: () => Promise<Idea | null>;
+  onRetryVideo: () => Promise<boolean>;
+  onUploadVideo: (file: File) => Promise<string | null>;
 }
 
 // One idea, opened: its video playing in the app (TikTok, YouTube, Instagram),
 // where it fits the plan, and everything to edit about it.
 export default function IdeaViewer({
-  idea, roomCode, placeGroups, days, voter, loading, plan, onUpdate, onSetPlace, onSetMoment, onSetCat, onVote, onRemove, onSetNote, onRetry,
+  idea, parent, roomCode, placeGroups, days, voter, loading, plan, onUpdate, onSetPlace, onSetMoment, onSetCat, onVote, onRemove, onSetNote, onRetry, onRetryVideo, onUploadVideo,
 }: IdeaViewerProps) {
   const p = IDEA_PLATFORMS[idea.platform];
   const embed = ideaEmbedUrl(idea);
@@ -96,6 +100,8 @@ export default function IdeaViewer({
           {idea.addedBy ? `compartida por ${idea.addedBy}` : p.label}
         </p>
       </div>
+
+      <IdeaVideoPanel idea={idea} parent={parent} onRetry={onRetryVideo} onUpload={onUploadVideo} />
 
       {s && !discarded && (
         <div className="flex items-center gap-2 rounded-xl bg-secondary px-3 py-2 text-[13px]">

@@ -9,7 +9,7 @@ let mock = createSupabaseMock((q) => handler(q));
 
 vi.mock("@/lib/supabase-server", () => ({ createServerClient: () => mock.client }));
 
-const { OPS, runOp } = await import("@/server/ops");
+const { OPS, isClientOp, runOp } = await import("@/server/ops");
 
 const ctx: OpContext = { code: "ABCD1234", userId: "u1", role: "member" };
 const header: RoomHeaderRow = {
@@ -71,9 +71,15 @@ describe("op registry", () => {
       "taskOption.create", "taskOption.update", "taskOption.delete",
       "traveler.add", "traveler.remove", "trip.update",
       "document.create", "document.update", "document.delete", "idea.create", "idea.update", "idea.delete",
-      "eventPlace.set", "trip.setIdeaSettings",
+      "eventPlace.set", "trip.setIdeaSettings", "idea.applyVideo",
     ];
     expect(Object.keys(OPS).sort()).toEqual([...planned].sort());
+  });
+
+  it("only idea.applyVideo is server-only", () => {
+    expect(Object.entries(OPS).filter(([, op]) => op.internal).map(([name]) => name)).toEqual(["idea.applyVideo"]);
+    expect(isClientOp("idea.applyVideo")).toBe(false);
+    expect(isClientOp("idea.create")).toBe(true);
   });
 
   it("only itinerary.reset is owner-only", () => {

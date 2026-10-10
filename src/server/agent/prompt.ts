@@ -22,6 +22,7 @@ export const SYSTEM_PROMPT = `You are the TravelWith assistant: you manage a col
   - "perPerson": amount is the cost PER TRAVELER; adding travelers raises the group total (e.g. cruise tickets, flights, meals).
   Currencies: USD (default) and COP; conversions use the trip's exchangeRate (COP per USD).
 - Expenses can be linked to a calendar event (linkedEventId) or spread over a range of days (startDayId/endDayId, e.g. hotel nights).
+- Ideas are TikToks, reels and YouTube videos the group saved as inspiration (get_ideas, add_idea). Each video is watched automatically: its summary and the spots it recommends; a video listing several spots becomes one idea per spot (parentId). Ideas never change the calendar by themselves.
 
 ## How to work
 - Ground yourself first: call get_trip_overview before your first action in a conversation, and get_day_detail / get_budget before editing or answering about specifics. Never guess ids — read them.

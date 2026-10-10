@@ -14,6 +14,7 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { PANEL } from "@/components/home/shared";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
 import { ideaLinks, matchIdeasToPlan } from "@/utils/ideaPlan";
+import { hideSplitVideos, isAnalyzingVideo } from "@/utils/ideaVideo";
 import { fmtHour } from "@/utils/time";
 import { cn } from "@/lib/utils";
 import type { Day, Idea, IdeaLink, IdeaMoment, IdeaPlanResult } from "@/types";
@@ -38,6 +39,8 @@ interface IdeasViewProps {
   onAcceptAll: () => void;
   onSetNote: (id: string, note: string) => void;
   onRetry: (id: string) => Promise<Idea | null>;
+  onRetryVideo: (id: string) => Promise<boolean>;
+  onUploadVideo: (id: string, file: File) => Promise<string | null>;
   onAddPlace: (place: string) => void;
   onRemovePlace: (place: string) => void;
   days: Day[];
@@ -48,6 +51,8 @@ interface IdeasViewProps {
   onSavePlan: (links: IdeaLink[], at: string, ideaIds: string[]) => void;
   phase?: "before" | "during" | "after";
   todayIdx?: number;
+  sharedText?: string | null;      // a link shared from the phone, to confirm
+  onSharedDone?: () => void;
 }
 
 const ALL = "all";
@@ -63,10 +68,12 @@ const GRID = "grid grid-cols-2 gap-2.5 md:grid-cols-[repeat(auto-fill,minmax(150
 // grouped by zone (Orlando, Miami, Crucero…), each card naming its exact spot;
 // or over the itinerary, by day. Tapping one plays it.
 export default function IdeasView({
-  ideas, index, roomCode, loadingIds, mobile, voter,
-  onAdd, onUpdate, onSetPlace, onSetCat, onSetMoment, onRemove, onVote, onApplyClaude, onAcceptAll, onSetNote, onRetry, onAddPlace, onRemovePlace,
-  days, planLinks, planLinksAt, planIdeaIds, onAnalyze, onSavePlan, phase, todayIdx,
+  ideas: allIdeas, index, roomCode, loadingIds, mobile, voter,
+  onAdd, onUpdate, onSetPlace, onSetCat, onSetMoment, onRemove, onVote, onApplyClaude, onAcceptAll, onSetNote, onRetry, onRetryVideo, onUploadVideo, onAddPlace, onRemovePlace,
+  days, planLinks, planLinksAt, planIdeaIds, onAnalyze, onSavePlan, phase, todayIdx, sharedText, onSharedDone,
 }: IdeasViewProps) {
+  // A video split into spot ideas shows as its spots.
+  const ideas = useMemo(() => hideSplitVideos(allIdeas), [allIdeas]);
   const places = index.places.map((p) => p.name);
   const areas = index.places.filter((p) => !isVenue(p)).map((p) => p.name);
   const venues = index.places.filter(isVenue).map((p) => p.name);
@@ -81,6 +88,16 @@ export default function IdeasView({
   // Remounts the add form each time it opens, so it starts empty.
   const [formKey, setFormKey] = useState(0);
   const openForm = () => { setFormKey((k) => k + 1); setAdding(true); };
+  // A shared link opens the form filled in; closing it, either way, uses it up.
+  const [sharedShown, setSharedShown] = useState<string | null>(null);
+  if (sharedText && sharedText !== sharedShown) {
+    setSharedShown(sharedText);
+    openForm();
+  }
+  const setAddingOpen = (open: boolean) => {
+    setAdding(open);
+    if (!open && sharedText) onSharedDone?.();
+  };
 
   const active = ideas.filter((i) => i.status !== "discarded");
   const discarded = ideas.filter((i) => i.status === "discarded");
@@ -108,7 +125,7 @@ export default function IdeasView({
   // The exact spot, when it says more than the zone it is under.
   const spotOf = (i: Idea) => { const p = placeOf(i); return p && p !== zones.get(p) ? p : undefined; };
   const card = (idea: Idea, className = CARD) => (
-    <IdeaCard key={idea.id} idea={idea} roomCode={roomCode} loading={loadingIds.has(idea.id)} spot={spotOf(idea)} onOpen={() => setViewing(idea.id)} className={className} />
+    <IdeaCard key={idea.id} idea={idea} roomCode={roomCode} loading={loadingIds.has(idea.id)} analyzing={isAnalyzingVideo(idea)} spot={spotOf(idea)} onOpen={() => setViewing(idea.id)} className={className} />
   );
 
   // Where each idea fits the plan. Ideas still being read aren't placed yet:
@@ -118,7 +135,8 @@ export default function IdeasView({
   const links = ideaLinks(ready, days, rules, { links: planLinks, at: planLinksAt, ideaIds: planIdeaIds });
   const placeGroups = zoneNames.map((z) => ({ zone: z, names: places.filter((p) => (zones.get(p) ?? p) === z) }));
 
-  const current = ideas.find((i) => i.id === shown);
+  const current = allIdeas.find((i) => i.id === shown);
+  const parent = current?.parentId ? allIdeas.find((i) => i.id === current.parentId) : undefined;
   const link = current && links.find((l) => l.ideaId === current.id);
   const linkDay = link && days.find((d) => d.id === link.dayId);
   const linkEvent = link?.eventId ? linkDay?.events.find((e) => e.id === link.eventId) : undefined;
@@ -130,6 +148,7 @@ export default function IdeasView({
     <IdeaViewer
       key={current.id}
       idea={current}
+      parent={parent}
       roomCode={roomCode}
       placeGroups={placeGroups}
       days={days}
@@ -144,9 +163,11 @@ export default function IdeasView({
       onRemove={() => { onRemove(current.id); setViewing(null); }}
       onSetNote={(note) => onSetNote(current.id, note)}
       onRetry={() => onRetry(current.id)}
+      onRetryVideo={() => onRetryVideo(parent?.id ?? current.id)}
+      onUploadVideo={(file) => onUploadVideo(parent?.id ?? current.id, file)}
     />
   );
-  const form = <AddIdeaForm key={formKey} onSubmit={onAdd} onDone={() => setAdding(false)} />;
+  const form = <AddIdeaForm key={formKey} onSubmit={onAdd} onDone={() => setAddingOpen(false)} initialText={sharedText ?? undefined} />;
 
   return (
     <div className="flex flex-col gap-4">
@@ -260,12 +281,12 @@ export default function IdeasView({
 
       {mobile ? (
         <>
-          <BottomSheet open={adding} onOpenChange={setAdding} title="Nueva idea">{form}</BottomSheet>
+          <BottomSheet open={adding} onOpenChange={setAddingOpen} title="Nueva idea">{form}</BottomSheet>
           <BottomSheet open={viewing !== null} onOpenChange={(o) => { if (!o) setViewing(null); }} title="Idea">{viewer}</BottomSheet>
         </>
       ) : (
         <>
-          <Dialog open={adding} onOpenChange={setAdding}>
+          <Dialog open={adding} onOpenChange={setAddingOpen}>
             <DialogContent className="max-w-[440px]">
               <DialogHeader><DialogTitle>Nueva idea</DialogTitle></DialogHeader>
               {form}

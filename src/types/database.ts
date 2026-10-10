@@ -1,5 +1,5 @@
 // Database types for the public schema, written by hand to match migrations
-// 001-017 (docs/plans/relational-broadcast.md, step 1.4). Once a Supabase
+// 001-021 (docs/plans/relational-broadcast.md, step 1.4). Once a Supabase
 // project with these migrations is available, replace this file with:
 //
 //   npx supabase gen types typescript --project-id <id> --schema public > src/types/database.ts
@@ -69,6 +69,26 @@ type AgentUsageRow = {
   room_code: string;
   input_tokens: number;
   output_tokens: number;
+  created_at: string;
+};
+
+type VideoUsageRow = {
+  id: number;
+  user_id: string;
+  room_code: string;
+  idea_id: string;
+  source: "tiktok" | "instagram" | "youtube" | "upload" | "other";
+  model: string | null;
+  ok: boolean;
+  reason: string | null;
+  video_seconds: number | null;
+  bytes: number | null;
+  input_tokens: number;
+  output_tokens: number;
+  thinking_tokens: number;
+  provider_calls: number;
+  attempts: number;
+  wall_ms: number | null;
   created_at: string;
 };
 
@@ -195,6 +215,11 @@ export type Database = {
       rooms: TableOf<RoomRow, "payload" | "updated_at" | "name" | "members" | "destination" | "start_date" | "end_date" | "exchange_rate" | "idea_places" | "idea_plan", []>;
       user_rooms: TableOf<UserRoomRow, "role" | "joined_at" | "last_active_at", [RoomFk<"user_rooms">]>;
       agent_usage: TableOf<AgentUsageRow, "id" | "input_tokens" | "output_tokens" | "created_at", []>;
+      video_usage: TableOf<
+        VideoUsageRow,
+        "id" | "model" | "ok" | "reason" | "video_seconds" | "bytes" | "input_tokens" | "output_tokens" | "thinking_tokens" | "provider_calls" | "attempts" | "wall_ms" | "created_at",
+        []
+      >;
       trip_days: TableOf<TripDayRow, MetaDefaults | "position" | "sub" | "flexible", [RoomFk<"trip_days">]>;
       trip_events: TableOf<
         TripEventRow,
@@ -263,6 +288,10 @@ export type Database = {
       reset_itinerary: { Args: { p_code: string; p_days: Json; p_user: string }; Returns: Json };
       choose_task_option: {
         Args: { p_code: string; p_task_id: string; p_expected_version: number | null; p_event: Json | null; p_expense: Json | null; p_user: string };
+        Returns: Json;
+      };
+      apply_idea_video: {
+        Args: { p_code: string; p_parent_id: string; p_expected_version: number | null; p_parent_data: Json; p_children: Json; p_user: string };
         Returns: Json;
       };
       delete_trip_row: {
