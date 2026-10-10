@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { initialDays } from "@/test/fixtures/initialDays";
 import { ideaVideoArgs } from "@/server/domain/featureRows";
 import { DomainError } from "@/server/domain/core";
-import { childId, childIdeas, doneVideo, parseAnalysis, withVideo, MAX_SPOTS } from "@/server/video/analysis";
+import { childId, childIdeas, doneVideo, parseAnalysis, withVideo, MAX_INSIGHTS, MAX_SPOTS } from "@/server/video/analysis";
+import { analysisPrompt } from "@/server/video/analysisPrompt";
 import { placeIndex } from "@/utils/ideas";
 import { tripPlaces } from "@/utils/places";
 import type { Idea } from "@/types";
@@ -131,5 +132,55 @@ describe("spot ideas' place", () => {
       { name: "Otro", city: "Orlando", cat: "comida" },
     ] }, index)[0];
     expect(c.suggestion?.place).toBe("Disney Springs");
+  });
+});
+
+describe("insights", () => {
+  const base = { relevant: true, summary: "Consejos de crucero", spots: [] };
+
+  it("keeps valid insights and cleans them", () => {
+    const a = parseAnalysis({
+      ...base,
+      insights: [
+        { kind: "todo", text: " Reserva los shows   en la app ", phase: "before", when: "60 días antes", at: 4.6 },
+        { kind: "tip", text: "Almuerza en el buffet del piso 14", phase: "first", start: 11.5, end: 13, place: "Crucero" },
+        { kind: "tip", text: "reserva los shows en la app" },
+        { kind: "souvenir", text: "Compra imanes" },
+        { kind: "avoid", text: "" },
+        { kind: "fact", text: "El wifi cuesta $25 al día", phase: "sometime", start: 30, end: 2 },
+      ],
+    })!;
+    expect(a.insights).toEqual([
+      { kind: "todo", text: "Reserva los shows en la app", phase: "before", when: "60 días antes", at: 5, start: undefined, end: undefined, place: undefined, brand: undefined },
+      { kind: "tip", text: "Almuerza en el buffet del piso 14", phase: "first", start: 11.5, end: 13, place: "Crucero", when: undefined, brand: undefined, at: undefined },
+      { kind: "fact", text: "El wifi cuesta $25 al día", phase: undefined, start: undefined, end: undefined, when: undefined, place: undefined, brand: undefined, at: undefined },
+    ]);
+  });
+
+  it("drops an end hour that isn't after the start", () => {
+    const a = parseAnalysis({ ...base, insights: [{ kind: "tip", text: "Piscina temprano", start: 9, end: 8 }] })!;
+    expect(a.insights?.[0]).toMatchObject({ start: 9, end: undefined });
+  });
+
+  it("caps the list and stores it on the video", () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ kind: "fact", text: `Dato número ${i}` }));
+    const a = parseAnalysis({ ...base, insights: many })!;
+    expect(a.insights).toHaveLength(MAX_INSIGHTS);
+    const video = doneVideo(a, "m", 1);
+    expect(video.insights?.[0]).toEqual({ kind: "fact", text: "Dato número 0" });
+  });
+
+  it("reads videos analyzed before insights existed", () => {
+    expect(parseAnalysis(base)?.insights).toEqual([]);
+  });
+});
+
+describe("analysisPrompt", () => {
+  it("passes the post text and the trip places", () => {
+    const p = analysisPrompt({ places: ["Crucero", "Miami"], caption: "5 errores en tu primer crucero", transcript: "hola" });
+    expect(p).toContain("Lugares del viaje: Crucero, Miami.");
+    expect(p).toContain("Texto del post: 5 errores en tu primer crucero");
+    expect(p).toContain("Subtítulos automáticos: hola");
+    expect(analysisPrompt({ places: [] })).not.toContain("Texto del post");
   });
 });

@@ -14,7 +14,7 @@ const FIRST_RUN_MS = 5 * 60_000;
 const due = (iso: string | undefined, now: number) => !!iso && Date.parse(iso) <= now;
 
 // TikTok and Instagram videos are analyzed; YouTube isn't (its length is unknown).
-export const isAnalyzablePlatform = (idea: Idea) => idea.platform === "tiktok" || idea.platform === "instagram";
+export const isAnalyzablePlatform = (idea: Pick<Idea, "platform">) => idea.platform === "tiktok" || idea.platform === "instagram";
 
 // A new TikTok or Instagram idea is analyzed right after it's saved, without a
 // "pending" mark (the server writes once, at the end).

@@ -3,6 +3,7 @@ import { Loader2, MapPin, Play, ThumbsUp } from "lucide-react";
 import IdeaThumb from "@/components/ideas/IdeaThumb";
 import { IDEA_PLATFORMS } from "@/constants/ideaPlatforms";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
+import { videoContribution } from "@/utils/insights";
 import { linkLabel } from "@/utils/linkify";
 import { cn } from "@/lib/utils";
 import type { Idea } from "@/types";
@@ -21,6 +22,7 @@ export default function IdeaCard({ idea, roomCode, loading, analyzing, spot, onO
   const t = idea.cat ? IDEA_TYPES[idea.cat] : undefined;
   const votes = idea.votes?.length ?? 0;
   const heading = idea.note || idea.title || linkLabel(idea.url);
+  const brings = videoContribution(idea);
 
   return (
     <button
@@ -39,6 +41,15 @@ export default function IdeaCard({ idea, roomCode, loading, analyzing, spot, onO
         {loading || analyzing ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5 fill-current" />}
       </span>
       <span className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-linear-to-t from-black/85 via-black/45 to-transparent p-2.5 pt-10">
+        {brings && !loading && (
+          <span className="flex flex-wrap gap-1 text-[11px] font-medium text-white">
+            {brings.length === 0
+              ? <span className="rounded-md bg-white/20 px-1.5 py-0.5">Sin datos útiles</span>
+              : brings.map((b) => (
+                <span key={b.label} title={b.label} className="rounded-md bg-white/20 px-1.5 py-0.5 backdrop-blur">{b.icon} {b.count}</span>
+              ))}
+          </span>
+        )}
         <span className="line-clamp-2 text-[12.5px] font-semibold leading-snug text-white">
           {loading ? "Leyendo el video…" : heading}
         </span>

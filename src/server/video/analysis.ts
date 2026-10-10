@@ -1,64 +1,25 @@
-import { IDEA_TYPES } from "@/constants/ideaTypes";
-import { classifyIdeaFields, type PlaceIndex } from "@/utils/ideas";
-import type { Idea, IdeaSpot, IdeaVideo } from "@/types";
+import { CATS, INSIGHT_MAX, KINDS, MAX_INSIGHTS, MAX_SPOTS, ON_SCREEN_MAX, PHASES, SUMMARY_MAX, WHEN_MAX } from "@/server/video/analysisPrompt";
+import { classifyIdeaFields, normalizeText, type PlaceIndex } from "@/utils/ideas";
+import type { Idea, IdeaInsight, IdeaSpot, IdeaVideo, InsightKind, InsightPhase } from "@/types";
 
 // What Gemini returns for a video, validated, and how it lands on the ideas:
-// the parent keeps the summary and the spots; with two or more spots, each one
-// also becomes a child idea the group can place, vote and plan on its own.
+// the parent keeps the summary, the spots and the insights; with two or more
+// spots, each spot also becomes a child idea the group can place, vote and
+// plan on its own.
 
-export const MAX_SPOTS = 12;
-const SUMMARY_MAX = 600;
-const ON_SCREEN_MAX = 600;
+export { MAX_SPOTS, MAX_INSIGHTS };
 const NAME_MAX = 80;
 const CITY_MAX = 60;
 const PRICE_MAX = 40;
 const TIP_MAX = 200;
-const CATS = Object.keys(IDEA_TYPES);
+const PLACE_MAX = 60;
 
 export interface VideoAnalysis {
   relevant: boolean;
   summary: string;
   onScreen?: string;
   spots: IdeaSpot[];
-}
-
-// Gemini responseSchema (OpenAPI subset).
-export const ANALYSIS_SCHEMA = {
-  type: "object",
-  properties: {
-    relevant: { type: "boolean" },
-    summary: { type: "string" },
-    onScreen: { type: "string" },
-    spots: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          name: { type: "string" },
-          city: { type: "string" },
-          cat: { type: "string", enum: CATS },
-          at: { type: "number" },
-          price: { type: "string" },
-          tip: { type: "string" },
-        },
-        required: ["name", "cat"],
-      },
-    },
-  },
-  required: ["relevant", "summary", "spots"],
-};
-
-export function analysisPrompt(places: string[]): string {
-  const list = places.length ? places.join(", ") : "(sin lugares definidos)";
-  return `Mira este video que un grupo guardó como inspiración para su viaje (imagen y audio). Responde en español.
-- relevant: true si da ideas útiles para viajar (lugares, comida, actividades, compras, tips); false si trata de otra cosa.
-- summary: qué muestra y recomienda, máximo ${SUMMARY_MAX} caracteres.
-- onScreen: el texto importante que aparece en pantalla (nombres, precios, direcciones), máximo ${ON_SCREEN_MAX} caracteres.
-- spots: cada lugar, negocio o experiencia concreta que recomienda (máximo ${MAX_SPOTS}), en el orden en que aparecen:
-  name (nombre propio), city, cat (${CATS.join(", ")}), at (segundo del video donde aparece), price y tip si se dicen o se ven.
-  Si el lugar queda en uno de estos lugares del viaje, usa ese nombre exacto en city: ${list}.
-  Un tip general sin lugar concreto no es un spot.
-No inventes: solo lo que se ve o se oye.`;
+  insights?: IdeaInsight[];
 }
 
 const text = (v: unknown, max: number): string | undefined => {
@@ -68,40 +29,70 @@ const text = (v: unknown, max: number): string | undefined => {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 };
 
+const second = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.round(v) : undefined);
+const hour = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 24 ? Math.round(v * 4) / 4 : undefined);
+
 function parseSpot(v: unknown): IdeaSpot | null {
   if (typeof v !== "object" || v === null) return null;
   const s = v as Record<string, unknown>;
   const name = text(s.name, NAME_MAX);
   if (!name) return null;
-  const at = typeof s.at === "number" && Number.isFinite(s.at) && s.at >= 0 ? Math.round(s.at) : undefined;
   const cat = typeof s.cat === "string" && CATS.includes(s.cat) ? s.cat : undefined;
   return {
     name,
     city: text(s.city, CITY_MAX),
     cat,
-    at,
+    at: second(s.at),
     price: text(s.price, PRICE_MAX),
     tip: text(s.tip, TIP_MAX),
   };
 }
 
+// An hour range only when it makes sense; a lone start is kept.
+function parseInsight(v: unknown): IdeaInsight | null {
+  if (typeof v !== "object" || v === null) return null;
+  const s = v as Record<string, unknown>;
+  const body = text(s.text, INSIGHT_MAX);
+  if (!body || typeof s.kind !== "string" || !KINDS.includes(s.kind)) return null;
+  const start = hour(s.start);
+  const end = start !== undefined ? hour(s.end) : undefined;
+  return {
+    kind: s.kind as InsightKind,
+    text: body,
+    phase: typeof s.phase === "string" && PHASES.includes(s.phase) ? (s.phase as InsightPhase) : undefined,
+    when: text(s.when, WHEN_MAX),
+    start,
+    end: end !== undefined && start !== undefined && end > start ? end : undefined,
+    place: text(s.place, PLACE_MAX),
+    brand: text(s.brand, PLACE_MAX),
+    at: second(s.at),
+  };
+}
+
+function unique<T>(items: unknown, parse: (v: unknown) => T | null, keyOf: (t: T) => string, max: number): T[] {
+  const seen = new Set<string>();
+  return (Array.isArray(items) ? items : [])
+    .map(parse)
+    .filter((t): t is T => {
+      if (!t) return false;
+      const k = keyOf(t);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .slice(0, max);
+}
+
 // Model output is untrusted: unknown types dropped, lengths clamped, spots
-// without a name dropped, repeated names kept once.
+// without a name and insights without text dropped, repeats kept once.
 export function parseAnalysis(raw: unknown): VideoAnalysis | null {
   if (typeof raw !== "object" || raw === null) return null;
   const r = raw as Record<string, unknown>;
   const summary = text(r.summary, SUMMARY_MAX);
   if (!summary) return null;
-  const seen = new Set<string>();
-  const spots = (Array.isArray(r.spots) ? r.spots : [])
-    .map(parseSpot)
-    .filter((s): s is IdeaSpot => {
-      if (!s || seen.has(s.name.toLowerCase())) return false;
-      seen.add(s.name.toLowerCase());
-      return true;
-    })
-    .slice(0, MAX_SPOTS);
-  return { relevant: r.relevant !== false, summary, onScreen: text(r.onScreen, ON_SCREEN_MAX), spots };
+  const spots = unique(r.spots, parseSpot, (s) => s.name.toLowerCase(), MAX_SPOTS);
+  const insights = unique(r.insights, parseInsight, (i) => normalizeText(i.text), MAX_INSIGHTS);
+  return { relevant: r.relevant !== false, summary, onScreen: text(r.onScreen, ON_SCREEN_MAX), spots, insights };
 }
 
 const strip = <T extends object>(o: T): T =>
@@ -114,6 +105,7 @@ export function doneVideo(a: VideoAnalysis, model: string, attempts: number): Id
     summary: a.summary,
     onScreen: a.onScreen,
     spots: a.spots.map(strip),
+    insights: a.insights?.map(strip),
     attempts,
     analyzedAt: new Date().toISOString(),
     model,

@@ -112,7 +112,8 @@ async function analyze(ctx: OpContext, ideaId: string, manual: boolean, first: b
         const days = trip?.payload.days ?? [];
         const places = tripPlaces(trip?.payload.trip?.destination, days, trip?.payload.ideaPlaces);
         index = placeIndex(places, days);
-        const result = await watchVideo(resolved.input, places.map((p) => p.name), started + BUDGET_MS);
+        const context = { places: places.map((p) => p.name), caption: idea.title, transcript: idea.transcript };
+        const result = await watchVideo(resolved.input, context, started + BUDGET_MS);
         ({ usage, model, attempts } = result);
         outcome = { kind: "done", analysis: result.analysis, model: result.model, attempts: result.attempts };
       }

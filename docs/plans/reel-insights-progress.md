@@ -1,23 +1,23 @@
 # Reel insights progress
 - Iteration: 1
 - Last commit: (see log)
-- Next step: 0.2
+- Next step: A.V + 1.V (browser), then 2.1
 - Human actions pending: (0.3) provide the Crucero reel links and annotate `evals/reel-insights/cases.json`
 
 ## Steps
 - [x] 0.1 Branch, plan copy, progress file
-- [ ] 0.2 Live eval harness (`insights.eval.test.ts`, `evals/reel-insights/cases.json`)
+- [x] 0.2 Live eval harness (`insights.eval.test.ts`, `evals/reel-insights/cases.json`)
 - [H] 0.3 Crucero reels annotated (human)
-- [ ] A.1 90 s limit checked before download (TikTok, Instagram)
-- [ ] A.2 YouTube not analyzed (server + client)
-- [ ] A.3 `IdeaVideo.skip`, panel without Reintentar, upload duration check, form hint, agent tool text
-- [ ] A.4 Tests + `docs/ideas-flow.md`
+- [x] A.1 90 s limit checked before download (TikTok, Instagram)
+- [x] A.2 YouTube not analyzed (server + client)
+- [x] A.3 `IdeaVideo.skip`, panel without Reintentar, upload duration check, form hint, agent tool text
+- [x] A.4 Tests + `docs/ideas-flow.md`
 - [ ] A.V Verify limit and YouTube in the browser
-- [ ] 1.1 Insight constants + types
-- [ ] 1.2 Schema, parser, `doneVideo`
-- [ ] 1.3 Prompt for short reels + caption/transcript context
-- [ ] 1.4 Viewer insight list
-- [ ] 1.5 Card "aporta" chips + agent `get_ideas`
+- [x] 1.1 Insight constants + types
+- [x] 1.2 Schema, parser, `doneVideo`
+- [x] 1.3 Prompt for short reels + caption/transcript context
+- [x] 1.4 Viewer insight list
+- [x] 1.5 Card "aporta" chips + agent `get_ideas`
 - [ ] 1.6 Tests (+ eval tuning when 0.3 is done)
 - [ ] 1.V Verify extraction in the browser
 - [ ] 2.1 `utils/insights.ts` collect + dedupe

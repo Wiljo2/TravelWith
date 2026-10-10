@@ -148,6 +148,22 @@ export type IdeaVideoStatus = "pending" | "done" | "failed" | "needsFile" | "ski
 // limit, or a platform that isn't analyzed (YouTube).
 export type IdeaVideoSkip = "tooLong" | "platform";
 
+// A piece of advice a video gives, other than a place (places are spots).
+export type InsightKind = "todo" | "tip" | "avoid" | "fact";
+export type InsightPhase = "before" | "first" | "during" | "last" | "anytime";
+
+export interface IdeaInsight {
+  kind: InsightKind;
+  text: string;             // one actionable sentence
+  phase?: InsightPhase;     // when in the trip it matters
+  when?: string;            // as the video says it: "60 días antes", "el día de embarque al mediodía"
+  start?: number;           // decimal hours, when the video gives a time
+  end?: number;
+  place?: string;           // the trip place or venue it's about
+  brand?: string;           // company, ship or park it is specific to
+  at?: number;              // second of the video where it's said
+}
+
 export interface IdeaVideo {
   status: IdeaVideoStatus;
   reason?: string;
@@ -156,6 +172,7 @@ export interface IdeaVideo {
   summary?: string;
   onScreen?: string;        // key text shown on screen (names, prices, addresses)
   spots?: IdeaSpot[];
+  insights?: IdeaInsight[]; // advice beyond places; absent on videos analyzed before it existed
   attempts?: number;
   retryAt?: string;         // ISO; a failed analysis is tried again after this
   analyzedAt?: string;
