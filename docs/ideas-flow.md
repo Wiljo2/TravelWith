@@ -39,7 +39,7 @@ flowchart TD
     Gemini --> Parse["Validate: summary · on-screen text<br/>relevant · spots (name, city, type, second, price, tip)<br/>insights (todo · tip · avoid · fact, when, hours, second)"]
     Parse --> Write["apply_idea_video (one transaction)<br/>merged onto the latest idea"]
     Write --> Parent["Parent: video = done + summary + spots + insights"]
-    Parent -. "Guardar como idea (a member, per spot)" .-> Children["Spot idea     Write --> Children["≥ 2 spots → one child idea per spot<br/>(parentId, own suggestion)"]lt;video    Write --> Children["≥ 2 spots → one child idea per spot<br/>(parentId, own suggestion)"]gt;-s-    Write --> Children["≥ 2 spots → one child idea per spot<br/>(parentId, own suggestion)"]lt;name    Write --> Children["≥ 2 spots → one child idea per spot<br/>(parentId, own suggestion)"]gt;<br/>(parentId, own suggestion)"]
+    Parent -. "Guardar como idea (a member, per spot)" .-> Children["Spot idea &lt;video&gt;-s-&lt;name&gt;<br/>(parentId, own suggestion)"]
     Gemini -. busy / error .-> Failed["video.status = failed<br/>retryAt → any member's app retries (max 3)"]
     Source -. "no video" .-> NeedsFile["video.status = needsFile<br/>→ Subir video"]
     Analyze --> Usage[("video_usage<br/>tokens · cost · time")]
