@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { Loader2, RotateCw, Sparkles, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { IDEA_TYPES } from "@/constants/ideaTypes";
-import { fmtVideoTime, isAnalyzingVideo } from "@/utils/ideaVideo";
+import { VIDEO_ANALYSIS_ON, fmtVideoTime, isAnalyzingVideo } from "@/utils/ideaVideo";
 import type { Idea, IdeaSpot } from "@/types";
 
 // What the video shows, as the server's analysis saw it: for a spot idea, its
@@ -41,7 +41,19 @@ export default function IdeaVideoPanel({ idea, parent, onRetry, onUpload }: {
       </p>
     );
   }
-  if (!video) return null;
+  // Ideas saved before the analysis existed, or while it was off.
+  if (!video) {
+    if (!VIDEO_ANALYSIS_ON || source.platform === "other") return null;
+    return (
+      <Button
+        variant="secondary"
+        className="h-10 gap-1.5 self-start rounded-xl"
+        onClick={async () => { if (await onRetry()) setAskedAt(key); }}
+      >
+        <Sparkles className="size-4 text-amber-500" /> Ver el video con IA
+      </Button>
+    );
+  }
 
   if (video.status !== "done") {
     const canRetry = video.status !== "pending";
