@@ -39,12 +39,12 @@ async function listTrips(user: User): Promise<TripListItem[]> {
   const codes = memberships.map((m) => m.room_code);
   const { data: rooms, error: rErr } = await supabase
     .from("rooms")
-    .select("code, name, payload->trip")
+    .select("code, name, destination, start_date, end_date")
     .in("code", codes);
 
   if (rErr) throw rErr;
 
-  const byCode = new Map((rooms ?? []).map((r) => [r.code, r as { code: string; name: string | null; trip: TripInfo | null }]));
+  const byCode = new Map((rooms ?? []).map((r) => [r.code, { name: r.name, trip: tripInfo(r) }]));
 
   // Drop stale memberships whose room no longer exists (defensive — shouldn't
   // happen given the cleanup in DELETE /members, but never resume into a dead room).
@@ -54,11 +54,22 @@ async function listTrips(user: User): Promise<TripListItem[]> {
       const room = byCode.get(m.room_code)!;
       return {
         code: m.room_code,
-        name: room.name ?? room.trip?.name ?? null,
+        name: room.name,
         role: m.role,
         joined_at: m.joined_at,
         last_active_at: m.last_active_at,
-        trip: room.trip ?? null,
+        trip: room.trip,
       };
     });
+}
+
+// Same shape get_trip builds from the header columns: only with both dates.
+function tripInfo(r: { name: string | null; destination: string | null; start_date: string | null; end_date: string | null }): TripInfo | null {
+  if (!r.start_date || !r.end_date) return null;
+  return {
+    name: r.name ?? "",
+    ...(r.destination ? { destination: r.destination } : {}),
+    startDate: r.start_date,
+    endDate: r.end_date,
+  };
 }
