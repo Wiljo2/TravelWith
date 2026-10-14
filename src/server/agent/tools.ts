@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { GUIDE_TOOLS, GUIDE_TOOL_LABELS, isGuideTool, runGuideTool } from "@/server/agent/guideTools";
 import { IDEA_TOOLS, IDEA_TOOL_LABELS, isIdeaTool, runIdeaTool } from "@/server/agent/ideaTools";
 import {
   EVENT_CATS, HOURS_DESC, NEW_EVENT_FIELDS, NEW_EVENT_REQUIRED, pick, readTrip, schema, summarize, toolErrorMessage, type Input,
@@ -153,6 +154,7 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
   },
   ...IDEA_TOOLS,
   ...TRIP_TOOLS,
+  ...GUIDE_TOOLS,
 ];
 
 // Spanish activity labels shown as chips in the chat UI while a tool runs.
@@ -172,6 +174,7 @@ export const TOOL_LABELS: Record<string, string> = {
   set_exchange_rate: "Actualizando TRM",
   ...IDEA_TOOL_LABELS,
   ...TRIP_TOOL_LABELS,
+  ...GUIDE_TOOL_LABELS,
 };
 
 export interface ToolOutcome {
@@ -237,6 +240,7 @@ async function runTool(ctx: OpContext, name: string, input: Input): Promise<unkn
   }
   if (isIdeaTool(name)) return runIdeaTool(ctx, name, input);
   if (isTripTool(name)) return runTripTool(ctx, name, input);
+  if (isGuideTool(name)) return runGuideTool(ctx, name, input);
   const toOps = WRITE_TOOLS[name];
   if (!toOps) throw new DomainError(`Unknown tool "${name}"`);
   const results: OpResult[] = [];

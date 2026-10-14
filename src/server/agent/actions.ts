@@ -10,6 +10,8 @@ export const TOOL_KIND: Record<string, ToolKind> = {
   get_budget: "read",
   get_ideas: "read",
   get_task_options: "read",
+  get_trip_guide: "read",
+  get_places: "read",
   create_event: "write",
   create_events: "write",
   update_event: "write",

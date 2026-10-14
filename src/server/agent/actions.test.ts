@@ -30,7 +30,7 @@ describe("toolKind", () => {
   });
 
   it("classifies the trip tools", () => {
-    expect(toolKind("get_task_options")).toBe("read");
+    for (const name of ["get_task_options", "get_trip_guide", "get_places"]) expect(toolKind(name)).toBe("read");
     for (const name of ["add_task_option", "create_events", "add_traveler", "update_trip"]) expect(toolKind(name)).toBe("write");
     for (const name of ["choose_task_option", "remove_traveler"]) expect(toolKind(name)).toBe("delete");
   });
