@@ -14,7 +14,7 @@ interface AgentConfirmCardProps {
 
 function ActionIcon({ action }: { action: AgentAction }) {
   if (action.kind === "delete") return <Trash2 className="size-3.5 shrink-0" aria-label="Eliminar" />;
-  if (action.name.startsWith("create_") || action.name === "add_expense") return <Plus className="size-3.5 shrink-0" aria-label="Crear" />;
+  if (action.name.startsWith("create_") || action.name.startsWith("add_")) return <Plus className="size-3.5 shrink-0" aria-label="Crear" />;
   return <Pencil className="size-3.5 shrink-0" aria-label="Modificar" />;
 }
 

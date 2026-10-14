@@ -1,26 +1,50 @@
-import type { RoomPayload } from "@/types";
-import { extraGroupUSD, extraPerPersonUSD } from "@/utils/currency";
+import type { RoomMember, RoomPayload } from "@/types";
+import { extraGroupUSD, extraPerPersonUSD, optionGroupUSD } from "@/utils/currency";
 import { DEFAULT_DOCUMENT_KIND } from "@/constants/documentKinds";
-import { requireDay } from "./core";
+import { DomainError, requireDay } from "./core";
 
 // Compact, token-efficient views of the trip for the agent. No styling fields.
 
-export function tripOverview(payload: RoomPayload, people: number) {
+// Members who joined plus travelers added by name: the headcount of the budget.
+export function peopleCount(payload: RoomPayload, memberCount: number): number {
+  return Math.max(1, memberCount + (payload.mockPeople?.length ?? 0));
+}
+
+export function tripOverview(payload: RoomPayload, members: Pick<RoomMember, "userId" | "name">[]) {
   const tasks = payload.tasks ?? [];
+  const people = peopleCount(payload, members.length);
   return {
     trip: payload.trip ?? null,
     people,
+    travelers: [
+      ...members.map((m) => ({ id: m.userId, name: m.name, kind: "member" as const })),
+      ...(payload.mockPeople ?? []).map((t) => ({ id: t.id, name: t.name, kind: "traveler" as const })),
+    ],
     exchangeRate: payload.exchangeRate,
     totalGroupUSD: round2(payload.extras.reduce((s, e) => s + extraGroupUSD(e, people, payload.exchangeRate), 0)),
     days: payload.days.map((d) => ({
       dayId: d.id,
       label: d.label,
+      sub: d.sub || undefined,
       eventCount: d.events.length,
       taskCount: tasks.filter((t) => t.dayId === d.id).length,
     })),
+    tripSpans: (payload.tripSpans ?? []).map((s) => ({
+      id: s.id,
+      label: s.label || undefined,
+      startEventId: s.startEventId,
+      endEventId: s.endEventId,
+    })),
     backlogTasks: tasks
       .filter((t) => !t.dayId)
-      .map((t) => ({ taskId: t.id, title: t.title, done: t.done, cat: t.cat, priority: t.priority })),
+      .map((t) => ({
+        taskId: t.id,
+        title: t.title,
+        done: t.done,
+        cat: t.cat,
+        priority: t.priority,
+        optionCount: t.options?.length ?? 0,
+      })),
     expenseCount: payload.extras.length,
     // Titles only: the Drive id and the file's contents never reach the model.
     documents: (payload.documents ?? []).map((d) => ({ documentId: d.id, title: d.title, kind: d.kind ?? DEFAULT_DOCUMENT_KIND })),
@@ -81,6 +105,32 @@ export function budgetDetail(payload: RoomPayload, people: number) {
     totalPerPersonUSD: round2(
       payload.extras.reduce((s, e) => s + extraGroupUSD(e, people, rate), 0) / Math.max(1, people),
     ),
+  };
+}
+
+// The candidate options of one task, or of every task that has any.
+export function taskOptionsDetail(payload: RoomPayload, people: number, taskId?: string) {
+  const rate = payload.exchangeRate;
+  const tasks = payload.tasks ?? [];
+  if (taskId !== undefined && !tasks.some((t) => t.id === taskId)) throw new DomainError(`Task "${taskId}" not found`);
+  const listed = taskId === undefined ? tasks.filter((t) => t.options?.length) : tasks.filter((t) => t.id === taskId);
+  return {
+    people,
+    exchangeRate: rate,
+    tasks: listed.map((t) => ({
+      taskId: t.id,
+      title: t.title,
+      dayId: t.dayId,
+      options: (t.options ?? []).map((o) => ({
+        optionId: o.id,
+        label: o.label,
+        note: o.note || undefined,
+        amount: o.amount,
+        currency: o.currency ?? "USD",
+        splitMode: o.splitMode ?? "group",
+        groupUSD: round2(optionGroupUSD(o, people, rate)),
+      })),
+    })),
   };
 }
 

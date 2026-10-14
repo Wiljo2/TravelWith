@@ -9,17 +9,26 @@ export const TOOL_KIND: Record<string, ToolKind> = {
   get_day_detail: "read",
   get_budget: "read",
   get_ideas: "read",
+  get_task_options: "read",
+  get_trip_guide: "read",
+  get_places: "read",
   create_event: "write",
+  create_events: "write",
   update_event: "write",
   create_task: "write",
   update_task: "write",
+  add_task_option: "write",
   add_expense: "write",
   update_expense: "write",
   set_exchange_rate: "write",
   add_idea: "write",
+  add_traveler: "write",
+  update_trip: "write",
   delete_event: "delete",
   delete_task: "delete",
   remove_expense: "delete",
+  choose_task_option: "delete",
+  remove_traveler: "delete",
 };
 
 export function toolKind(name: string): ToolKind {
@@ -36,6 +45,7 @@ export interface ProposedAction {
 type Input = Record<string, unknown>;
 
 const MAX_TITLE = 60;
+const MAX_SHORT = 40;
 const MAX_SUMMARY = 160;
 
 function clip(text: string, max: number): string {
@@ -142,6 +152,55 @@ function withChanges(head: string, changes: string[]): string {
   return changes.length ? `${head}: ${changes.join(", ")}` : head;
 }
 
+function listJoin(items: string[]): string {
+  return items.length > 1 ? `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}` : (items[0] ?? "");
+}
+
+function addOption(trip: RoomPayload | null, input: Input): string {
+  const task = findTask(trip, input.taskId);
+  const head = `Agregar opción ${quoted(input.label) ?? ""}`.trim();
+  const parts = [task ? `${head} a "${clip(task.title, MAX_TITLE)}"` : `${head} (tarea no encontrada)`];
+  const amount = num(input.amount);
+  if (amount !== undefined) parts.push(money(amount, input.currency), splitLabel(input.splitMode));
+  return parts.join(" · ");
+}
+
+// What confirming an option does, as task.chooseOption decides it.
+function chooseOption(trip: RoomPayload | null, input: Input): string {
+  const task = findTask(trip, input.taskId);
+  const option = task?.options?.find((o) => o.id === input.optionId);
+  if (!task || !option) return "Elegir opción (no encontrada)";
+  const effects = [
+    task.dayId && task.start != null ? "crea la actividad" : "",
+    (option.amount ?? 0) > 0 ? "crea el gasto" : "",
+    "elimina la tarea",
+  ].filter(Boolean);
+  return `Elegir "${clip(option.label, MAX_SHORT)}" para "${clip(task.title, MAX_SHORT)}" (${listJoin(effects)})`;
+}
+
+// "Crear 3 actividades: Sáb 14 "Museo", "Cena" · Dom 15 "Playa"".
+function createEvents(trip: RoomPayload | null, input: Input): string {
+  const events = Array.isArray(input.events) ? input.events.map((e) => (e && typeof e === "object" ? e as Input : {})) : [];
+  if (!events.length) return "Crear actividades";
+  const groups: { dayId: unknown; titles: string[] }[] = [];
+  for (const ev of events) {
+    const title = quoted(ev.title) ?? "sin título";
+    const last = groups[groups.length - 1];
+    if (last && last.dayId === ev.dayId) last.titles.push(title);
+    else groups.push({ dayId: ev.dayId, titles: [title] });
+  }
+  const list = groups.map((g) => `${dayName(trip, g.dayId)} ${g.titles.join(", ")}`).join(" · ");
+  return `Crear ${events.length} ${events.length === 1 ? "actividad" : "actividades"}: ${list}`;
+}
+
+function updateTrip(input: Input): string {
+  const changes: string[] = [];
+  const name = quoted(input.name);
+  if (name) changes.push(`nombre ${name}`);
+  if (input.destination !== undefined) changes.push(str(input.destination) ? `destino ${quoted(input.destination)}` : "quitar destino");
+  return withChanges("Actualizar viaje", changes);
+}
+
 function describe(trip: RoomPayload | null, name: string, input: Input): string {
   switch (name) {
     case "create_event": {
@@ -199,6 +258,20 @@ function describe(trip: RoomPayload | null, name: string, input: Input): string 
       const note = quoted(input.note);
       return [`Guardar idea ${clip(str(input.url) ?? "", MAX_TITLE)}`.trim(), note].filter(Boolean).join(" · ");
     }
+    case "add_task_option":
+      return addOption(trip, input);
+    case "choose_task_option":
+      return chooseOption(trip, input);
+    case "create_events":
+      return createEvents(trip, input);
+    case "add_traveler":
+      return `Agregar viajero ${quoted(input.name) ?? ""}`.trim();
+    case "remove_traveler": {
+      const traveler = trip?.mockPeople?.find((p) => p.id === input.travelerId);
+      return traveler ? `Quitar viajero "${clip(traveler.name, MAX_TITLE)}"` : "Quitar viajero (no encontrado)";
+    }
+    case "update_trip":
+      return updateTrip(input);
     default:
       return `Ejecutar ${name}`;
   }
