@@ -1,29 +1,21 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { RoomPayload } from "@/types";
 import { IDEA_TOOLS, IDEA_TOOL_LABELS, isIdeaTool, runIdeaTool } from "@/server/agent/ideaTools";
+import {
+  EVENT_CATS, HOURS_DESC, NEW_EVENT_FIELDS, NEW_EVENT_REQUIRED, pick, readTrip, schema, summarize, toolErrorMessage, type Input,
+} from "@/server/agent/shared";
 import { DomainError } from "@/server/domain/core";
-import { tripOverview, dayDetail, budgetDetail } from "@/server/domain/read";
-import { HttpError } from "@/server/http";
+import { tripOverview, dayDetail, budgetDetail, peopleCount } from "@/server/domain/read";
 import { runOp } from "@/server/ops";
 import type { OpContext, OpResult } from "@/server/ops/types";
-import { RowConflictError, RowNotFoundError } from "@/server/repo/errors";
-import { getTrip } from "@/server/repo/trip";
-import { DEFAULT_EVENT_CAT, EVENT_CATEGORY_KEYS } from "@/constants/categories";
 import { TASK_CATEGORIES } from "@/constants/taskCategories";
 
-const HOURS_DESC = "Decimal hour between 0 and 26 (e.g. 5.5 = 5:30am, 19.5 = 7:30pm, 25 = 1:00am next day)";
-const EVENT_CATS = EVENT_CATEGORY_KEYS.join(" | ");
 const TASK_CATS = Object.keys(TASK_CATEGORIES).join(" | ");
-
-function schema(properties: Record<string, unknown>, required: string[] = []) {
-  return { type: "object" as const, properties, required, additionalProperties: false };
-}
 
 export const AGENT_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_trip_overview",
     description:
-      "Get the trip summary: name, dates, traveler count, day list with dayIds, backlog tasks and the current group total. Call this FIRST whenever you need context about the trip (day ids, what exists) before reading details or writing.",
+      "Get the trip summary: name, dates, travelers (app members and travelers added by name), day list with dayIds, cross-day ranges, backlog tasks with their option counts and the current group total. Call this FIRST whenever you need context about the trip (day ids, what exists) before reading details or writing.",
     input_schema: schema({}),
   },
   {
@@ -44,17 +36,7 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
   {
     name: "create_event",
     description: "Create a calendar activity on a day. Call when the user asks to add/schedule an activity.",
-    input_schema: schema(
-      {
-        dayId: { type: "string", description: "Target day id (from get_trip_overview)" },
-        title: { type: "string" },
-        start: { type: "number", description: HOURS_DESC },
-        end: { type: "number", description: `${HOURS_DESC}; must be greater than start` },
-        cat: { type: "string", description: `Category: ${EVENT_CATS}. Default ${DEFAULT_EVENT_CAT}.` },
-        note: { type: "string", description: "Optional note shown on the event" },
-      },
-      ["dayId", "title", "start", "end"],
-    ),
+    input_schema: schema(NEW_EVENT_FIELDS, NEW_EVENT_REQUIRED),
   },
   {
     name: "update_event",
@@ -194,26 +176,11 @@ export interface ToolOutcome {
   isError: boolean;
 }
 
-function peopleCount(payload: RoomPayload, memberCount: number): number {
-  return Math.max(1, memberCount + (payload.mockPeople?.length ?? 0));
-}
-
-async function readTrip(code: string) {
-  const trip = await getTrip(code);
-  if (!trip) throw new DomainError("The trip no longer exists.");
-  return trip;
-}
-
-type Input = Record<string, unknown>;
 type OpCall = { op: string; args: Input };
 
 function rename(input: Input, from: string): Input {
   const { [from]: id, ...rest } = input;
   return { id, ...rest };
-}
-
-function pick(input: Input, keys: string[]): Input {
-  return Object.fromEntries(keys.filter((k) => input[k] !== undefined).map((k) => [k, input[k]]));
 }
 
 // Tool inputs keep their original shape (the model and the prompt know them);
@@ -239,34 +206,14 @@ const WRITE_TOOLS: Record<string, (input: Input) => OpCall[]> = {
   set_exchange_rate: (input) => [{ op: "trip.setExchangeRate", args: input }],
 };
 
-function publicRow(row: object): Input {
-  const { room_code: _code, updated_at: _at, updated_by: _by, ...rest } = row as Input;
-  return rest;
-}
-
-function summarize(results: OpResult[]) {
-  return {
-    ok: true,
-    changed: results.flatMap((r) => r.changed.map(({ table, row }) => ({ table, ...publicRow(row) }))),
-    deleted: results.flatMap((r) => r.deleted),
-    ...(results.some((r) => r.trip) ? { trip: results.findLast((r) => r.trip)?.trip } : {}),
-  };
-}
-
 export async function executeTool(ctx: OpContext, name: string, input: Input): Promise<ToolOutcome> {
   try {
     const result = await runTool(ctx, name, input);
     return { content: JSON.stringify(result), isError: false };
   } catch (e) {
-    if (e instanceof DomainError) return { content: e.message, isError: true };
-    if (e instanceof RowConflictError) {
-      return { content: "That item was changed by someone else at the same time. Re-read it and try again.", isError: true };
-    }
-    if (e instanceof RowNotFoundError) {
-      return { content: "That item no longer exists (someone may have deleted it). Re-read the trip.", isError: true };
-    }
-    if (e instanceof HttpError && e.status < 500) return { content: e.message, isError: true };
-    throw e;
+    const message = toolErrorMessage(e);
+    if (message === null) throw e;
+    return { content: message, isError: true };
   }
 }
 
@@ -274,7 +221,7 @@ async function runTool(ctx: OpContext, name: string, input: Input): Promise<unkn
   switch (name) {
     case "get_trip_overview": {
       const { payload, members } = await readTrip(ctx.code);
-      return tripOverview(payload, peopleCount(payload, members.length));
+      return tripOverview(payload, members);
     }
     case "get_day_detail": {
       const { payload } = await readTrip(ctx.code);
