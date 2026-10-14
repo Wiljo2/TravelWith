@@ -72,6 +72,17 @@ type AgentUsageRow = {
   created_at: string;
 };
 
+type AppErrorRow = {
+  id: number;
+  source: "client" | "server";
+  context: string | null;
+  message: string;
+  stack: string | null;
+  path: string | null;
+  user_agent: string | null;
+  created_at: string;
+};
+
 type VideoUsageRow = {
   id: number;
   user_id: string;
@@ -215,6 +226,7 @@ export type Database = {
       rooms: TableOf<RoomRow, "payload" | "updated_at" | "name" | "members" | "destination" | "start_date" | "end_date" | "exchange_rate" | "idea_places" | "idea_plan", []>;
       user_rooms: TableOf<UserRoomRow, "role" | "joined_at" | "last_active_at", [RoomFk<"user_rooms">]>;
       agent_usage: TableOf<AgentUsageRow, "id" | "input_tokens" | "output_tokens" | "created_at", []>;
+      app_errors: TableOf<AppErrorRow, "id" | "context" | "stack" | "path" | "user_agent" | "created_at", []>;
       video_usage: TableOf<
         VideoUsageRow,
         "id" | "model" | "ok" | "reason" | "video_seconds" | "bytes" | "input_tokens" | "output_tokens" | "thinking_tokens" | "provider_calls" | "attempts" | "wall_ms" | "created_at",

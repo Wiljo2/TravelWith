@@ -62,6 +62,17 @@ export function createSupabaseMock(handler: QueryHandler) {
       const r = handler(q) ?? {};
       return Promise.resolve({ data: r.data ?? null, error: r.error ?? null });
     },
+    // auth.admin.getUserById is answered by the handler as table "auth.users".
+    auth: {
+      admin: {
+        getUserById: (id: string) => {
+          const q: RecordedQuery = { table: "auth.users", op: "select", filters: [{ column: "id", op: "eq", value: id }], single: true };
+          log.push(q);
+          const r = handler(q) ?? {};
+          return Promise.resolve({ data: { user: r.data ?? null }, error: r.error ?? null });
+        },
+      },
+    },
   };
   return { client, log };
 }

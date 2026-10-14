@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { requireMember, type MemberRole } from "@/server/auth";
 import { assertWritable } from "@/server/maintenance";
+import { reportServerError } from "@/server/errors";
 import { HttpError, errorResponse, roomCodeParam } from "@/server/http";
 import { LIMITS } from "@/constants/limits";
 import { runAgentLoop, resumeMessages, type Decision, type Send } from "@/server/agent/loop";
@@ -164,13 +165,14 @@ function validateTurns(raw: unknown): ChatTurn[] {
 // details are logged server-side.
 function friendlyError(e: unknown): string {
   if (e instanceof HttpError && e.status < 500) return e.message;
+  console.error("[api] POST /api/rooms/[code]/agent", e);
+  reportServerError("POST /api/rooms/[code]/agent", e);
   if (e instanceof Anthropic.RateLimitError) {
     return "Se alcanzó el límite de peticiones a Claude. Intenta de nuevo en unos segundos.";
   }
   if (e instanceof Anthropic.APIConnectionError) {
     return "No se pudo conectar con la API de Claude. Intenta de nuevo.";
   }
-  console.error("[api] POST /api/rooms/[code]/agent", e);
   if (e instanceof Anthropic.APIError) {
     return "El asistente no está disponible en este momento. Intenta más tarde.";
   }

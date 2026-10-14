@@ -6,7 +6,7 @@ import { dayColor } from "@/constants/mapColors";
 import { MAP_STYLE } from "@/lib/mapOffline";
 import { MAPLIBRE_WORKER_URL } from "@/lib/maplibreFiles";
 import { googleMapsDirectionsUrl, googleMapsPlaceUrl } from "@/utils/googleMaps";
-import { boundsOf, inTripRegion, TRIP_REGION, type LngLat, type MapStop } from "@/utils/tripGeo";
+import { boundsOf, inBBox, type BBox, type LngLat, type MapStop } from "@/utils/tripGeo";
 import { fmtHour } from "@/utils/time";
 import { cn } from "@/lib/utils";
 import type { Day } from "@/types";
@@ -17,6 +17,7 @@ interface TripMapProps {
   bottomInset: number;         // px covered by overlays at the bottom (place cards)
   days: Day[];
   stops: MapStop[];            // pins to show (already filtered by day)
+  region: BBox | null;         // where the trip happens (see tripRegion); null before any pin
   order: Map<string, number>;  // each pin's place in the itinerary (see stopOrder)
   dayIdx: number | null;       // selected day: its route is drawn
   fitRequest: number;          // bumped when the user picks a day (or the whole trip) again
@@ -32,7 +33,7 @@ const POPUP_ROOM = 260;  // px kept above a focused pin on phones (popup height)
 
 // MapLibre map (OpenFreeMap tiles) with the trip's pins, the selected day's
 // route and the user's live position. Loaded on demand: it's a large library.
-export default function TripMap({ className, touch, bottomInset, days, stops, order, dayIdx, fitRequest, focus, onPosition, onOpenEvent }: TripMapProps) {
+export default function TripMap({ className, touch, bottomInset, days, stops, region, order, dayIdx, fitRequest, focus, onPosition, onOpenEvent }: TripMapProps) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibre | null>(null);
   const lib = useRef<typeof import("maplibre-gl") | null>(null);
@@ -44,6 +45,8 @@ export default function TripMap({ className, touch, bottomInset, days, stops, or
   // Latest callbacks, so the map's listeners never go stale.
   const cb = useRef({ onPosition, onOpenEvent });
   cb.current = { onPosition, onOpenEvent };
+  const area = useRef(region);
+  area.current = region;
   const inset = useRef(bottomInset);
   inset.current = bottomInset;
   const padding = () => ({ top: 56, left: 40, right: 40, bottom: 56 + inset.current });
@@ -60,7 +63,9 @@ export default function TripMap({ className, touch, bottomInset, days, stops, or
       instance = new maplibre.Map({
         container: box.current,
         style: MAP_STYLE,
-        bounds: [[TRIP_REGION.west, TRIP_REGION.south], [TRIP_REGION.east, TRIP_REGION.north]],
+        ...(area.current
+          ? { bounds: [[area.current.west, area.current.south], [area.current.east, area.current.north]] as [[number, number], [number, number]] }
+          : { center: [0, 20] as [number, number], zoom: 1 }),
         attributionControl: false,
       });
       map.current = instance;
@@ -76,7 +81,7 @@ export default function TripMap({ className, touch, bottomInset, days, stops, or
         const p = { lat: e.coords.latitude, lng: e.coords.longitude };
         cb.current.onPosition(p);
         // First fix inside the trip's region: show what's around.
-        if (!located.current && inTripRegion(p)) {
+        if (!located.current && area.current && inBBox(area.current, p)) {
           located.current = true;
           instance?.flyTo({ center: [p.lng, p.lat], zoom: Math.max(instance.getZoom(), 13), padding: centered() });
         }

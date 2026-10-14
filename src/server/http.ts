@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { normalizeRoomCode } from "@/lib/validate";
+import { reportServerError } from "@/server/errors";
 
 const GENERIC_ERROR = "Ocurrió un error en el servidor. Intenta de nuevo.";
 
@@ -39,5 +40,6 @@ export function errorResponse(e: unknown, context: string): NextResponse {
     return NextResponse.json({ error: e.message }, { status: e.status });
   }
   console.error(`[api] ${context}`, e);
+  reportServerError(context, e);
   return NextResponse.json({ error: GENERIC_ERROR }, { status: 500 });
 }

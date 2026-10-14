@@ -106,6 +106,7 @@ Server-side mutations do NOT talk to Supabase directly. The layering is:
 | POST | `/api/rooms/[code]/ops` | One write `{ op, args, expectedVersion? }` (member; `itinerary.reset` owner only). 200 `{ changed, deleted, trip? }`; 400 invalid; 404 gone; 409 `{ table, current }` on a stale version; 503 in maintenance. Body ≤ 32 KB |
 | DELETE | `/api/rooms/[code]` | Hard-delete for everyone. Authenticated + **owner only** (403 otherwise). Not wired in the UI |
 | GET/POST/DELETE | `/api/rooms/[code]/members` | List / join (idempotent, authenticated) / **leave** |
+| POST | `/api/rooms/errors` | Browser error report (no auth: same origin only, body ≤ 8 KB) stored in `app_errors` |
 
 ### Deletion semantics (collaborative model)
 
@@ -184,6 +185,13 @@ Trip data lives in the `trip_*` tables; rows migrated from old payloads keep the
 - Every trip row change is audited in `trip_changes` by trigger (bulk loads with `app.bulk_load = 'on'` are skipped). Retention is not scheduled yet.
 - `MAINTENANCE_MODE=on` answers every write route with 503; clients keep their ops and retry. Used for the cut-over and future data migrations.
 - The permissive `rooms` policies from `001_init.sql` are still `using (true)`, but `005_rls_lockdown.sql` adds restrictive policies on top: browser clients (anon key, signed in or not) can only read/write rooms they are members of, and cannot insert or delete `user_rooms` rows. Route handlers use the service role and bypass RLS, so **every route must enforce membership itself**. Never add a permissive policy that widens this, and never grant clients direct writes to `user_rooms`.
+
+### Observability
+- Errors go to `app_errors` (`024_app_errors.sql`, service role only), because Vercel's runtime logs expire within hours:
+  - server: every 500 answered by `errorResponse` and every assistant error (`reportServerError` in `src/server/errors.ts`), plus anything uncaught (`onRequestError` in `src/instrumentation.ts`);
+  - browser: uncaught errors and rejections (`src/instrumentation-client.ts`) and the error boundaries (`app/error.tsx`, `app/global-error.tsx`), sent by `reportClientError` (`src/lib/reportError.ts`, production builds only, at most 10 per page load).
+- Look at them in the Supabase SQL editor: `select created_at, source, context, message, path from app_errors order by created_at desc limit 50;`. Nothing prunes the table yet; when it grows, `delete from app_errors where created_at < now() - interval '90 days';`.
+- Page views: Vercel Web Analytics (`<Analytics />` in `app/layout.tsx`, production only; enable it in the Vercel project).
 
 ---
 
