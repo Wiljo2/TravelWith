@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Geist } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { cn } from "@/lib/utils";
 import RegisterServiceWorker from "@/components/RegisterServiceWorker";
 import { ENTRY_SCRIPT } from "@/components/landing/entryScript";
@@ -49,6 +50,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning>
         {children}
         <RegisterServiceWorker />
+        {/* Production only: the CSP allows its same-origin endpoints, not the dev script's CDN. */}
+        {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>
   );
