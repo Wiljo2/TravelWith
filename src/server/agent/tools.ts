@@ -3,6 +3,7 @@ import { IDEA_TOOLS, IDEA_TOOL_LABELS, isIdeaTool, runIdeaTool } from "@/server/
 import {
   EVENT_CATS, HOURS_DESC, NEW_EVENT_FIELDS, NEW_EVENT_REQUIRED, pick, readTrip, schema, summarize, toolErrorMessage, type Input,
 } from "@/server/agent/shared";
+import { TRIP_TOOLS, TRIP_TOOL_LABELS, isTripTool, runTripTool } from "@/server/agent/tripTools";
 import { DomainError } from "@/server/domain/core";
 import { tripOverview, dayDetail, budgetDetail, peopleCount } from "@/server/domain/read";
 import { runOp } from "@/server/ops";
@@ -151,6 +152,7 @@ export const AGENT_TOOLS: Anthropic.Tool[] = [
     input_schema: schema({ rate: { type: "number", description: "COP per 1 USD, e.g. 4000" } }, ["rate"]),
   },
   ...IDEA_TOOLS,
+  ...TRIP_TOOLS,
 ];
 
 // Spanish activity labels shown as chips in the chat UI while a tool runs.
@@ -169,6 +171,7 @@ export const TOOL_LABELS: Record<string, string> = {
   remove_expense: "Eliminando gasto",
   set_exchange_rate: "Actualizando TRM",
   ...IDEA_TOOL_LABELS,
+  ...TRIP_TOOL_LABELS,
 };
 
 export interface ToolOutcome {
@@ -233,6 +236,7 @@ async function runTool(ctx: OpContext, name: string, input: Input): Promise<unkn
     }
   }
   if (isIdeaTool(name)) return runIdeaTool(ctx, name, input);
+  if (isTripTool(name)) return runTripTool(ctx, name, input);
   const toOps = WRITE_TOOLS[name];
   if (!toOps) throw new DomainError(`Unknown tool "${name}"`);
   const results: OpResult[] = [];

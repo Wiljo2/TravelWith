@@ -1,7 +1,7 @@
 import type { RoomMember, RoomPayload } from "@/types";
-import { extraGroupUSD, extraPerPersonUSD } from "@/utils/currency";
+import { extraGroupUSD, extraPerPersonUSD, optionGroupUSD } from "@/utils/currency";
 import { DEFAULT_DOCUMENT_KIND } from "@/constants/documentKinds";
-import { requireDay } from "./core";
+import { DomainError, requireDay } from "./core";
 
 // Compact, token-efficient views of the trip for the agent. No styling fields.
 
@@ -105,6 +105,32 @@ export function budgetDetail(payload: RoomPayload, people: number) {
     totalPerPersonUSD: round2(
       payload.extras.reduce((s, e) => s + extraGroupUSD(e, people, rate), 0) / Math.max(1, people),
     ),
+  };
+}
+
+// The candidate options of one task, or of every task that has any.
+export function taskOptionsDetail(payload: RoomPayload, people: number, taskId?: string) {
+  const rate = payload.exchangeRate;
+  const tasks = payload.tasks ?? [];
+  if (taskId !== undefined && !tasks.some((t) => t.id === taskId)) throw new DomainError(`Task "${taskId}" not found`);
+  const listed = taskId === undefined ? tasks.filter((t) => t.options?.length) : tasks.filter((t) => t.id === taskId);
+  return {
+    people,
+    exchangeRate: rate,
+    tasks: listed.map((t) => ({
+      taskId: t.id,
+      title: t.title,
+      dayId: t.dayId,
+      options: (t.options ?? []).map((o) => ({
+        optionId: o.id,
+        label: o.label,
+        note: o.note || undefined,
+        amount: o.amount,
+        currency: o.currency ?? "USD",
+        splitMode: o.splitMode ?? "group",
+        groupUSD: round2(optionGroupUSD(o, people, rate)),
+      })),
+    })),
   };
 }
 
