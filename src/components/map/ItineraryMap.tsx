@@ -7,7 +7,7 @@ import NearbyList from "@/components/map/NearbyList";
 import PlaceCarousel from "@/components/map/PlaceCarousel";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { canStoreMap, needsRefresh, offlineMapState, storeMapOffline } from "@/lib/mapOffline";
-import { eventKey, inTripRegion, mapStops, missingPhotos, staleEvents, stopOrder, type LngLat } from "@/utils/tripGeo";
+import { eventKey, inBBox, mapStops, missingPhotos, staleEvents, stopOrder, tripRegion, type LngLat } from "@/utils/tripGeo";
 import type { useTripGeo } from "@/hooks/useTripGeo";
 import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -65,7 +65,11 @@ export default function ItineraryMap({ geo, days, todayIdx, roomCode, accessToke
   const [storing, setStoring] = useState<Storing>(() => (offlineMapState() ? "ready" : null));
   const storingRun = useRef(false);
 
-  const allStops = useMemo(() => mapStops(days, geo.eventPlaces).filter(inTripRegion), [days, geo.eventPlaces]);
+  const { region, allStops } = useMemo(() => {
+    const located = mapStops(days, geo.eventPlaces);
+    const area = tripRegion(located);
+    return { region: area, allStops: area ? located.filter((s) => inBBox(area, s)) : [] };
+  }, [days, geo.eventPlaces]);
   const stops = dayIdx == null ? allStops : allStops.filter((s) => s.visits.some((v) => v.dayIdx === dayIdx));
   const stale = staleEvents(days, geo.eventPlaces);
   const order = useMemo(() => stopOrder(allStops, dayIdx), [allStops, dayIdx]);
@@ -147,6 +151,7 @@ export default function ItineraryMap({ geo, days, todayIdx, roomCode, accessToke
       bottomInset={bottomInset}
       days={days}
       stops={stops}
+      region={region}
       order={order}
       dayIdx={dayIdx}
       fitRequest={fitRequest}
@@ -206,7 +211,7 @@ export default function ItineraryMap({ geo, days, todayIdx, roomCode, accessToke
         {failed}
         {pending}
         {saving}
-        {storing === "ready" && <span className="flex items-center gap-1.5"><CloudDownload className="size-3.5" />Mapa de Orlando, Miami y el crucero guardado para usar sin internet</span>}
+        {storing === "ready" && <span className="flex items-center gap-1.5"><CloudDownload className="size-3.5" />Mapa del viaje guardado para usar sin internet</span>}
         <span>Tip: pega un link de Google Maps en la nota de una actividad para fijar su ubicación exacta.</span>
       </div>
       {position && <NearbyList position={position} stops={allStops} days={days} onFocus={focusStop} />}

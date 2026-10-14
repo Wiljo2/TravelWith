@@ -8,14 +8,12 @@ import type { CalendarEvent, Day, EventPlace } from "@/types";
 export type LngLat = { lat: number; lng: number };
 export type BBox = { west: number; south: number; east: number; north: number };
 
-// Orlando, Miami and the cruise (Nassau, CocoCay): always kept for offline use
-// at overview zooms, so the ship's position can be seen anywhere on the route.
-export const TRIP_REGION: BBox = { west: -82.2, south: 23.0, east: -76.0, north: 29.2 };
-
-// Only the trip's region goes on the map (not, say, the home airport).
-export const inTripRegion = (p: LngLat) =>
-  p.lng >= TRIP_REGION.west && p.lng <= TRIP_REGION.east && p.lat >= TRIP_REGION.south && p.lat <= TRIP_REGION.north;
+// Pins this close to each other belong to the same region; the home airport
+// of a trip abroad is farther than this from everything else.
+const REGION_LINK_KM = 1000;
+const REGION_MIN_SPAN = 0.3;          // degrees, so a one-city trip still gets an overview
 const REGION_ZOOMS = [4, 5, 6, 7, 8, 9];
+const MAX_REGION_TILES = 3000;
 // Around each pin, more detail the closer in (km of radius per zoom). The
 // vector tiles stop at zoom 14; the map draws closer views from those.
 const STOP_RADIUS_KM: Record<number, number> = { 10: 12, 11: 7, 12: 4, 13: 2.5, 14: 1.5 };
@@ -95,6 +93,47 @@ export function boundsOf(points: LngLat[]): BBox | null {
   };
 }
 
+export const inBBox = (b: BBox, p: LngLat) => p.lng >= b.west && p.lng <= b.east && p.lat >= b.south && p.lat <= b.north;
+
+// A little room around the points, and at least REGION_MIN_SPAN each way.
+export function padBBox(b: BBox): BBox {
+  const grow = (lo: number, hi: number) => Math.max((hi - lo) * 0.1, (REGION_MIN_SPAN - (hi - lo)) / 2);
+  const dLng = grow(b.west, b.east);
+  const dLat = grow(b.south, b.north);
+  return {
+    west: Math.max(-180, b.west - dLng),
+    south: Math.max(-85, b.south - dLat),
+    east: Math.min(180, b.east + dLng),
+    north: Math.min(85, b.north + dLat),
+  };
+}
+
+// Where the trip happens: the group of pins (each within REGION_LINK_KM of
+// another) with the most visits, so a far-off home airport stays off the map.
+export function tripRegion(stops: MapStop[]): BBox | null {
+  const group: number[] = stops.map(() => -1);
+  let groups = 0;
+  for (let i = 0; i < stops.length; i++) {
+    if (group[i] !== -1) continue;
+    group[i] = groups;
+    for (const queue = [i]; queue.length > 0; ) {
+      const j = queue.pop()!;
+      stops.forEach((s, k) => {
+        if (group[k] === -1 && distanceKm(stops[j], s) <= REGION_LINK_KM) {
+          group[k] = groups;
+          queue.push(k);
+        }
+      });
+    }
+    groups++;
+  }
+  const weight = Array.from({ length: groups }, () => 0);
+  stops.forEach((s, i) => { weight[group[i]] += Math.max(1, s.visits.length); });
+  const best = weight.indexOf(Math.max(...weight));
+  const bounds = boundsOf(stops.filter((_, i) => group[i] === best));
+  return bounds && padBBox(bounds);
+}
+
 // ── Offline tiles (slippy-map numbering) ──────────────────────────────────────
 
 export type Tile = { z: number; x: number; y: number };
@@ -119,8 +158,20 @@ function around(p: LngLat, km: number): BBox {
   return { west: p.lng - dLng, south: p.lat - dLat, east: p.lng + dLng, north: p.lat + dLat };
 }
 
-// Every tile to keep on the device: the whole region at overview zooms, and
-// street detail around each pin (and around where the user is, when known).
+// The region around the points at overview zooms (the ship's position shows
+// anywhere on a cruise route), without the closest zooms when it's too large.
+function regionTiles(points: LngLat[]): Tile[] {
+  const bounds = boundsOf(points);
+  if (!bounds) return [];
+  const region = padBBox(bounds);
+  for (let zooms = REGION_ZOOMS; ; zooms = zooms.slice(0, -1)) {
+    const tiles = zooms.flatMap((z) => tilesInBBox(region, z));
+    if (tiles.length <= MAX_REGION_TILES || zooms.length === 1) return tiles;
+  }
+}
+
+// Every tile to keep on the device: the region at overview zooms, and street
+// detail around each pin (and around where the user is, when known).
 export function offlineTiles(points: LngLat[]): Tile[] {
   const seen = new Set<string>();
   const out: Tile[] = [];
@@ -128,7 +179,7 @@ export function offlineTiles(points: LngLat[]): Tile[] {
     const k = `${t.z}/${t.x}/${t.y}`;
     if (!seen.has(k)) { seen.add(k); out.push(t); }
   };
-  for (const z of REGION_ZOOMS) tilesInBBox(TRIP_REGION, z).forEach(add);
+  regionTiles(points).forEach(add);
   for (const p of points) {
     for (const [z, km] of Object.entries(STOP_RADIUS_KM)) tilesInBBox(around(p, km), Number(z)).forEach(add);
   }
