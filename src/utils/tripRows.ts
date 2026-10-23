@@ -1,4 +1,6 @@
-import type { CalendarEvent, Day, DaySpan, EventPlace, Extra, Idea, MockPerson, Task, TaskOption, TripDocument, TripSpan } from "@/types";
+import type {
+  CalendarEvent, Day, DaySpan, EventPlace, Extra, Idea, MockPerson, Task, TaskDecides, TaskOption, TripDocument, TripInfo, TripSpan,
+} from "@/types";
 
 // Pure helpers that apply one database row (as returned by the ops endpoint or
 // broadcast on the trip channel) to the client's trip state. `row = null`
@@ -23,6 +25,11 @@ export type Row = Record<string, unknown> & { id: string; version: number };
 const num = (v: unknown): number => Number(v);
 const optNum = (v: unknown): number | undefined => (v == null ? undefined : Number(v));
 const optStr = (v: unknown): string | undefined => (v == null ? undefined : String(v));
+const optStrings = (v: unknown): string[] | undefined =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : undefined;
+// Date columns arrive as "yyyy-mm-dd".
+const optDate = (v: unknown): string | undefined => (typeof v === "string" && v ? v.slice(0, 10) : undefined);
+const optDecides = (v: unknown): TaskDecides | undefined => (v === "dates" || v === "destination" ? v : undefined);
 
 function isStale(current: { version?: number } | undefined, row: Row): boolean {
   return current?.version !== undefined && current.version >= row.version;
@@ -64,7 +71,7 @@ export function rowToTaskOption(r: Row): TaskOption {
   return {
     id: r.id, label: String(r.label), note: optStr(r.note), amount: optNum(r.amount),
     currency: optStr(r.currency) as TaskOption["currency"], splitMode: optStr(r.split_mode) as TaskOption["splitMode"],
-    version: r.version,
+    votes: optStrings(r.votes), startDate: optDate(r.start_date), endDate: optDate(r.end_date), version: r.version,
   };
 }
 
@@ -72,7 +79,8 @@ export function rowToTask(r: Row, options: TaskOption[] = []): Task {
   return {
     id: r.id, title: String(r.title), done: Boolean(r.done), note: optStr(r.note), dayId: optStr(r.day_id),
     start: r.day_id == null ? undefined : optNum(r.start_hour), end: r.day_id == null ? undefined : optNum(r.end_hour),
-    cat: optStr(r.cat), priority: optStr(r.priority) as Task["priority"], icon: optStr(r.icon), options, version: r.version,
+    cat: optStr(r.cat), priority: optStr(r.priority) as Task["priority"], icon: optStr(r.icon), options,
+    decides: optDecides(r.decides), version: r.version,
   };
 }
 
@@ -90,6 +98,17 @@ export function rowToEventPlace(r: Row): EventPlace {
 
 export function rowToTraveler(r: Row): MockPerson {
   return { id: r.id, name: String(r.name), version: r.version };
+}
+
+// The trip header as stored on rooms (op responses and the trip channel). Columns
+// the header leaves out keep their previous value; null dates mean dates to decide.
+export function headerToTrip(h: Record<string, unknown>, prev: TripInfo | null): TripInfo | null {
+  const startDate = "start_date" in h ? h.start_date : prev?.startDate;
+  const endDate = "end_date" in h ? h.end_date : prev?.endDate;
+  const name = String(h.name ?? prev?.name ?? "");
+  const destination = h.destination == null ? undefined : String(h.destination);
+  if (startDate && endDate) return { name, destination, startDate: String(startDate), endDate: String(endDate) };
+  return name ? { name, destination } : prev;
 }
 
 // Upsert or remove one item of a flat list, keeping its place on update.

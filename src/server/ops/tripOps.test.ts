@@ -67,8 +67,8 @@ describe("op registry", () => {
       "day.swap", "day.update", "itinerary.reset",
       "daySpan.create", "daySpan.update", "daySpan.delete", "tripSpan.create", "tripSpan.update", "tripSpan.delete",
       "expense.create", "expense.update", "expense.delete", "trip.setExchangeRate",
-      "task.create", "task.update", "task.toggle", "task.delete", "task.chooseOption",
-      "taskOption.create", "taskOption.update", "taskOption.delete",
+      "task.create", "task.update", "task.toggle", "task.delete", "task.chooseOption", "task.closeVote",
+      "taskOption.create", "taskOption.update", "taskOption.delete", "taskOption.vote",
       "traveler.add", "traveler.remove", "trip.update",
       "document.create", "document.update", "document.delete", "idea.create", "idea.update", "idea.delete",
       "eventPlace.set", "trip.setIdeaSettings", "idea.applyVideo",
@@ -82,7 +82,8 @@ describe("op registry", () => {
     expect(isClientOp("idea.create")).toBe(true);
   });
 
-  it("only itinerary.reset is owner-only", () => {
-    expect(Object.entries(OPS).filter(([, op]) => op.minRole === "owner").map(([name]) => name)).toEqual(["itinerary.reset"]);
+  it("only itinerary.reset and task.closeVote are owner-only", () => {
+    expect(Object.entries(OPS).filter(([, op]) => op.minRole === "owner").map(([name]) => name).sort())
+      .toEqual(["itinerary.reset", "task.closeVote"]);
   });
 });

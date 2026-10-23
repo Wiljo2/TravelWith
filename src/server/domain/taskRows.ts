@@ -4,6 +4,8 @@ import { DomainError, checkArgs, checkClientId } from "@/server/domain/core";
 import { iconArg, optionalIcon } from "@/server/domain/featureRows";
 import { parseAmount, parseCurrency, parseSplitMode } from "@/server/domain/expenseRows";
 import { validatePriority, validateSchedule, validateTaskCat } from "@/server/domain/tasks";
+import { optionDates, parseDecides } from "@/server/domain/voteRows";
+import { VOTE_TASK_CAT } from "@/constants/votes";
 import type { NewRow, RowPatch } from "@/server/repo/core";
 import type { TripTaskOptionRow, TripTaskRow } from "@/types/database";
 import { uid } from "@/utils/uid";
@@ -33,15 +35,16 @@ function schedule(start: number | undefined, end: number | undefined): { start_h
   return { start_hour: s, end_hour: e };
 }
 
+// A task with `decides` is a group vote: always "Por decidir", open and in the backlog.
 export function newTaskRow(args: unknown, position: number): NewRow<"trip_tasks"> {
-  checkArgs(args, { ...TASK_FIELDS, title: { ...TASK_FIELDS.title, required: true } });
+  checkArgs(args, { ...TASK_FIELDS, title: { ...TASK_FIELDS.title, required: true }, decides: { type: "string", max: LIMITS.id } });
   const a = args as Args;
   const title = (a.title as string).trim();
   if (!title) throw new DomainError("title is required");
   if (a.cat !== undefined) validateTaskCat(a.cat as string);
   if (a.priority !== undefined) validatePriority(a.priority as string);
   const note = typeof a.note === "string" && a.note.trim() ? a.note.trim() : null;
-  return {
+  const row: NewRow<"trip_tasks"> = {
     id: a.id === undefined ? uid() : checkClientId(a.id),
     position,
     title,
@@ -53,6 +56,10 @@ export function newTaskRow(args: unknown, position: number): NewRow<"trip_tasks"
     ...(a.dayId !== undefined
       ? { day_id: a.dayId as string, ...schedule(a.start as number | undefined, a.end as number | undefined) }
       : { day_id: null, start_hour: null, end_hour: null }),
+  };
+  if (a.decides === undefined) return row;
+  return {
+    ...row, done: false, cat: VOTE_TASK_CAT, day_id: null, start_hour: null, end_hour: null, decides: parseDecides(a.decides),
   };
 }
 
@@ -117,6 +124,7 @@ export function newTaskOptionRow(args: unknown, position: number): NewRow<"trip_
     amount: a.amount == null ? null : parseAmount(a.amount),
     currency: a.currency == null ? null : parseCurrency(a.currency),
     split_mode: a.splitMode == null ? null : parseSplitMode(a.splitMode),
+    ...optionDates(a, false),
   };
 }
 
@@ -132,6 +140,7 @@ export function taskOptionPatch(args: unknown): RowPatch<"trip_task_options"> {
   if (a.amount !== undefined) patch.amount = a.amount === null ? null : parseAmount(a.amount);
   if (a.currency !== undefined) patch.currency = a.currency === null ? null : parseCurrency(a.currency);
   if (a.splitMode !== undefined) patch.split_mode = a.splitMode === null ? null : parseSplitMode(a.splitMode);
+  Object.assign(patch, optionDates(a, true));
   if (Object.keys(patch).length === 0) throw new DomainError("nothing to update");
   return patch;
 }

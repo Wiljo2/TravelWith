@@ -3,6 +3,17 @@ import type { User } from "@supabase/supabase-js";
 import type { TripInfo } from "@/types";
 import { apiFetch } from "@/lib/api";
 import { loadRoomList, saveRoomList } from "@/lib/offline";
+import { LOCAL_ROOM_CODE } from "@/data/localMode";
+import { isSandbox, onSandboxChange, sandboxTrip, setSandboxTrip } from "@/data/localSandbox";
+import { tripHeader } from "@/utils/tripSetup";
+
+// The sandbox has at most one trip: the one created in its "Nuevo viaje" wizard.
+function sandboxRooms(): UserRoom[] {
+  const trip = sandboxTrip();
+  if (!trip) return [];
+  const now = new Date().toISOString();
+  return [{ room_code: LOCAL_ROOM_CODE, role: "owner", joined_at: now, last_active_at: now, name: trip.name, trip: tripHeader(trip) }];
+}
 
 export interface UserRoom {
   room_code: string;
@@ -25,6 +36,13 @@ export function useUserRooms(user: User | null, accessToken: string | undefined)
   const [listOwner, setListOwner] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
+    if (isSandbox()) {
+      const sync = () => setRooms(user ? sandboxRooms() : []);
+      sync();
+      setRoomsLoading(false);
+      setListOwner(user?.id ?? null);
+      return onSandboxChange(sync);
+    }
     if (!user || !accessToken) {
       setRooms([]);
       setRoomsLoading(false);
@@ -71,6 +89,7 @@ export function useUserRooms(user: User | null, accessToken: string | undefined)
 
   // Uses the server-side API (service role key) to bypass RLS
   async function removeRoom(code: string, accessToken: string) {
+    if (isSandbox()) return setSandboxTrip(null);
     await apiFetch(`/api/rooms/${code}/members`, accessToken, { method: "DELETE" });
     setRooms((prev) => prev.filter((r) => r.room_code !== code));
   }

@@ -10,20 +10,23 @@ export function normalizeRoomCode(raw: string): string | null {
   return CODE_RE.test(code) ? code : null;
 }
 
-export function validateTripInput(body: unknown): TripInfo | null {
+// A trip header: a name and either both dates (ordered) or neither (dates to decide).
+export function validateTripHeader(body: unknown): TripInfo | null {
   if (typeof body !== "object" || body === null) return null;
   const t = body as Record<string, unknown>;
 
   if (typeof t.name !== "string" || !t.name.trim() || t.name.trim().length > MAX_NAME_LENGTH) return null;
+
+  const destination = typeof t.destination === "string" && t.destination.trim()
+    ? t.destination.trim().slice(0, MAX_NAME_LENGTH)
+    : undefined;
+
+  if (t.startDate == null && t.endDate == null) return { name: t.name.trim(), destination };
   if (typeof t.startDate !== "string" || typeof t.endDate !== "string") return null;
 
   const start = parseISODate(t.startDate);
   const end = parseISODate(t.endDate);
   if (!start || !end || end < start) return null;
-
-  const destination = typeof t.destination === "string" && t.destination.trim()
-    ? t.destination.trim().slice(0, MAX_NAME_LENGTH)
-    : undefined;
 
   return { name: t.name.trim(), destination, startDate: t.startDate, endDate: t.endDate };
 }
@@ -51,7 +54,7 @@ export function validateRoomPayload(body: unknown): RoomPayload | null {
     if (d.spans !== undefined && d.spans !== null && (!Array.isArray(d.spans) || !d.spans.every(isObject))) return null;
   }
 
-  if (p.trip !== undefined && !validateTripInput(p.trip)) return null;
+  if (p.trip !== undefined && !validateTripHeader(p.trip)) return null;
   if (p.eventPlaces !== undefined && (typeof p.eventPlaces !== "object" || p.eventPlaces === null || Array.isArray(p.eventPlaces))) return null;
 
   return p as unknown as RoomPayload;

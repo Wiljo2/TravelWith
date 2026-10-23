@@ -4,6 +4,7 @@ import App from "@/App";
 import { LOCAL_MODE_ENABLED } from "@/data/localMode";
 import { isOffline, lastSnapshotCode } from "@/lib/offline";
 import { shouldEnterApp } from "@/components/landing/entry";
+import { startSandbox } from "@/data/localSandbox";
 
 function readStorageKeys(): string[] {
   try {
@@ -17,6 +18,7 @@ export default function EntryGate({ landing }: { landing: ReactNode }) {
   const [enter, setEnter] = useState(false);
 
   useLayoutEffect(() => {
+    if (LOCAL_MODE_ENABLED && new URLSearchParams(window.location.search).get("local") === "new") startSandbox();
     const go = shouldEnterApp({
       search: window.location.search,
       storageKeys: readStorageKeys(),

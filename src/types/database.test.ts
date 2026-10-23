@@ -18,7 +18,7 @@ import type {
   TripTravelerRow,
 } from "@/types/database";
 
-const sql = ["008_trip_tables.sql", "018_main_features_tables.sql", "020_item_icons.sql"]
+const sql = ["008_trip_tables.sql", "018_main_features_tables.sql", "020_item_icons.sql", "027_group_votes.sql"]
   .map((f) => readFileSync(join(process.cwd(), "supabase/migrations", f), "utf8"))
   .join("\n");
 
@@ -56,10 +56,11 @@ const typed: Record<string, string[]> = {
   } satisfies Columns<TripExpenseRow>),
   trip_tasks: Object.keys({
     ...meta, position: true, title: true, done: true, note: true, day_id: true,
-    start_hour: true, end_hour: true, cat: true, priority: true, icon: true,
+    start_hour: true, end_hour: true, cat: true, priority: true, icon: true, decides: true,
   } satisfies Columns<TripTaskRow>),
   trip_task_options: Object.keys({
     ...meta, task_id: true, position: true, label: true, note: true, amount: true, currency: true, split_mode: true,
+    votes: true, start_date: true, end_date: true,
   } satisfies Columns<TripTaskOptionRow>),
   trip_travelers: Object.keys({ ...meta, position: true, name: true } satisfies Columns<TripTravelerRow>),
   trip_documents: Object.keys({

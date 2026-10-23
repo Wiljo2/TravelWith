@@ -112,6 +112,48 @@ describe("OpQueue", () => {
   });
 });
 
+describe("OpQueue votes", () => {
+  const optionRow = (version: number, votes: string[]) => ({ table: "trip_task_options", row: { id: "o1", version, votes } });
+
+  it("sends votes unguarded on the option's key and applies the response", async () => {
+    const { queue, calls, handlers } = setup();
+    queue.seed([["trip_task_options:o1", 3]]);
+    queue.send("taskOption.vote", { id: "o1", on: true });
+    expect(calls[0]).toMatchObject({ op: "taskOption.vote", expectedVersion: undefined });
+    expect(opTarget("taskOption.vote", { id: "o1" }).key).toBe("trip_task_options:o1");
+    calls[0].resolve(ok([optionRow(5, ["u2", "u1"])]));
+    await flush();
+    expect(handlers.onRows).toHaveBeenCalledWith([optionRow(5, ["u2", "u1"])]);
+    queue.send("taskOption.update", { id: "o1", label: "B" });
+    expect(calls[1].expectedVersion).toBe(5);
+  });
+
+  it("merges queued toggles and applies only the last response", async () => {
+    const { queue, calls, handlers } = setup();
+    queue.send("taskOption.vote", { id: "o1", on: true });
+    queue.send("taskOption.vote", { id: "o1", on: false });
+    queue.send("taskOption.vote", { id: "o1", on: true });
+    calls[0].resolve(ok([optionRow(2, ["u1"])]));
+    await flush();
+    expect(handlers.onRows).not.toHaveBeenCalled();
+    expect(calls.map((c) => c.args)).toEqual([{ id: "o1", on: true }, { id: "o1", on: true }]);
+    calls[1].resolve(ok([optionRow(2, ["u1"])]));
+    await flush();
+    expect(handlers.onRows).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the response while an edit of the option is queued", async () => {
+    const { queue, calls, handlers } = setup();
+    queue.seed([["trip_task_options:o1", 1]]);
+    queue.send("taskOption.vote", { id: "o1", on: true });
+    queue.send("taskOption.update", { id: "o1", label: "Nuevo" });
+    calls[0].resolve(ok([optionRow(2, ["u1"])]));
+    await flush();
+    expect(handlers.onRows).not.toHaveBeenCalled();
+    expect(calls[1]).toMatchObject({ op: "taskOption.update", expectedVersion: 2 });
+  });
+});
+
 describe("OpQueue outcomes", () => {
   it("resolves ok, and records lastSavedAt for onState", async () => {
     const { queue, calls, handlers } = setup();
@@ -235,6 +277,7 @@ describe("helpers", () => {
   it("opTarget keys ops by item, days or trip", () => {
     expect(opTarget("event.move", { id: "e1" }).key).toBe("trip_events:e1");
     expect(opTarget("task.chooseOption", { taskId: "k1" }).key).toBe("trip_tasks:k1");
+    expect(opTarget("task.closeVote", { taskId: "k1", optionId: "o1" }).key).toBe("trip_tasks:k1");
     expect(opTarget("day.swap", { a: "d0", b: "d1" }).key).toBe("days");
     expect(opTarget("trip.update", { name: "x" }).key).toBe("trip");
   });
@@ -282,5 +325,32 @@ describe("OpQueue flush", () => {
     expect(versionEntries({ documents: [{ id: "d", version: 2 }], ideas: [{ id: "i", version: 3 }], eventPlaces: { e1: { version: 4 } } })).toEqual([
       ["trip_documents:d", 2], ["trip_ideas:i", 3], ["trip_event_places:e1", 4],
     ]);
+  });
+});
+
+describe("OpQueue closing a vote", () => {
+  it("guards the task version, applies the task and days, passes the header and resyncs", async () => {
+    const { queue, calls, handlers } = setup();
+    queue.seed([["trip_tasks:k1", 4]]);
+    queue.send("task.closeVote", { taskId: "k1", optionId: "o1" });
+    expect(calls[0]).toMatchObject({ op: "task.closeVote", expectedVersion: 4 });
+    const rows = [{ table: "trip_tasks", row: { id: "k1", version: 5 } }, { table: "trip_days", row: { id: "d0", version: 2 } }];
+    calls[0].resolve(ok(rows, { trip: { start_date: "2026-11-26", end_date: "2026-11-28" } }));
+    await flush();
+    expect(handlers.onRows).toHaveBeenCalledWith(rows);
+    expect(handlers.onTrip).toHaveBeenCalledWith({ start_date: "2026-11-26", end_date: "2026-11-28" });
+    expect(handlers.onResync).toHaveBeenCalled();
+    queue.send("task.update", { id: "k1", note: "x" });
+    expect(calls[1].expectedVersion).toBe(5);
+  });
+
+  it("adopts the current task on a conflict", async () => {
+    const { queue, calls, handlers } = setup();
+    queue.seed([["trip_tasks:k1", 4]]);
+    queue.send("task.closeVote", { taskId: "k1", optionId: "o1" });
+    calls[0].resolve({ status: 409, body: { table: "trip_tasks", current: { id: "k1", version: 6 } } });
+    await flush();
+    expect(handlers.onConflict).toHaveBeenCalledWith("trip_tasks", "k1", { id: "k1", version: 6 });
+    expect(handlers.onResync).not.toHaveBeenCalled();
   });
 });

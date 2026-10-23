@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeRoomCode, validateRoomPayload, validateTripInput } from "./validate";
+import { normalizeRoomCode, validateRoomPayload, validateTripHeader } from "./validate";
 
 describe("normalizeRoomCode", () => {
   it("uppercases and trims valid codes", () => {
@@ -13,9 +13,22 @@ describe("normalizeRoomCode", () => {
   });
 });
 
-describe("validateTripInput", () => {
-  it("accepts a named trip with ordered dates", () => {
-    expect(validateTripInput({ name: " Viaje ", startDate: "2026-01-01", endDate: "2026-01-03" })).toEqual({
+describe("validateTripHeader", () => {
+  it("accepts a trip without dates", () => {
+    expect(validateTripHeader({ name: " Viaje ", destination: " Cartagena " })).toEqual({ name: "Viaje", destination: "Cartagena" });
+    expect(validateTripHeader({ name: "Viaje", startDate: null, endDate: null })).toEqual({ name: "Viaje", destination: undefined });
+  });
+
+  it("accepts both dates in order and rejects one alone", () => {
+    expect(validateTripHeader({ name: "X", startDate: "2026-01-01", endDate: "2026-01-03" })).toMatchObject({ startDate: "2026-01-01", endDate: "2026-01-03" });
+    expect(validateTripHeader({ name: "X", startDate: "2026-01-01" })).toBeNull();
+    expect(validateTripHeader({ name: "X", endDate: "2026-01-03" })).toBeNull();
+    expect(validateTripHeader({ name: "X", startDate: "2026-01-05", endDate: "2026-01-02" })).toBeNull();
+    expect(validateTripHeader({ name: "X", startDate: "", endDate: "" })).toBeNull();
+  });
+
+  it("trims a named trip with ordered dates", () => {
+    expect(validateTripHeader({ name: " Viaje ", startDate: "2026-01-01", endDate: "2026-01-03" })).toEqual({
       name: "Viaje",
       destination: undefined,
       startDate: "2026-01-01",
@@ -23,10 +36,11 @@ describe("validateTripInput", () => {
     });
   });
 
-  it("rejects missing names, reversed ranges and long names", () => {
-    expect(validateTripInput({ name: "", startDate: "2026-01-01", endDate: "2026-01-02" })).toBeNull();
-    expect(validateTripInput({ name: "X", startDate: "2026-01-05", endDate: "2026-01-02" })).toBeNull();
-    expect(validateTripInput({ name: "X".repeat(81), startDate: "2026-01-01", endDate: "2026-01-02" })).toBeNull();
+  it("requires a name within the limit", () => {
+    expect(validateTripHeader({ name: " " })).toBeNull();
+    expect(validateTripHeader({ name: "", startDate: "2026-01-01", endDate: "2026-01-02" })).toBeNull();
+    expect(validateTripHeader({ name: "X".repeat(81), startDate: "2026-01-01", endDate: "2026-01-02" })).toBeNull();
+    expect(validateTripHeader(null)).toBeNull();
   });
 });
 
@@ -36,6 +50,11 @@ describe("validateRoomPayload", () => {
   it("accepts the minimal payload and optional collections", () => {
     expect(validateRoomPayload(base)).not.toBeNull();
     expect(validateRoomPayload({ ...base, tasks: [], tripSpans: [], mockPeople: [] })).not.toBeNull();
+  });
+
+  it("accepts a trip whose dates are still to be decided", () => {
+    expect(validateRoomPayload({ ...base, trip: { name: "Viaje" } })).not.toBeNull();
+    expect(validateRoomPayload({ ...base, trip: { name: "Viaje", startDate: "2026-01-01" } })).toBeNull();
   });
 
   it("rejects wrong top-level types and non-positive rates", () => {

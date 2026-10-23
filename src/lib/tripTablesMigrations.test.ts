@@ -1,7 +1,8 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LIMITS } from "@/constants/limits";
+import { MAX_TRIP_DAYS } from "@/utils/tripDays";
 
 const sql = readFileSync(join(process.cwd(), "supabase/migrations/008_trip_tables.sql"), "utf8");
 
@@ -346,5 +347,74 @@ describe("020_item_icons mirrors LIMITS.icon", () => {
   it("get_trip returns the icon of events and tasks", () => {
     expect(icons).toContain("'icon', e.icon");
     expect(icons).toContain("'icon', t.icon");
+  });
+});
+
+describe("027_group_votes", () => {
+  const dir = join(process.cwd(), "supabase/migrations");
+  const m027 = readFileSync(join(dir, "027_group_votes.sql"), "utf8");
+  const fn = (name: string, source = m027) => {
+    const start = source.lastIndexOf(`create or replace function public.${name}(`);
+    return start === -1 ? null : source.slice(start, source.indexOf("$$;", source.indexOf("as $$", start)));
+  };
+
+  it("adds nullable columns, with checks that mirror LIMITS and MAX_TRIP_DAYS", () => {
+    for (const [table, column, type] of [
+      ["trip_tasks", "decides", "text"],
+      ["trip_task_options", "votes", "text[]"],
+      ["trip_task_options", "start_date", "date"],
+      ["trip_task_options", "end_date", "date"],
+    ]) {
+      expect(m027).toContain(`alter table public.${table} add column if not exists ${column} ${type};`);
+    }
+    expect(m027).not.toMatch(/add column[^;]*not null/);
+    expect(Number(/cardinality\(votes\) <= (\d+)/.exec(m027)?.[1])).toBe(LIMITS.votesPerOption);
+    expect(Number(/end_date between start_date and start_date \+ (\d+)/.exec(m027)?.[1])).toBe(MAX_TRIP_DAYS - 1);
+    expect(m027).toContain("check (decides is null or decides in ('dates', 'destination'))");
+    expect(m027).toContain("(start_date is null) = (end_date is null)");
+  });
+
+  it("defines server-only invoker functions with a pinned search_path", () => {
+    expect(m027).not.toContain("security definer");
+    expect(m027.match(/set search_path = ''/g)).toHaveLength(3);
+    for (const sig of ["set_task_option_vote(text, text, boolean, uuid)", "close_task_vote(text, text, text, int, jsonb, boolean, uuid)"]) {
+      expect(m027).toContain(`revoke all on function public.${sig} from public, anon, authenticated;`);
+      expect(m027).toContain(`grant execute on function public.${sig} to service_role;`);
+    }
+  });
+
+  it("set_task_option_vote is unguarded, attributed and skips no-op votes", () => {
+    const vote = fn("set_task_option_vote")!;
+    expect(vote).not.toMatch(/version/);
+    expect(vote).toContain("updated_by = p_user");
+    expect(vote).toContain("is distinct from p_on");
+    expect(vote).toContain("errcode = 'P0002'");
+  });
+
+  it("close_task_vote locks the room first, is guarded and never wipes activities without p_replace", () => {
+    const close = fn("close_task_vote")!;
+    expect(close.indexOf("from public.rooms where code = p_code for update")).toBeLessThan(close.indexOf("from public.trip_tasks"));
+    expect(close).toContain("p_expected_version is not null and v_task.version <> p_expected_version");
+    expect(close).toContain("not coalesce(p_replace, false) and exists (select 1 from public.trip_events where room_code = p_code)");
+    expect(close).toContain("public.reset_itinerary(p_code, p_days, p_user)");
+    expect(close).toContain("set done = true, updated_by = p_user");
+  });
+
+  it("get_trip keeps every key of the previous definition and adds the vote fields", () => {
+    const previous = readdirSync(dir)
+      .filter((f) => /^\d{3}_.*\.sql$/.test(f) && f < "027")
+      .sort()
+      .map((f) => fn("get_trip", readFileSync(join(dir, f), "utf8")))
+      .filter((body): body is string => body !== null)
+      .at(-1)!;
+    // Each key, with the column it reads when it is a plain column ("icon t.icon").
+    const keys = (body: string) => new Set([...body.matchAll(/'([A-Za-z_]+)',( [a-z]\.[a-z_]+)?/g)].map((m) => m[1] + (m[2] ?? "")));
+    const next = fn("get_trip")!;
+    expect([...keys(previous)].filter((k) => !keys(next).has(k))).toEqual([]);
+    for (const key of ["'decides', t.decides", "'votes', o.votes", "'startDate', to_char(o.start_date", "'endDate', to_char(o.end_date"]) {
+      expect(next).toContain(key);
+    }
+    expect(next).not.toMatch(/r\.payload/);
+    expect(next).toMatch(/\|\| jsonb_build_object\('trip', jsonb_strip_nulls/);
   });
 });

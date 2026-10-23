@@ -81,3 +81,47 @@ describe("task.chooseOption", () => {
       .rejects.toBeInstanceOf(RowConflictError);
   });
 });
+
+describe("vote tasks", () => {
+  const vote = { ...task, day_id: null, start_hour: null, end_hour: null, cat: "decidir", decides: "dates" };
+  const owner: OpContext = { ...ctx, role: "owner" };
+  const answer = (row: object): QueryHandler => (q) => {
+    if (q.op === "update") return { data: { ...row, ...(q.values as object) } };
+    if (q.op === "rpc") return { data: { deleted: row } };
+    return { data: row };
+  };
+
+  it("task.create forces the vote shape and allows one open vote per kind", async () => {
+    handler = (q) => (q.op === "insert" ? { data: { ...(q.values as object), version: 1 } } : { data: [{ ...vote, done: true }] });
+    const result = await runOp("task.create", ctx, { args: { title: "¿Cuándo viajamos?", decides: "dates", dayId: "d0" } });
+    expect(result.changed[0].row).toMatchObject({ decides: "dates", cat: "decidir", day_id: null, done: false });
+    handler = () => ({ data: [vote] });
+    await expect(runOp("task.create", ctx, { args: { title: "Otra", decides: "dates" } })).rejects.toThrow(/already has an open vote/);
+    expect(mock.log.some((q) => q.op === "insert" && (q.values as { title?: string }).title === "Otra")).toBe(false);
+  });
+
+  it("members can't mark a vote done or delete it; the owner can", async () => {
+    handler = answer(vote);
+    await expect(runOp("task.toggle", ctx, { args: { id: "k1" } })).rejects.toMatchObject({ status: 403 });
+    await expect(runOp("task.update", ctx, { args: { id: "k1", done: true } })).rejects.toMatchObject({ status: 403 });
+    await expect(runOp("task.delete", ctx, { args: { id: "k1" } })).rejects.toMatchObject({ status: 403 });
+    expect(mock.log.some((q) => q.op === "update" || q.op === "rpc")).toBe(false);
+    await runOp("task.update", ctx, { args: { id: "k1", note: "Pregunten en el trabajo" } });
+    await runOp("task.toggle", owner, { args: { id: "k1" } });
+    await runOp("task.delete", owner, { args: { id: "k1" } });
+    expect(mock.log.filter((q) => q.op === "update" || q.op === "rpc")).toHaveLength(3);
+  });
+
+  it("regular tasks keep working for members", async () => {
+    handler = answer(task);
+    await runOp("task.toggle", ctx, { args: { id: "k1" } });
+    await runOp("task.delete", ctx, { args: { id: "k1" } });
+    expect(mock.log.filter((q) => q.op === "update" || q.op === "rpc")).toHaveLength(2);
+  });
+
+  it("task.chooseOption refuses a vote", async () => {
+    handler = (q) => (q.table === "trip_tasks" ? { data: vote } : { data: option });
+    await expect(runOp("task.chooseOption", owner, { args: { taskId: "k1", optionId: "o1" } })).rejects.toThrow(/group vote.*task\.closeVote/);
+    expect(mock.log.some((q) => q.op === "rpc")).toBe(false);
+  });
+});

@@ -1,5 +1,5 @@
 import { fmtHour } from "@/utils/time";
-import { parseISODate } from "@/utils/tripDays";
+import { UNDATED_LABEL, hasDates, parseISODate } from "@/utils/tripDays";
 import { documentKind } from "@/constants/documentKinds";
 import { driveFileUrl } from "@/utils/driveLinks";
 import type { CalendarEvent, Day, TripDocument, TripInfo } from "@/types";
@@ -61,7 +61,7 @@ function withoutMoney(note: string): string {
 }
 
 const dayDate = (trip: TripInfo | null, idx: number): Date | null => {
-  const start = trip ? parseISODate(trip.startDate) : null;
+  const start = hasDates(trip) ? parseISODate(trip.startDate) : null;
   return start ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + idx) : null;
 };
 
@@ -77,9 +77,10 @@ export function buildTripReport(kind: ReportKind, { trip, days, travelers, docum
     const d = dayDate(trip, idx);
     return d ? (long ? longDate(d) : shortDate(d)) : pdfText(days[idx].label);
   };
+  const undated = !!trip && !hasDates(trip);
   const dates = [
-    first && last ? `${first.toLocaleDateString("es-CO", { day: "numeric", month: "long" })} al ${last.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}` : "",
-    `${days.length} ${days.length === 1 ? "día" : "días"}`,
+    first && last ? `${first.toLocaleDateString("es-CO", { day: "numeric", month: "long" })} al ${last.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}` : undated ? UNDATED_LABEL : "",
+    undated && days.length === 0 ? "" : `${days.length} ${days.length === 1 ? "día" : "días"}`,
   ].filter(Boolean).join(" · ");
 
   const docs = new Map(documents.map((d) => [d.id, d]));

@@ -1,6 +1,6 @@
 const ITEMS = [
   { q: "¿Es gratis?", a: "Sí, TravelWith es gratis mientras está en beta." },
-  { q: "¿Necesito cuenta?", a: "Sí, inicias sesión con tu cuenta de Google. No tienes que crear una contraseña." },
+  { q: "¿Necesito cuenta?", a: "Sí. Puedes entrar con Google o crear una cuenta con tu correo y una contraseña." },
   { q: "¿Cómo invito a mis amigos?", a: "Cada viaje tiene un código. Compártelo y quien lo ingrese se une al viaje." },
   {
     q: "¿Funciona sin internet?",

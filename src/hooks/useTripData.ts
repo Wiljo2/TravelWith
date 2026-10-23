@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useItinerary } from "@/hooks/useItinerary";
 import { useBudget } from "@/hooks/useBudget";
 import { useTasks } from "@/hooks/useTasks";
+import { useVotes } from "@/hooks/useVotes";
 import { useTripInfo } from "@/hooks/useTripInfo";
 import { useTripOps } from "@/hooks/useTripOps";
 import { useRoom } from "@/hooks/useRoom";
@@ -12,6 +13,7 @@ import type { Notify } from "@/hooks/useSnackbar";
 import { useFeatureSync } from "@/hooks/useFeatureSync";
 import { ideaPlanOf, type FeatureState, type IdeaPlan } from "@/utils/featureSync";
 import type { RoomPayload } from "@/types";
+import { localVariant } from "@/data/localSandbox";
 import { rowToDocument, rowToEventPlace, rowToIdea, type Row, type TripTable } from "@/utils/tripRows";
 
 // The ideas, documents and map places of a loaded trip, as their hooks hold them.
@@ -48,6 +50,12 @@ export function useTripData(roomCode: string | null, accessToken: string | undef
   const budget = useBudget(ops.send, notify);
   const taskState = useTasks(ops.send, ops.isKnown, notify);
   const tripInfo = useTripInfo(ops.send);
+  const votes = useVotes({
+    send: ops.send, isKnown: ops.isKnown, notify, resync: () => room.reload(),
+    tasks: taskState.tasks, addTask: taskState.addTask, updateTask: taskState.updateTask,
+    patchOption: taskState.patchOptionLocal, patchTasks: taskState.patchTasksLocal,
+    trip: tripInfo.trip, applyHeader: tripInfo.applyHeader, loadDays: (days) => itinerary.loadItinerary(days, []),
+  });
   const ideasApi = useIdeas(roomCode, accessToken);
   const geoApi = useTripGeo();
   const docs = useDocuments();
@@ -121,14 +129,14 @@ export function useTripData(roomCode: string | null, accessToken: string | undef
     canResync: ops.idle,
   });
 
-  // useRoom fetches nothing for LOCAL, so the demo (or a local snapshot) is
+  // useRoom fetches nothing for LOCAL, so the demo, a local snapshot or an empty trip is
   // seeded here, once. It is imported lazily and never in production builds.
   const localSeeded = useRef(false);
   useEffect(() => {
     // Inline NODE_ENV check (not LOCAL_MODE_ENABLED) so the bundler can drop the import.
     if (process.env.NODE_ENV === "production" || !localMode || localSeeded.current) return;
     localSeeded.current = true;
-    import("@/data/localPayload").then(({ loadLocalPayload }) => loadLocalPayload()).then(onLoad);
+    import("@/data/localPayload").then(({ loadLocalPayload }) => loadLocalPayload(localVariant())).then(onLoad);
   }, [localMode, onLoad]);
   const resetLocalSeed = useCallback(() => {
     localSeeded.current = false;
@@ -153,5 +161,5 @@ export function useTripData(roomCode: string | null, accessToken: string | undef
   const { flush } = ops;
   const save = useCallback(async () => (localMode ? true : flush()), [localMode, flush]);
 
-  return { ops, itinerary, budget, taskState, tripInfo, ideasApi, geoApi, docs, room, payloadNow, resetLocalSeed, save };
+  return { ops, itinerary, budget, taskState, votes, tripInfo, ideasApi, geoApi, docs, room, payloadNow, resetLocalSeed, save };
 }

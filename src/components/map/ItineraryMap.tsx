@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CloudDownload, Loader2, MapPin } from "lucide-react";
 import dynamic from "next/dynamic";
 import DayStrip from "@/components/map/DayStrip";
+import MapEmptyState from "@/components/map/MapEmptyState";
 import NearbyList from "@/components/map/NearbyList";
 import PlaceCarousel from "@/components/map/PlaceCarousel";
 import { useIsMobile } from "@/hooks/useMediaQuery";
@@ -10,6 +11,7 @@ import { canStoreMap, needsRefresh, offlineMapState, storeMapOffline } from "@/l
 import { eventKey, inBBox, mapStops, missingPhotos, staleEvents, stopOrder, tripRegion, type LngLat } from "@/utils/tripGeo";
 import type { useTripGeo } from "@/hooks/useTripGeo";
 import { apiFetch } from "@/lib/api";
+import { isOffline } from "@/lib/offline";
 import { cn } from "@/lib/utils";
 import type { Day, EventPlace, RoomPayload } from "@/types";
 
@@ -37,6 +39,7 @@ interface ItineraryMapProps {
   currentPayload: () => RoomPayload;
   save: (payload: RoomPayload, opts?: { force?: boolean }) => Promise<boolean>;
   onOpenEvent: (eventId: string) => void;
+  onOpenItinerary?: () => void;
 }
 
 type Status = { kind: "idle" } | { kind: "locating"; count: number } | { kind: "error"; message: string };
@@ -51,7 +54,7 @@ const LOCATE_DELAY = 2500;   // ms after the last itinerary change
 // Itinerary as a map: a pin per place, filtered by day, the user's position
 // and what's near it. Activities are located the first time (and when they
 // change), and the map of the trip's region is kept for use without internet.
-export default function ItineraryMap({ geo, days, todayIdx, roomCode, accessToken, localMode, currentPayload, save, onOpenEvent }: ItineraryMapProps) {
+export default function ItineraryMap({ geo, days, todayIdx, roomCode, accessToken, localMode, currentPayload, save, onOpenEvent, onOpenItinerary }: ItineraryMapProps) {
   const [dayIdx, setDayIdx] = useState<number | null>(todayIdx ?? null);
   const [position, setPosition] = useState<LngLat | null>(null);
   const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
@@ -176,6 +179,10 @@ export default function ItineraryMap({ geo, days, todayIdx, roomCode, accessToke
       <MapPin className="size-3.5" />Ubicar {stale.length} {stale.length === 1 ? "actividad nueva" : "actividades nuevas"}
     </button>
   );
+  // Nothing to pin and nothing waiting to be located. Offline the map's own
+  // "No se pudo cargar el mapa" message takes the centre instead.
+  const empty = allStops.length === 0 && stale.length === 0 && status.kind === "idle" && !isOffline()
+    && <MapEmptyState onOpenItinerary={onOpenItinerary} />;
   const saving = storing && storing !== "ready" && (
     <span className="flex items-center gap-1.5">
       <CloudDownload className="size-3.5" />Guardando mapa sin conexión… {Math.round((storing.done / storing.total) * 100)}%
@@ -189,6 +196,7 @@ export default function ItineraryMap({ geo, days, todayIdx, roomCode, accessToke
         <DayStrip days={days} selected={dayIdx} onSelect={pickDay} />
         <div ref={fillRef} className="relative -mx-4" style={{ height: fill ?? "60dvh" }}>
           {map("h-full", 112)}
+          {empty}
           {notice && (
             <div role="status" className="absolute left-1/2 top-3 z-10 max-w-[80%] -translate-x-1/2 rounded-full bg-card/95 px-3 py-1.5 text-xs text-secondary-foreground shadow-md ring-1 ring-border backdrop-blur">
               {notice}
@@ -205,7 +213,10 @@ export default function ItineraryMap({ geo, days, todayIdx, roomCode, accessToke
   return (
     <div className="flex flex-col gap-3">
       <DayStrip days={days} selected={dayIdx} onSelect={pickDay} />
-      {map("h-[68dvh] rounded-2xl ring-1 ring-border", 0)}
+      <div className="relative">
+        {map("h-[68dvh] rounded-2xl ring-1 ring-border", 0)}
+        {empty}
+      </div>
       <div className="flex flex-col items-start gap-1 text-xs text-muted-foreground" aria-live="polite">
         {locating}
         {failed}

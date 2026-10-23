@@ -15,6 +15,14 @@ describe("activity text", () => {
     expect(activitySentence(entry({ table: "trip_tasks", label: "Tolls", fields: ["done"] }))).toBe("Ana marcó el pendiente “Tolls”");
   });
 
+  it("tells votes apart from edits of an option", () => {
+    expect(activitySentence(entry({ table: "trip_task_options", label: "Hotel A", fields: ["votes"] }))).toBe("Ana votó en la opción “Hotel A”");
+    expect(activitySentence(entry({ table: "trip_task_options", label: "Hotel A", fields: ["label", "votes"] })))
+      .toBe("Ana editó la opción “Hotel A” (nombre, votos)");
+    expect(activitySentence(entry({ table: "trip_task_options", label: "Dic", fields: ["end_date", "start_date"] })))
+      .toBe("Ana editó la opción “Dic” (fechas)");
+  });
+
   it("groups entries by day, newest first", () => {
     const now = new Date("2026-10-09T18:00:00Z");
     const groups = groupByDay([entry({ id: 3 }), entry({ id: 2 }), entry({ id: 1, at: "2026-10-08T15:00:00Z" })], now);

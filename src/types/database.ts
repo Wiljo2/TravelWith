@@ -1,5 +1,5 @@
 // Database types for the public schema, written by hand to match migrations
-// 001-021 (docs/plans/relational-broadcast.md, step 1.4). Once a Supabase
+// 001-027 (docs/plans/relational-broadcast.md, step 1.4). Once a Supabase
 // project with these migrations is available, replace this file with:
 //
 //   npx supabase gen types typescript --project-id <id> --schema public > src/types/database.ts
@@ -169,6 +169,7 @@ type TripTaskRow = Flat<RowMeta & {
   cat: string | null;
   priority: "alta" | "media" | "baja" | null;
   icon: string | null;
+  decides: "dates" | "destination" | null;
 }>;
 
 type TripTaskOptionRow = Flat<RowMeta & {
@@ -179,6 +180,10 @@ type TripTaskOptionRow = Flat<RowMeta & {
   amount: number | null;
   currency: "USD" | "COP" | null;
   split_mode: "group" | "perPerson" | null;
+  // Auth user ids of the members who back this option.
+  votes: string[] | null;
+  start_date: string | null;
+  end_date: string | null;
 }>;
 
 type TripTravelerRow = Flat<RowMeta & {
@@ -266,12 +271,12 @@ export type Database = {
       >;
       trip_tasks: TableOf<
         TripTaskRow,
-        MetaDefaults | "position" | "done" | "note" | "day_id" | "start_hour" | "end_hour" | "cat" | "priority" | "icon",
+        MetaDefaults | "position" | "done" | "note" | "day_id" | "start_hour" | "end_hour" | "cat" | "priority" | "icon" | "decides",
         [RoomFk<"trip_tasks">, DayFk<"trip_tasks", "day_id">]
       >;
       trip_task_options: TableOf<
         TripTaskOptionRow,
-        MetaDefaults | "position" | "note" | "amount" | "currency" | "split_mode",
+        MetaDefaults | "position" | "note" | "amount" | "currency" | "split_mode" | "votes" | "start_date" | "end_date",
         [
           RoomFk<"trip_task_options">,
           Relationship<"trip_task_options_room_code_task_id_fkey", ["room_code", "task_id"], "trip_tasks", ["room_code", "id"]>,
@@ -300,6 +305,22 @@ export type Database = {
       reset_itinerary: { Args: { p_code: string; p_days: Json; p_user: string }; Returns: Json };
       choose_task_option: {
         Args: { p_code: string; p_task_id: string; p_expected_version: number | null; p_event: Json | null; p_expense: Json | null; p_user: string };
+        Returns: Json;
+      };
+      set_task_option_vote: {
+        Args: { p_code: string; p_option_id: string; p_on: boolean; p_user: string };
+        Returns: Json;
+      };
+      close_task_vote: {
+        Args: {
+          p_code: string;
+          p_task_id: string;
+          p_option_id: string;
+          p_expected_version: number | null;
+          p_days: Json;
+          p_replace: boolean;
+          p_user: string;
+        };
         Returns: Json;
       };
       apply_idea_video: {

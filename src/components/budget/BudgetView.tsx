@@ -77,6 +77,12 @@ export default function BudgetView({
               className="w-[64px] border-none bg-transparent text-right text-[13px] font-semibold text-foreground outline-none" />
           </label>
         </div>
+        {extras.length === 0 && (
+          <p className="mt-3 border-t border-foreground/10 pt-3 text-[13px] text-secondary-foreground">
+            Anota abajo los gastos globales (tiquetes, hoteles) o por días (comidas, excursiones); cada uno puede ser
+            grupal, dividido entre todos, o por persona.
+          </p>
+        )}
         {optionTasks.length > 0 && (
           <p className="mt-3 border-t border-foreground/10 pt-3 text-[13px] text-secondary-foreground">
             Con lo pendiente por decidir quedaría entre{" "}
@@ -152,6 +158,7 @@ export default function BudgetView({
             </table>
           </section>
 
+        {(days.length > 0 || dayExtras.length > 0) && (
           <section className={TABLE_PANEL}>
             <SectionHeader className={TABLE_HEAD} label="Gastos por día" hint="Hospedaje, comidas y excursiones repartidas en un rango de días" />
             {dayExtras.length > 0 ? (
@@ -191,6 +198,7 @@ export default function BudgetView({
               </div>
             )}
           </section>
+        )}
 
           {(dayExtras.length > 0 || linkedExtras.length > 0) && (
             <section className={cn(PANEL, "py-1 md:py-1")}>

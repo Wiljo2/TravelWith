@@ -24,6 +24,11 @@ describe("shouldEnterApp", () => {
     expect(shouldEnterApp({ ...base, search: "?code=abc" })).toBe(true);
   });
 
+  it("enters on an invitation link", () => {
+    expect(shouldEnterApp({ ...base, search: "?join=ABC123" })).toBe(true);
+    expect(shouldEnterApp({ ...base, search: "?join=" })).toBe(true);
+  });
+
   it("enters on OAuth errors", () => {
     expect(shouldEnterApp({ ...base, search: "?error=access_denied" })).toBe(true);
     expect(shouldEnterApp({ ...base, search: "?error_description=nope" })).toBe(true);
@@ -32,6 +37,10 @@ describe("shouldEnterApp", () => {
   it("honors local mode only when enabled", () => {
     expect(shouldEnterApp({ ...base, search: "?local=1" })).toBe(false);
     expect(shouldEnterApp({ ...base, search: "?local=1", localModeEnabled: true })).toBe(true);
+  });
+
+  it("shows the landing for the first-run sandbox, even with a session", () => {
+    expect(shouldEnterApp({ ...base, search: "?local=new", localModeEnabled: true, storageKeys: ["sb-abcdef-auth-token"] })).toBe(false);
   });
 
   it("enters when a Supabase session exists", () => {

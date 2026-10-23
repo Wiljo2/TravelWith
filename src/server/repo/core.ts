@@ -49,6 +49,16 @@ export function tableRepo<T extends TripTable>(table: T) {
     return data as Row;
   }
 
+  async function insertMany(code: string, rows: NewRow<T>[], userId: string): Promise<Row[]> {
+    if (rows.length === 0) return [];
+    const { data, error } = await createServerClient()
+      .from(table)
+      .insert(rows.map((row) => ({ ...row, room_code: code, updated_by: userId })))
+      .select("*");
+    if (error) throw repoError(error);
+    return (data ?? []) as Row[];
+  }
+
   async function guardedUpdate(code: string, id: string, patch: RowPatch<T>, expected: number, userId: string) {
     const { data, error } = await createServerClient()
       .from(table)
@@ -111,7 +121,7 @@ export function tableRepo<T extends TripTable>(table: T) {
     return data ? (data as { position: number }).position + 1 : 0;
   }
 
-  return { table, list, get, insert, update, remove, nextPosition };
+  return { table, list, get, insert, insertMany, update, remove, nextPosition };
 }
 
 export type TableRepo<T extends TripTable> = ReturnType<typeof tableRepo<T>>;

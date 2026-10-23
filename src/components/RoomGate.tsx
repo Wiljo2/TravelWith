@@ -2,81 +2,95 @@
 import { useState } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import type { UserRoom } from "@/hooks/useUserRooms";
+import type { InviteState } from "@/hooks/useTripSession";
+import type { NewTrip } from "@/types";
 import { apiFetch } from "@/lib/api";
+import { joinTrip } from "@/lib/joinTrip";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { loadSnapshot } from "@/lib/offline";
+import { LOCAL_ROOM_CODE, type LocalVariant } from "@/data/localMode";
+import { isSandbox, setSandboxTrip } from "@/data/localSandbox";
+import { firstName } from "@/utils/userName";
+import SignInOptions, { type SignInOptionsProps } from "@/components/auth/SignInOptions";
+import TripList from "@/components/gate/TripList";
+import JoinByCode from "@/components/gate/JoinByCode";
+import CreateTripWizard from "@/components/gate/CreateTripWizard";
+import WelcomeFirstTrip from "@/components/gate/WelcomeFirstTrip";
+import InviteBanner from "@/components/gate/InviteBanner";
 
 interface RoomGateProps {
   onEnter: (code: string) => void;
   user: User | null;
   session: Session | null;
   authLoading: boolean;
-  signInWithGoogle: () => void;
+  signIn: SignInOptionsProps;
   signOut: () => void;
   rooms: UserRoom[];
   addRoom: (code: string, role?: "owner" | "member", name?: string | null) => void;
   removeRoom: (code: string, accessToken: string) => Promise<void>;
-  onEnterLocal?: () => void;
+  onEnterLocal?: (variant: LocalVariant) => void;
+  // An invitation link waiting for sign-in, being joined, or failed.
+  invite?: InviteState;
+  // Called right before entering a trip this browser just created.
+  onCreated?: (code: string, trip: NewTrip) => void;
+  // Called with a trip joined by code or opened from the list, before addRoom, so the
+  // caller can still tell a first join from a trip already in `rooms`.
+  onJoined?: (code: string) => void;
 }
 
 export default function RoomGate({
-  onEnter, user, session, authLoading, signInWithGoogle, signOut, rooms, addRoom, removeRoom, onEnterLocal,
+  onEnter, user, session, authLoading, signIn, signOut, rooms, addRoom, removeRoom, onEnterLocal, invite, onCreated, onJoined,
 }: RoomGateProps) {
-  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showJoin, setShowJoin] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [tripName, setTripName] = useState("");
-  const [tripDestination, setTripDestination] = useState("");
-  const [tripStart, setTripStart] = useState("");
-  const [tripEnd, setTripEnd] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ code: string; name: string | null } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Reading a room requires membership, so joining registers first; the
-  // members endpoint answers 404 for unknown codes.
-  async function join(code?: string) {
-    const c = (code ?? input).trim().toUpperCase();
+  async function join(code: string) {
+    const c = code.trim().toUpperCase();
     if (!c) return;
+    if (isSandbox()) {
+      if (c === LOCAL_ROOM_CODE) onEnter(c);
+      else setError("En modo local no hay viajes de otras personas a los que unirse.");
+      return;
+    }
     setLoading(true);
     setError("");
-    const res = await apiFetch(`/api/rooms/${c}/members`, session?.access_token, { method: "POST" }).catch(() => null);
-    // Offline: open this device's last copy of the trip, if it has one.
-    if (!res && loadSnapshot(c)) {
+    const outcome = await joinTrip(c, session?.access_token);
+    if (outcome === "offline") {
       setLoading(false);
       onEnter(c);
       return;
     }
-    if (!res?.ok) {
-      setError(res?.status === 404 ? "Sala no encontrada." : "No se pudo entrar al viaje.");
+    if (outcome !== "joined") {
+      setError(outcome === "notFound" ? "Sala no encontrada." : "No se pudo entrar al viaje.");
       setLoading(false);
       return;
     }
+    onJoined?.(c);
     addRoom(c, "member");
     onEnter(c);
   }
 
-  const canCreate = tripName.trim().length > 0 && !!tripStart && !!tripEnd && tripStart <= tripEnd;
-
-  async function create() {
-    if (!canCreate) return;
+  async function create(trip: NewTrip) {
+    if (isSandbox()) {
+      setSandboxTrip(trip);
+      addRoom(LOCAL_ROOM_CODE, "owner", trip.name);
+      onCreated?.(LOCAL_ROOM_CODE, trip);
+      onEnter(LOCAL_ROOM_CODE);
+      return;
+    }
     setLoading(true);
     setError("");
     const res = await apiFetch("/api/rooms", session?.access_token, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: tripName.trim(),
-        destination: tripDestination.trim() || undefined,
-        startDate: tripStart,
-        endDate: tripEnd,
-      }),
+      body: JSON.stringify(trip),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => null);
@@ -85,19 +99,36 @@ export default function RoomGate({
       return;
     }
     const { code } = await res.json();
-    addRoom(code, "owner", tripName.trim());
+    addRoom(code, "owner", trip.name);
+    onCreated?.(code, trip);
     onEnter(code);
   }
 
   // Collaborative model: "delete" always means leaving MY view. The room lives
   // while anyone else still has it; the server deletes it when the last member leaves.
   async function confirmDelete() {
-    if (!deleteTarget || !session?.access_token) return;
+    if (!deleteTarget || (!session?.access_token && !isSandbox())) return;
     setDeleting(true);
-    await removeRoom(deleteTarget.code, session.access_token);
+    await removeRoom(deleteTarget.code, session?.access_token ?? "");
     setDeleting(false);
     setDeleteTarget(null);
   }
+
+  function openPanel(panel: "create" | "join") {
+    setError("");
+    setShowCreate(panel === "create");
+    setShowJoin(panel === "join");
+  }
+
+  function closePanel() {
+    setShowCreate(false);
+    setShowJoin(false);
+    setError("");
+  }
+
+  const joinPanel = showJoin ? (
+    <JoinByCode loading={loading} error={error} onSubmit={join} onCancel={closePanel} />
+  ) : null;
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-secondary px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))]">
@@ -114,17 +145,17 @@ export default function RoomGate({
         {authLoading ? (
           <div className="text-center text-[13px] text-muted-foreground">Cargando...</div>
         ) : !user ? (
-          <Card className="rounded-[14px]">
-            <CardContent className="px-7 py-2 text-center">
-              <p className="mb-5 text-sm leading-relaxed text-secondary-foreground">
-                Inicia sesión para ver tus viajes y colaborar en tiempo real con tu grupo.
-              </p>
-              <Button variant="outline" size="lg" onClick={signInWithGoogle} className="w-full gap-2.5 bg-secondary text-[15px]">
-                <GoogleIcon />
-                Continuar con Google
-              </Button>
-            </CardContent>
-          </Card>
+          <>
+            {invite && <InviteBanner invite={invite} signedIn={false} />}
+            <Card className="rounded-[14px]">
+              <CardContent className="px-7 py-2 text-center">
+                <p className="mb-5 text-sm leading-relaxed text-secondary-foreground">
+                  Inicia sesión o crea tu cuenta para ver tus viajes y colaborar en tiempo real con tu grupo.
+                </p>
+                <SignInOptions {...signIn} />
+              </CardContent>
+            </Card>
+          </>
 
         ) : (
           <>
@@ -148,135 +179,56 @@ export default function RoomGate({
               </Button>
             </div>
 
-            <div className="mb-4">
-              <p className="mb-2.5 text-[11px] font-semibold tracking-[.07em] text-muted-foreground">
-                MIS VIAJES
-              </p>
-
-              {rooms.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border bg-card p-[22px] text-center text-[13px] text-muted-foreground">
-                  Aún no tienes viajes. Crea uno o únete con un código.
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {rooms.map((r) => (
-                    <div
-                      key={r.room_code}
-                      className="flex items-center overflow-hidden rounded-xl border border-border bg-card"
-                    >
-                      <button
-                        onClick={() => join(r.room_code)}
-                        disabled={loading}
-                        className="flex flex-1 cursor-pointer items-center justify-between px-4 py-3.5 text-left text-foreground hover:bg-secondary"
-                      >
-                        <div>
-                          <div className="text-[15px] font-semibold">
-                            {r.name ?? <span className="font-mono tracking-[.08em]">{r.room_code}</span>}
-                          </div>
-                          <div className="mt-0.5 text-[11px] text-muted-foreground">
-                            <span className="font-mono tracking-wider">{r.room_code}</span>
-                            {" · "}{r.role === "owner" ? "Creador" : "Miembro"}
-                            {r.trip?.destination && <> · {r.trip.destination}</>}
-                          </div>
-                        </div>
-                        <span className="text-xl opacity-35">→</span>
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget({ code: r.room_code, name: r.name })}
-                        title="Quitar de mi lista"
-                        className="flex h-full min-w-12 cursor-pointer items-center justify-center self-stretch border-l border-border px-3.5 text-base text-muted-foreground hover:bg-secondary"
-                      >
-                        🗑
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {invite && <InviteBanner invite={invite} signedIn />}
 
             {showCreate ? (
-              <Card className="rounded-xl py-4">
-                <CardContent className="flex flex-col gap-2.5 px-4">
-                  <div className="text-[11px] font-semibold tracking-[.06em] text-muted-foreground">NUEVO VIAJE</div>
-                  <Input
-                    autoFocus
-                    value={tripName}
-                    onChange={(e) => setTripName(e.target.value)}
-                    placeholder="Nombre del viaje (ej. Vacaciones 2027)"
-                    maxLength={80}
-                    className="bg-secondary text-sm"
-                  />
-                  <Input
-                    value={tripDestination}
-                    onChange={(e) => setTripDestination(e.target.value)}
-                    placeholder="Destino (opcional)"
-                    maxLength={80}
-                    className="bg-secondary text-sm"
-                  />
-                  <div className="flex gap-2">
-                    <label className="flex-1 text-[11px] text-secondary-foreground">
-                      Inicio
-                      <Input type="date" value={tripStart} onChange={(e) => setTripStart(e.target.value)} className="mt-1 bg-secondary text-[13px]" />
-                    </label>
-                    <label className="flex-1 text-[11px] text-secondary-foreground">
-                      Fin
-                      <Input type="date" value={tripEnd} min={tripStart || undefined} onChange={(e) => setTripEnd(e.target.value)} className="mt-1 bg-secondary text-[13px]" />
-                    </label>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={create} disabled={loading || !canCreate} className="flex-1 font-semibold">
-                      {loading ? "Creando..." : "Crear viaje"}
-                    </Button>
-                    <Button variant="outline" onClick={() => { setShowCreate(false); setError(""); }} className="text-muted-foreground">
-                      ×
-                    </Button>
-                  </div>
-                  {error && <p className="text-xs text-destructive">{error}</p>}
-                </CardContent>
-              </Card>
-            ) : showJoin ? (
-              <Card className="rounded-xl py-4">
-                <CardContent className="px-4">
-                  <div className="flex gap-2">
-                    <Input
-                      autoFocus
-                      value={input}
-                      onChange={(e) => setInput(e.target.value.toUpperCase())}
-                      onKeyDown={(e) => e.key === "Enter" && join()}
-                      placeholder="Código de sala"
-                      maxLength={12}
-                      className="flex-1 bg-secondary font-mono text-[15px] tracking-[.1em]"
-                    />
-                    <Button onClick={() => join()} disabled={loading || !input.trim()} className="font-semibold">
-                      Entrar
-                    </Button>
-                    <Button variant="outline" onClick={() => { setShowJoin(false); setError(""); }} className="text-muted-foreground">
-                      ×
-                    </Button>
-                  </div>
-                  {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
-                </CardContent>
-              </Card>
+              <CreateTripWizard loading={loading} error={error} onSubmit={create} onCancel={closePanel} />
+            ) : rooms.length === 0 ? (
+              <WelcomeFirstTrip
+                name={firstName(user)}
+                panel={joinPanel}
+                onCreate={() => openPanel("create")}
+                onJoin={() => openPanel("join")}
+              />
             ) : (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setShowJoin(true)} className="flex-1 bg-card">
-                  Unirse con código
-                </Button>
-                <Button onClick={() => setShowCreate(true)} className="flex-1 font-semibold">
-                  Nuevo viaje
-                </Button>
-              </div>
+              <>
+                <TripList
+                  rooms={rooms}
+                  disabled={loading}
+                  error={joinPanel ? "" : error}
+                  onOpen={join}
+                  onRemove={setDeleteTarget}
+                />
+                {joinPanel ?? (
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => openPanel("join")} className="flex-1 bg-card">
+                      Unirse con código
+                    </Button>
+                    <Button onClick={() => openPanel("create")} className="flex-1 font-semibold">
+                      Nuevo viaje
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
 
         {onEnterLocal && (
-          <button
-            onClick={onEnterLocal}
-            className="mt-6 w-full cursor-pointer border-none bg-transparent text-[11px] text-muted-foreground underline underline-offset-4 hover:text-foreground"
-          >
-            Modo local · datos de prueba, sin cuenta ni guardado
-          </button>
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <button
+              onClick={() => onEnterLocal("demo")}
+              className="cursor-pointer border-none bg-transparent text-[11px] text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              Modo local · datos de prueba, sin cuenta ni guardado
+            </button>
+            <button
+              onClick={() => onEnterLocal("new")}
+              className="cursor-pointer border-none bg-transparent text-[11px] text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              Modo local · viaje nuevo vacío, como un usuario recién llegado
+            </button>
+          </div>
         )}
       </div>
 
@@ -303,16 +255,5 @@ export default function RoomGate({
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24">
-      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-    </svg>
   );
 }

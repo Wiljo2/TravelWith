@@ -3,6 +3,7 @@
 //
 //   node scripts/dev.mjs                  against real Supabase data (needs .env.local)
 //   node scripts/dev.mjs --local          mock data (or public/local-snapshot.json, see snapshot-room.mjs), no login, no database
+//   node scripts/dev.mjs --fresh          like --local, but an empty trip as a first-time user sees it
 //   node scripts/dev.mjs --port 3001 --open
 
 import { spawn, spawnSync } from "node:child_process";
@@ -27,6 +28,7 @@ const { values: args } = parseArgs({
   options: {
     port: { type: "string", short: "p", default: "3000" },
     local: { type: "boolean", short: "l", default: false },
+    fresh: { type: "boolean", default: false },
     open: { type: "boolean", short: "o", default: false },
   },
 });
@@ -44,7 +46,7 @@ if (!existsSync(installedLock) || statSync(lock).mtimeMs > statSync(installedLoc
   if (result.status !== 0) fail("npm install failed.");
 }
 
-if (!args.local) {
+if (!args.local && !args.fresh) {
   const envFile = join(root, ".env.local");
   if (!existsSync(envFile)) {
     copyFileSync(join(root, ".env.example"), envFile);
@@ -68,7 +70,8 @@ if (!args.local) {
   warn("! Local dev shares the production database. Use a test room.");
 }
 
-const url = `http://localhost:${args.port}/${args.local ? "?local=1" : ""}`;
+const localQuery = args.fresh ? "?local=new" : "?local=1";
+const url = `http://localhost:${args.port}/${args.local || args.fresh ? localQuery : ""}`;
 
 function openBrowser(target) {
   const [cmd, cmdArgs] = isWindows

@@ -7,10 +7,11 @@ import type { TripTaskOptionRow, TripTaskRow } from "@/types/database";
 const meta = { room_code: "ABCD1234", version: 2, updated_at: "t", updated_by: null };
 const task: TripTaskRow = {
   ...meta, id: "k1", position: 0, title: "Reservar hotel", done: false, note: null,
-  day_id: "d0", start_hour: 10, end_hour: null, cat: null, priority: null, icon: null,
+  day_id: "d0", start_hour: 10, end_hour: null, cat: null, priority: null, icon: null, decides: null,
 };
 const option: TripTaskOptionRow = {
   ...meta, id: "o1", task_id: "k1", position: 0, label: "Hotel A", note: "link", amount: 120, currency: null, split_mode: null,
+  votes: null, start_date: null, end_date: null,
 };
 
 describe("task rows", () => {
@@ -42,6 +43,11 @@ describe("task rows", () => {
     expect(newTaskOptionRow({ taskId: "k1", label: "B", amount: 5, currency: "COP" }, 1)).toMatchObject({ amount: 5, currency: "COP", split_mode: null });
     expect(() => newTaskOptionRow({ taskId: "k1", label: "B", amount: -5 }, 0)).toThrow(/non-negative/);
     expect(taskOptionPatch({ id: "o1", amount: null, label: "C" })).toEqual({ amount: null, label: "C" });
+  });
+
+  it("votes are never written through create or update (only taskOption.vote)", () => {
+    expect(newTaskOptionRow({ taskId: "k1", label: "B", votes: ["u9"] }, 0)).not.toHaveProperty("votes");
+    expect(() => taskOptionPatch({ id: "o1", votes: ["u9"] })).toThrow(/nothing to update/);
   });
 });
 

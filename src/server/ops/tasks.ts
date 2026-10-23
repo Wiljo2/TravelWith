@@ -1,14 +1,18 @@
 import { LIMITS } from "@/constants/limits";
+import { VOTE_KINDS } from "@/constants/votes";
 import { DomainError, argId } from "@/server/domain/core";
 import {
   chooseOptionArgs, chosenOptionRows, newTaskOptionRow, newTaskRow, taskOptionPatch, taskPatch,
 } from "@/server/domain/taskRows";
+import { checkVoteOption, optionLimit, requireEditableOptions } from "@/server/domain/voteRows";
+import { HttpError } from "@/server/http";
 import { RowNotFoundError } from "@/server/repo/errors";
 import { eventsRepo } from "@/server/repo/events";
 import { taskOptionsRepo } from "@/server/repo/taskOptions";
 import { chooseTaskOption, tasksRepo } from "@/server/repo/tasks";
 import { requireDayRow } from "@/server/ops/shared";
-import type { OpDefinition, RowChange } from "@/server/ops/types";
+import type { OpContext, OpDefinition, RowChange } from "@/server/ops/types";
+import type { TripTaskRow } from "@/types/database";
 
 function nextPosition(rows: { position: number }[]): number {
   return rows.length ? Math.max(...rows.map((r) => r.position)) + 1 : 0;
@@ -20,12 +24,29 @@ async function requireTaskRow(code: string, id: string) {
   return row;
 }
 
+async function requireOptionRow(code: string, id: string) {
+  const row = await taskOptionsRepo.get(code, id);
+  if (!row) throw new RowNotFoundError("trip_task_options", id);
+  return row;
+}
+
+// Only the owner settles a date or destination vote (task.closeVote): marking
+// one done or deleting it is theirs too.
+function requireVoteOwner(ctx: OpContext, task: Pick<TripTaskRow, "decides"> | null) {
+  if (task?.decides && ctx.role !== "owner") {
+    throw new HttpError(403, "Solo el creador del viaje puede cerrar o borrar esta votación");
+  }
+}
+
 export const TASK_OPS: Record<string, OpDefinition> = {
   "task.create": {
     async run(ctx, { args }) {
       const existing = await tasksRepo.list(ctx.code);
       if (existing.length >= LIMITS.tasks) throw new DomainError(`The trip already has ${LIMITS.tasks} tasks`);
       const newRow = newTaskRow(args, nextPosition(existing));
+      if (newRow.decides && existing.some((t) => t.decides === newRow.decides && !t.done)) {
+        throw new DomainError(`The trip already has an open vote "${VOTE_KINDS[newRow.decides].title}"`);
+      }
       if (newRow.day_id) await requireDayRow(ctx.code, newRow.day_id);
       const row = await tasksRepo.insert(ctx.code, newRow, ctx.userId);
       return { changed: [{ table: "trip_tasks", row }], deleted: [] };
@@ -35,7 +56,9 @@ export const TASK_OPS: Record<string, OpDefinition> = {
   "task.update": {
     async run(ctx, { args, expectedVersion }) {
       const id = argId(args);
-      const patch = taskPatch(await requireTaskRow(ctx.code, id), args);
+      const current = await requireTaskRow(ctx.code, id);
+      const patch = taskPatch(current, args);
+      if (patch.done !== undefined) requireVoteOwner(ctx, current);
       if (patch.day_id) await requireDayRow(ctx.code, patch.day_id);
       const row = await tasksRepo.update(ctx.code, id, patch, expectedVersion, ctx.userId);
       return { changed: [{ table: "trip_tasks", row }], deleted: [] };
@@ -48,6 +71,7 @@ export const TASK_OPS: Record<string, OpDefinition> = {
     async run(ctx, { args, expectedVersion }) {
       const id = argId(args);
       const current = await requireTaskRow(ctx.code, id);
+      requireVoteOwner(ctx, current);
       const row = await tasksRepo.update(ctx.code, id, { done: !current.done }, expectedVersion ?? current.version, ctx.userId);
       return { changed: [{ table: "trip_tasks", row }], deleted: [] };
     },
@@ -56,6 +80,7 @@ export const TASK_OPS: Record<string, OpDefinition> = {
   "task.delete": {
     async run(ctx, { args, expectedVersion }) {
       const id = argId(args);
+      requireVoteOwner(ctx, await tasksRepo.get(ctx.code, id));
       await tasksRepo.remove(ctx.code, id, expectedVersion, ctx.userId);
       return { changed: [], deleted: [{ table: "trip_tasks", id }] };
     },
@@ -66,6 +91,7 @@ export const TASK_OPS: Record<string, OpDefinition> = {
     async run(ctx, { args, expectedVersion }) {
       const { taskId, optionId, eventId, expenseId } = chooseOptionArgs(args);
       const task = await requireTaskRow(ctx.code, taskId);
+      if (task.decides) throw new DomainError(`Task "${taskId}" is a group vote; the trip owner closes it with task.closeVote`);
       const option = await taskOptionsRepo.get(ctx.code, optionId);
       if (!option || option.task_id !== taskId) throw new DomainError(`Option "${optionId}" not found in task "${taskId}"`);
       const { event, expense } = chosenOptionRows(task, option, { eventId, expenseId });
@@ -85,12 +111,13 @@ export const TASK_OPS: Record<string, OpDefinition> = {
     async run(ctx, { args }) {
       const taskId = (args as { taskId?: unknown }).taskId;
       if (typeof taskId !== "string") throw new DomainError("taskId is required");
-      await requireTaskRow(ctx.code, taskId);
+      const task = await requireTaskRow(ctx.code, taskId);
       const existing = await taskOptionsRepo.list(ctx.code, { column: "task_id", value: taskId });
-      if (existing.length >= LIMITS.optionsPerTask) {
-        throw new DomainError(`Task ${taskId} already has ${LIMITS.optionsPerTask} options`);
-      }
-      const row = await taskOptionsRepo.insert(ctx.code, newTaskOptionRow(args, nextPosition(existing)), ctx.userId);
+      const limit = optionLimit(task);
+      if (existing.length >= limit) throw new DomainError(`Task ${taskId} already has ${limit} options`);
+      const newRow = newTaskOptionRow(args, nextPosition(existing));
+      checkVoteOption(task, newRow, true);
+      const row = await taskOptionsRepo.insert(ctx.code, newRow, ctx.userId);
       return { changed: [{ table: "trip_task_options", row }], deleted: [] };
     },
   },
@@ -98,7 +125,10 @@ export const TASK_OPS: Record<string, OpDefinition> = {
   "taskOption.update": {
     async run(ctx, { args, expectedVersion }) {
       const id = argId(args);
-      const row = await taskOptionsRepo.update(ctx.code, id, taskOptionPatch(args), expectedVersion, ctx.userId);
+      const patch = taskOptionPatch(args);
+      const option = await requireOptionRow(ctx.code, id);
+      checkVoteOption(await requireTaskRow(ctx.code, option.task_id), patch, false);
+      const row = await taskOptionsRepo.update(ctx.code, id, patch, expectedVersion, ctx.userId);
       return { changed: [{ table: "trip_task_options", row }], deleted: [] };
     },
   },
@@ -106,6 +136,9 @@ export const TASK_OPS: Record<string, OpDefinition> = {
   "taskOption.delete": {
     async run(ctx, { args, expectedVersion }) {
       const id = argId(args);
+      const option = await taskOptionsRepo.get(ctx.code, id);
+      const task = option && (await tasksRepo.get(ctx.code, option.task_id));
+      if (task) requireEditableOptions(task);
       await taskOptionsRepo.remove(ctx.code, id, expectedVersion, ctx.userId);
       return { changed: [], deleted: [{ table: "trip_task_options", id }] };
     },

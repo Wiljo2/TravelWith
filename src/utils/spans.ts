@@ -37,6 +37,8 @@ export function resolveForDay(day: Day, allDays: Day[], tripSpans: TripSpan[]): 
   return result;
 }
 
+const spanColor = (s: { bg: string; border: string }) => (s.border !== "transparent" ? s.border : s.bg);
+
 // Distinct labeled spans touching a day (static + trip-level), for compact chips.
 export function daySpanLabels(day: Day, allDays: Day[], tripSpans: TripSpan[]): { label: string; color: string }[] {
   const seen = new Set<string>();
@@ -44,7 +46,50 @@ export function daySpanLabels(day: Day, allDays: Day[], tripSpans: TripSpan[]): 
   for (const s of [...(day.spans ?? []), ...resolveForDay(day, allDays, tripSpans)]) {
     if (!s.label || seen.has(s.label)) continue;
     seen.add(s.label);
-    out.push({ label: s.label, color: s.border !== "transparent" ? s.border : s.bg });
+    out.push({ label: s.label, color: spanColor(s) });
   }
+  return out;
+}
+
+// A span as a run of whole days (indices into the itinerary, inclusive), for the month view.
+export interface SpanRange {
+  id: string;
+  label?: string;
+  bg: string;
+  color: string;
+  startIdx: number;
+  endIdx: number;
+}
+
+// Trip spans resolved to the days of their start and end activities (skipped when
+// either is gone or they are reversed, as in the grid), then day spans, where the
+// same label and colors on consecutive days read as one range.
+export function spanRanges(days: Day[], tripSpans: TripSpan[]): SpanRange[] {
+  const dayOfEvent = new Map<string, number>();
+  days.forEach((d, i) => d.events.forEach((e) => dayOfEvent.set(e.id, i)));
+
+  const out: SpanRange[] = [];
+  for (const s of tripSpans) {
+    const startIdx = dayOfEvent.get(s.startEventId);
+    const endIdx = dayOfEvent.get(s.endEventId);
+    if (startIdx === undefined || endIdx === undefined || endIdx < startIdx) continue;
+    out.push({ id: `trip-${s.id}`, label: s.label, bg: s.bg, color: spanColor(s), startIdx, endIdx });
+  }
+
+  const open = new Map<string, SpanRange>();
+  days.forEach((d, i) => {
+    for (const s of d.spans ?? []) {
+      const key = `${s.label ?? ""}|${s.bg}|${s.border}`;
+      const prev = open.get(key);
+      if (prev?.endIdx === i) continue;
+      if (prev?.endIdx === i - 1) {
+        prev.endIdx = i;
+        continue;
+      }
+      const range = { id: `day-${s.id}`, label: s.label, bg: s.bg, color: spanColor(s), startIdx: i, endIdx: i };
+      open.set(key, range);
+      out.push(range);
+    }
+  });
   return out;
 }

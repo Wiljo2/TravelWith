@@ -22,10 +22,17 @@ interface AgentPanelProps {
   className?: string;
   // Inside a titled container (the phone sheet): header only shows the stop button.
   embedded?: boolean;
+  // A suggested message put in the box on mount or when it changes; never sent on its own.
+  initialDraft?: string;
 }
 
-export default function AgentPanel({ roomCode, accessToken, messages, setMessages, className, embedded }: AgentPanelProps) {
-  const [draft, setDraft] = useState("");
+export default function AgentPanel({ roomCode, accessToken, messages, setMessages, className, embedded, initialDraft }: AgentPanelProps) {
+  const [draft, setDraft] = useState(initialDraft ?? "");
+  const [seededDraft, setSeededDraft] = useState(initialDraft);
+  if (initialDraft !== seededDraft) {
+    setSeededDraft(initialDraft);
+    if (initialDraft) setDraft(initialDraft);
+  }
   const scrollRef = useRef<HTMLDivElement>(null);
   const { streaming, send, decide, stop } = useAgentChat({ roomCode, accessToken, messages, setMessages });
 

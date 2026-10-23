@@ -46,7 +46,8 @@ auth.users (Supabase Auth)
    │ 1:N
 user_rooms (user_id, room_code, role owner|member, joined_at)   ← relational membership
    │ N:1
-rooms (code PK, name, destination, start_date, end_date, exchange_rate, members JSONB,
+rooms (code PK, name, destination, start_date, end_date ← both null while the group votes on dates,
+       exchange_rate, members JSONB,
        idea_places JSONB, idea_plan JSONB  ← idea settings, last write wins
        payload JSONB ← frozen pre-cut-over backup, never written by the app)
    ├── trip_days          (id, position, label, sub, flexible)
@@ -55,8 +56,8 @@ rooms (code PK, name, destination, start_date, end_date, exchange_rate, members 
    │     └── trip_day_spans   (day_id; start/end_event_id → trip_events)
    ├── trip_spans         (start/end_event_id → trip_events, cross-day)
    ├── trip_expenses      (linked_event_id → trip_events, start/end_day_id → trip_days, document_id)
-   ├── trip_tasks         (day_id → trip_days when scheduled)
-   │     └── trip_task_options
+   ├── trip_tasks         (day_id → trip_days when scheduled; decides dates|destination → a group vote)
+   │     └── trip_task_options (votes = voters' user ids; start_date/end_date on a dates vote)
    ├── trip_travelers     (mockPeople in the client)
    ├── trip_documents     (drive_file_id, title, kind)
    ├── trip_ideas         (data = the Idea without its id; video.insights + insightStates live here)
@@ -71,9 +72,9 @@ ideaLinks and insightLinks (where each video insight fits the plan).
 
 Notes and known trade-offs:
 - **Membership is stored twice**: `rooms.members` (JSONB — display cache with name/avatar) and `user_rooms` (relational — source of truth for access and "my trips"). Both change only through the SQL functions `join_room` / `leave_room` / `delete_room` (`006_membership_functions.sql`, called via `src/server/members.ts`), which update them in one transaction; do not write either directly, and do not add a third representation. Roles are assigned by the server: the creator is `owner` (in `POST /api/rooms`), everyone who joins is `member`.
-- The trip header (`name`, `destination`, dates, `exchange_rate`) is written only by the `trip.update` / `trip.setExchangeRate` ops; it has no row version (last write wins).
+- The trip header (`name`, `destination`, dates, `exchange_rate`) is written only by the `trip.update` / `trip.setExchangeRate` ops and by closing a date or destination vote (`task.closeVote`); it has no row version (last write wins).
 - References between items are **foreign keys** (`008_trip_tables.sql`): deleting an event nulls `linked_event_id` and day-span event ids and deletes the trip spans that start or end on it; deleting a day deletes its events and day spans and nulls expense and task day ids. New data has no dangling ids. Consumers still handle a missing reference gracefully (`find(...) ?? null`).
-- New rooms are **built server-side** in `POST /api/rooms`: header columns plus empty days in `trip_days` (via `reset_itinerary`). Client hooks start empty; the fictional demo trip (`src/data/mockRoom.ts`) is loaded with a dynamic import only in the `LOCAL` room in development builds, so it never ships to production. Never put real trip data in app code or anything the client bundle imports (the idea-matching tests use the fixture `src/test/fixtures/initialDays.ts`, test-only).
+- New rooms are **built server-side** in `POST /api/rooms`: header columns plus empty days in `trip_days` (via `reset_itinerary`; none for a trip created without dates, which the group votes on), plus the creation wizard's optional placeholder travelers and starter tasks, including its date/destination votes (`server/domain/seedRows.ts`); any failure deletes the room. Client hooks start empty; the fictional demo trip (`src/data/mockRoom.ts`) is loaded with a dynamic import only in the `LOCAL` room in development builds, so it never ships to production. Never put real trip data in app code or anything the client bundle imports (the idea-matching tests use the fixture `src/test/fixtures/initialDays.ts`, test-only).
 - `rooms.payload` is the backup from before the cut-over: never write it from the app. `private.rebuild_payload(code)` regenerates it from the tables for a rollback. The cut-over ran on 2026-10-09; production reads and writes only the tables. `validateRoomPayload` (`lib/validate.ts`) checks payload-shaped JSON that the client sends (local mode, offline snapshots).
 - Event categories: new events use `DEFAULT_EVENT_CAT`; pickers, the legend and the agent list `EVENT_CATEGORY_KEYS`. Legacy keys (`barco`, `puerto`, `miami`) stay in `CATEGORIES` so stored events render — never remove a category key.
 
@@ -83,7 +84,7 @@ Server-side mutations do NOT talk to Supabase directly. The layering is:
 
 - `src/server/ops/*` — the **op registry** (`runOp(name, ctx, args)`): one entry per write (`event.create`, `task.chooseOption`, …, 28 today), each with its `minRole`. The only way to change trip data: the ops route and the agent both call it. Any future feature that writes trip data (REST endpoints, agents, cron) adds an op — never inline Supabase writes.
 - `src/server/domain/*Rows.ts` — **pure validation** of op arguments into rows (`DomainError` with an actionable message; no I/O, unit-tested). `domain/read.ts` builds the agent's compact read views from a `RoomPayload`.
-- `src/server/repo/*` — one module per table. Updates and deletes are **version-guarded** (`... and version = expected`): 0 rows → `RowConflictError` carrying the current row (409). Multi-row changes are SQL functions called with `rpc` (`swap_days`, `reset_itinerary`, `choose_task_option`, `get_trip`), so they are atomic.
+- `src/server/repo/*` — one module per table. Updates and deletes are **version-guarded** (`... and version = expected`): 0 rows → `RowConflictError` carrying the current row (409). Multi-row changes are SQL functions called with `rpc` (`swap_days`, `reset_itinerary`, `choose_task_option`, `get_trip`), so they are atomic. One exception to the guard: an option vote (`taskOption.vote` → `set_task_option_vote`, 027) adds or removes only the caller's id in one statement, so concurrent voters never 409; it still bumps the option version.
 - `src/server/agent/*` — the Claude assistant: tool definitions + executor (`tools.ts`, thin wrappers over `runOp` and `getTrip`) and the stable system prompt (`prompt.ts`).
 
 ### AI assistant (Claude agent)
@@ -100,10 +101,10 @@ Server-side mutations do NOT talk to Supabase directly. The layering is:
 
 | Method | Route | Purpose |
 |--------|-------|---------|
-| POST | `/api/rooms` | Create trip (authenticated): validates `{name, destination?, startDate, endDate}`, generates days, inserts room with a random 10-char code, makes the caller owner |
+| POST | `/api/rooms` | Create trip (authenticated): validates `{name, destination?, startDate?, endDate?, travelers?: string[], tasks?: {title, cat?, priority?, decides?: "dates" \| "destination"}[]}` (dates both or neither: neither = dates to decide, no days; at most one vote per `decides` kind, created like `task.create` with `decides`; ≤ `LIMITS.travelers` / `LIMITS.starterTasks`; malformed → 400 before anything is written), generates the days of a dated trip, inserts room with a random 10-char code, makes the caller owner, seeds the travelers and backlog tasks |
 | GET | `/api/rooms/list` | Authenticated: trips of the current user (joins `user_rooms` + `rooms`, returns names) |
 | GET | `/api/rooms/[code]` | Trip in `RoomPayload` shape assembled from the tables (`get_trip`), every item with its `version`, plus members |
-| POST | `/api/rooms/[code]/ops` | One write `{ op, args, expectedVersion? }` (member; `itinerary.reset` owner only). 200 `{ changed, deleted, trip? }`; 400 invalid; 404 gone; 409 `{ table, current }` on a stale version; 503 in maintenance. Body ≤ 32 KB |
+| POST | `/api/rooms/[code]/ops` | One write `{ op, args, expectedVersion? }` (member; `itinerary.reset` and `task.closeVote` owner only, and so are marking done or deleting a date/destination vote task). 200 `{ changed, deleted, trip? }`; 400 invalid; 404 gone; 409 `{ table, current }` on a stale version; 503 in maintenance. Body ≤ 32 KB |
 | DELETE | `/api/rooms/[code]` | Hard-delete for everyone. Authenticated + **owner only** (403 otherwise). Not wired in the UI |
 | GET/POST/DELETE | `/api/rooms/[code]/members` | List / join (idempotent, authenticated) / **leave** |
 | POST | `/api/rooms/errors` | Browser error report (no auth: same origin only, body ≤ 8 KB) stored in `app_errors` |

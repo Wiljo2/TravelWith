@@ -3,13 +3,16 @@ import { useDragDrop } from "@/hooks/useDragDrop";
 import { useTripSession } from "@/hooks/useTripSession";
 import { useTripData } from "@/hooks/useTripData";
 import { useSharedLink } from "@/hooks/useSharedLink";
+import { useStartChoices } from "@/hooks/useStartChoices";
+import StartChoices from "@/components/onboarding/StartChoices";
+import { useJoinWelcome } from "@/hooks/useJoinWelcome";
+import JoinWelcome from "@/components/onboarding/JoinWelcome";
 import DocumentsPanel from "@/components/documents/DocumentsPanel";
 import { chooseOption } from "@/utils/taskDecision";
 import { HOUR_START, HOUR_END } from "@/constants/time";
 import { snapHour, fmtHour } from "@/utils/time";
 import { extraGroupUSD } from "@/utils/currency";
 import { countByEvent, placedInsights } from "@/utils/insights";
-import CalendarGrid from "@/components/calendar/CalendarGrid";
 import SlotCreateModal from "@/components/calendar/SlotCreateModal";
 import AgentPanel from "@/components/agent/AgentPanel";
 import BudgetView from "@/components/budget/BudgetView";
@@ -26,21 +29,23 @@ import Snackbar from "@/components/Snackbar";
 import { useSnackbar } from "@/hooks/useSnackbar";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
+import type { OptionVoting } from "@/components/tasks/OptionVote";
+import type { VoteControls } from "@/components/votes/VoteCard";
 import IdeasTab from "@/components/ideas/IdeasTab";
 import ItineraryMap from "@/components/map/ItineraryMap";
-import type { AgentChatMessage, Task } from "@/types";
-import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
-import { generateDays, tripDayIndex } from "@/utils/tripDays";
+import type { AgentChatMessage } from "@/types";
+import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE, openLocalDemo, type LocalVariant } from "@/data/localMode";
+import { generateDays, hasDates, tripDayIndex } from "@/utils/tripDays";
 import { useIsMobile } from "@/hooks/useMediaQuery";
-import ItineraryView from "@/components/itinerary/ItineraryView";
 import type { ItinerarySheet } from "@/components/itinerary/ItineraryView";
-import ItineraryAgenda from "@/components/itinerary/ItineraryAgenda";
+import ItineraryTab, { type SlotDraft } from "@/components/itinerary/ItineraryTab";
 import ActivityDetail from "@/components/itinerary/ActivityDetail";
-import SpansManager from "@/components/itinerary/SpansManager";
+import PasswordRecoveryDialog from "@/components/auth/PasswordRecoveryDialog";
 
 export default function App() {
-  const { roomCode, setRoomCode, resumeAttempted, localMode, auth, userRooms: rooms } = useTripSession();
-  const { user, session, loading: authLoading, signInWithGoogle, signOut } = auth;
+  const { roomCode, setRoomCode, resumeAttempted, localMode, auth, userRooms: rooms, invite, joinedCode, markJoined } = useTripSession();
+  const { user, session, loading: authLoading, recovering, updatePassword, signOut } = auth;
+  const recoveryDialog = <PasswordRecoveryDialog open={recovering} onSubmit={updatePassword} />;
   const { rooms: userRooms, addRoom, removeRoom } = rooms;
   // Beta: the assistant is owner-only, like resetting the itinerary (both enforced server-side too).
   const isOwner = localMode || userRooms.some((r) => r.room_code === roomCode && r.role === "owner");
@@ -50,17 +55,18 @@ export default function App() {
   const shared = useSharedLink();
   // A link shared from the phone lands on the ideas of the open trip.
   useEffect(() => { if (shared.text && roomCode) setActiveTab("ideas"); }, [shared.text, roomCode]); // eslint-disable-line react-hooks/set-state-in-effect -- follows the shared link
-  const [slotDraft, setSlotDraft] = useState<{ dayId: string; hour: number; x: number; y: number; task: Task | null } | null>(null);
+  const [slotDraft, setSlotDraft] = useState<SlotDraft | null>(null);
   const isMobile = useIsMobile();
   const [sheet, setSheet] = useState<ItinerarySheet | null>(null);
   const [agentMessages, setAgentMessages] = useState<AgentChatMessage[]>([]);
+  const start = useStartChoices({ roomCode, mobile: isMobile, canUseAssistant: canUseAgent && !localMode, chatLength: agentMessages.length, setActiveTab, setSheet, share: shared.share });
 
   const { snack, notify, dismiss: dismissSnack } = useSnackbar();
   const data = useTripData(roomCode, session?.access_token, localMode, () => setRoomCode(null), notify);
   const { ops, itinerary, budget, taskState, tripInfo, ideasApi, geoApi, docs, payloadNow } = data;
-  const { days, tripSpans, selectedId, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, swapDays, setDaySub, removeDaySpan, updateDaySpan, addTripSpan, removeTripSpan, updateTripSpan } = itinerary;
+  const { days, tripSpans, selectedEvent, setSelectedId, updateEvent, deleteEvent, addEvent, moveEvent, addTripSpan, removeTripSpan } = itinerary;
   const { extras, exchangeRate, setExchangeRate, updateExtra, commitExtra, addExtra, removeExtra } = budget;
-  const { tasks, addTask, toggleTask, updateTask, deleteTask, swapTaskDays } = taskState;
+  const { tasks, addTask, toggleTask, updateTask, deleteTask } = taskState;
   const { trip, mockPeople, addMockPerson, removeMockPerson } = tripInfo;
   const { ideas } = ideasApi;
   // Advice from the videos that "Analizar con Claude" placed on the plan.
@@ -68,6 +74,15 @@ export default function App() {
   const tipsByEvent = useMemo(() => countByEvent(placed), [placed]);
   const { documents, addDocument, updateDocument, removeDocument } = docs;
   const { connected, offlineSince, members } = data.room;
+  // Option votes are keyed like idea votes: the signed-in user, "local" without an account.
+  const voter = user?.id ?? "local";
+  const voting: OptionVoting = { voter, members, onVote: (optionId, on) => data.votes.vote(optionId, voter, on) };
+  // Anyone proposes and votes; only the owner closes a date or destination vote (enforced server-side too).
+  const votes: VoteControls = { ...data.votes, canClose: isOwner };
+  const welcome = useJoinWelcome({
+    joinedCode, roomCode, loaded: data.room.loaded, me: voter, trip, members,
+    placeholders: mockPeople.length, tasks, days, ideaCount: ideas.length, setActiveTab,
+  });
 
   // The server turns the task into an event and an expense in one transaction;
   // the LOCAL demo does it in memory.
@@ -75,13 +90,6 @@ export default function App() {
     localMode ? chooseOption(tasks, taskId, optionId, { addEvent, addExtra, deleteTask }) : taskState.chooseOption(taskId, optionId);
 
   const { save } = data;
-
-  // Swap the whole contents of two days (events + spans) and their scheduled tasks.
-  function swapDaysWithTasks(aId: string, bId: string) {
-    if (aId === bId) return;
-    swapDays(aId, bId);
-    swapTaskDays(aId, bId);
-  }
 
   const [activityOpen, setActivityOpen] = useState(false);
 
@@ -102,15 +110,11 @@ export default function App() {
     if (id !== null && isMobile) setSheet("detail");
   }
 
-  function openSlot(dayId: string, hour: number, x: number, y: number) {
-    setSelectedId(null);
-    setSlotDraft({ dayId, hour, x, y, task: null });
-  }
-
-  const { onDragStart, beginDrag, cancelDrag, onDragEnter, onDragMove, onDropInDay, onDragEnd, dragTarget, dragPreview } = useDragDrop(
+  const drag = useDragDrop(
     (fromDayId, toDayId, ev, droppedHour) => {
       const dur = ev.end - ev.start;
       const newStart = snapHour(droppedHour, dur, HOUR_START, HOUR_END);
+      if (toDayId === fromDayId && newStart === ev.start) return;
       const newEnd = newStart + dur;
       moveEvent(fromDayId, toDayId, ev, newStart);
       notify({
@@ -119,6 +123,12 @@ export default function App() {
       });
     }
   );
+
+  function enterLocal(variant: LocalVariant) {
+    if (variant === "new") return window.location.assign("/?local=new");
+    openLocalDemo();
+    setRoomCode(LOCAL_ROOM_CODE);
+  }
 
   if (!roomCode) {
     // Wait for the resume decision before rendering RoomGate, so a returning
@@ -131,22 +141,28 @@ export default function App() {
       );
     }
     return (
-      <RoomGate
-        onEnter={setRoomCode}
-        user={user}
-        session={session}
-        authLoading={authLoading}
-        signInWithGoogle={signInWithGoogle}
-        signOut={signOut}
-        rooms={userRooms}
-        addRoom={addRoom}
-        removeRoom={removeRoom}
-        onEnterLocal={LOCAL_MODE_ENABLED ? () => setRoomCode(LOCAL_ROOM_CODE) : undefined}
-      />
+      <>
+        {recoveryDialog}
+        <RoomGate
+          onEnter={setRoomCode}
+          user={user}
+          session={session}
+          authLoading={authLoading}
+          signIn={auth}
+          signOut={signOut}
+          rooms={userRooms}
+          addRoom={addRoom}
+          removeRoom={removeRoom}
+          onEnterLocal={LOCAL_MODE_ENABLED ? enterLocal : undefined}
+          invite={invite}
+          onCreated={start.markCreated}
+          onJoined={markJoined}
+        />
+      </>
     );
   }
 
-  const todayIdx = trip ? tripDayIndex(trip.startDate, days.length) : undefined;
+  const todayIdx = hasDates(trip) ? tripDayIndex(trip.startDate, days.length) : undefined;
   const detail = selectedEvent && (
     <ActivityDetail
       key={selectedEvent.ev.id}
@@ -177,6 +193,7 @@ export default function App() {
       setMessages={setAgentMessages}
       className={isMobile ? "h-[75dvh] rounded-none border-x-0 border-b-0" : "rounded-2xl border-0 shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-border/70"}
       embedded={isMobile}
+      initialDraft={start.agentDraft}
     />
   );
 
@@ -188,9 +205,9 @@ export default function App() {
         saveState={ops.syncState}
         lastSavedAt={ops.lastSavedAt}
         trip={trip}
-        onReset={isOwner ? () => {
+        onReset={isOwner && (!trip || hasDates(trip)) ? () => {
           if (confirm("¿Restablecer el itinerario? Se perderán las actividades del calendario.")) {
-            const regenerated = trip ? generateDays(trip.startDate, trip.endDate) : null;
+            const regenerated = hasDates(trip) ? generateDays(trip.startDate, trip.endDate) : null;
             itinerary.resetItinerary(regenerated ?? days.map((d) => ({ ...d, events: [], spans: [] })));
           }
         } : undefined}
@@ -205,6 +222,8 @@ export default function App() {
 
       {activeTab === "home" && (
         <HomeView
+          roomCode={roomCode} loaded={data.room.loaded} memberCount={members.length} voting={voting} votes={votes}
+          expenseCount={extras.length} documentCount={documents.length}
           trip={trip}
           days={days}
           tasks={tasks}
@@ -219,65 +238,24 @@ export default function App() {
       )}
 
       {activeTab === "calendar" && (
-        <ItineraryView
+        <ItineraryTab
           mobile={isMobile}
-          selectedId={selectedId}
-          detail={detail || null}
+          trip={trip}
+          itinerary={itinerary}
+          taskState={taskState}
+          drag={drag}
+          todayIdx={todayIdx}
+          tipsByEvent={tipsByEvent}
+          detail={detail}
           agent={agentPanel}
+          focusAgent={!!start.agentDraft}
           sheet={sheet}
-          onOpenSheet={setSheet}
-          onCloseSheet={() => { setSheet(null); setSelectedId(null); }}
-          settings={
-            <SpansManager
-              days={days}
-              tripSpans={tripSpans}
-              onRemoveTripSpan={removeTripSpan}
-              onUpdateTripSpan={updateTripSpan}
-              onRemoveDaySpan={removeDaySpan}
-              onUpdateDaySpan={updateDaySpan}
-            />
-          }
-          agenda={
-            <ItineraryAgenda
-              days={days}
-              tripSpans={tripSpans}
-              tasks={tasks}
-              selectedId={selectedId}
-              todayIdx={todayIdx}
-              onSelect={handleSelect}
-              onAdd={openSlot}
-              onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
-              onToggleTask={toggleTask}
-              onSetDaySub={setDaySub}
-              tipsByEvent={tipsByEvent}
-            />
-          }
-          grid={
-          <CalendarGrid
-            days={days}
-            tripSpans={tripSpans}
-            tasks={tasks}
-            onDragStart={onDragStart}
-            onTouchDragStart={beginDrag}
-            onTouchDragCancel={cancelDrag}
-            onDragEnter={onDragEnter}
-            onDragMove={onDragMove}
-            onDrop={onDropInDay}
-            onDragEnd={onDragEnd}
-            onSelect={handleSelect}
-            selectedId={selectedId}
-            dragTarget={dragTarget}
-            dragPreview={dragPreview}
-            onAddEvent={openSlot}
-            onToggleTask={toggleTask}
-            onEditTask={(task, x, y) => setSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task })}
-            onSwapDays={swapDaysWithTasks}
-            onSetDaySub={setDaySub}
-            tipsByEvent={tipsByEvent}
-            pendingNew={slotDraft && !slotDraft.task ? { dayId: slotDraft.dayId, hour: slotDraft.hour } : null}
-            initialDayIdx={todayIdx}
-          />
-          }
+          onSheet={setSheet}
+          onSelect={handleSelect}
+          slotDraft={slotDraft}
+          onSlotDraft={setSlotDraft}
+          onStartVote={votes.startVote}
+          onOpenVotes={() => setActiveTab("home")}
         />
       )}
 
@@ -289,9 +267,9 @@ export default function App() {
           roomCode={roomCode}
           accessToken={session?.access_token}
           localMode={localMode}
-          currentPayload={payloadNow}
-          save={save}
+          currentPayload={payloadNow} save={save}
           onOpenEvent={(id) => { setActiveTab("calendar"); handleSelect(id); }}
+          onOpenItinerary={() => setActiveTab("calendar")}
         />
       )}
 
@@ -340,8 +318,11 @@ export default function App() {
         <TasksView
           days={days}
           tasks={tasks}
+          trip={trip}
           people={people}
           exchangeRate={exchangeRate}
+          voting={voting}
+          votes={votes}
           onAdd={(title) => addTask({ title })}
           onToggle={toggleTask}
           onUpdateTask={updateTask}
@@ -350,9 +331,12 @@ export default function App() {
         />
       )}
 
+      {start.choices && <StartChoices {...start.choices} />}
+      {welcome && <JoinWelcome {...welcome} />}
       <Snackbar snack={snack} onDismiss={dismissSnack} />
       <SyncNotice message={ops.notice} onDismiss={ops.dismissNotice} />
       {ops.maintenance && <MaintenanceBanner />}
+      {recoveryDialog}
 
       {slotDraft && (
         <SlotCreateModal

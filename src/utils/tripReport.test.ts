@@ -54,5 +54,14 @@ describe("buildTripReport", () => {
   it("falls back to the day labels when the trip has no dates", () => {
     const r = buildTripReport("migration", { ...input, trip: null });
     expect(r.sections[1].rows[0].when).toBe(initialDays[0].label);
+    const undated = buildTripReport("full", { ...input, trip: { name: trip.name } });
+    expect(undated.dates).toBe(`Fechas por decidir · ${initialDays.length} días`);
+    expect(undated.sections[0].title).toBe(pdfText(initialDays[0].label));
+  });
+
+  it("says the dates are to be decided for a trip without dates or days", () => {
+    const r = buildTripReport("full", { ...input, trip: { name: "Cartagena" }, days: [] });
+    expect(r.dates).toBe("Fechas por decidir");
+    expect(r.sections).toEqual([]);
   });
 });

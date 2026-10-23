@@ -44,18 +44,27 @@ interface ChangeBody {
   current?: Row | null;
 }
 
-// Ops whose rows the client did not create optimistically: apply the response.
-const APPLY_RESPONSE = new Set(["task.chooseOption"]);
+// Ops whose response rows hold more than the client's optimistic state (rows the
+// server created; votes others committed first; the days a closed vote rebuilt): apply them.
+const APPLY_RESPONSE = new Set(["task.chooseOption", "taskOption.vote", "task.closeVote"]);
+// Multi-row ops that also change rows the response leaves out: refetch the trip after them.
+const RESYNC_AFTER = new Set(["itinerary.reset", "task.closeVote"]);
+// Keyed by the task they settle, like any other write of that task.
+const TASK_KEYED = new Set(["task.chooseOption", "task.closeVote"]);
+// Applied only when nothing else is queued for the item: a later op of ours
+// (another toggle, an edit) already shows in the optimistic state.
+const APPLY_WHEN_IDLE = new Set(["taskOption.vote"]);
 
 const MERGEABLE = (op: string) =>
-  op.endsWith(".update") || op === "event.move" || op === "trip.setExchangeRate" || op === "trip.setIdeaSettings";
+  op.endsWith(".update") || op === "event.move" || op === "trip.setExchangeRate" || op === "trip.setIdeaSettings" ||
+  op === "taskOption.vote";
 const GUARDED = (op: string) =>
   op.endsWith(".update") || op.endsWith(".delete") || op === "event.move" || op === "task.toggle" ||
-  op === "task.chooseOption" || op === "traveler.remove";
+  op === "task.chooseOption" || op === "task.closeVote" || op === "traveler.remove";
 
 export function opTarget(op: string, args: Record<string, unknown>): { key: string; table?: TripTable; id?: string } {
   const prefix = op.split(".")[0];
-  if (op === "task.chooseOption") {
+  if (TASK_KEYED.has(op)) {
     const id = String(args.taskId);
     return { key: `trip_tasks:${id}`, table: "trip_tasks", id };
   }
@@ -195,7 +204,7 @@ export class OpQueue {
     }
     this.pendingCreates.delete(key);
     const outcome: OpOutcome = res.status === 200 ? "ok" : res.status === 409 && table && id ? "conflict" : "failed";
-    if (this.handle(next.op, table, id, res)) {
+    if (this.handle(next.op, key, table, id, res)) {
       for (const dropped of this.queues.get(key) ?? []) for (const resolve of dropped.resolvers) resolve("conflict");
       this.queues.delete(key);
     }
@@ -206,7 +215,7 @@ export class OpQueue {
     void this.pump(key);
   }
 
-  private handle(op: string, table: TripTable | undefined, id: string | undefined, res: OpResponse): boolean {
+  private handle(op: string, key: string, table: TripTable | undefined, id: string | undefined, res: OpResponse): boolean {
     const body = (res.body ?? {}) as ChangeBody;
     if (res.status === 200) {
       this.failed = false;
@@ -214,8 +223,10 @@ export class OpQueue {
       for (const c of body.changed ?? []) this.setVersion(c.table, c.row.id, c.row.version);
       for (const d of body.deleted ?? []) this.setVersion(d.table, d.id, null);
       if (body.trip) this.handlers.onTrip(body.trip);
-      if (APPLY_RESPONSE.has(op)) this.handlers.onRows(body.changed ?? []);
-      if (op === "itinerary.reset") this.handlers.onResync();
+      if (APPLY_RESPONSE.has(op) && !(APPLY_WHEN_IDLE.has(op) && this.queues.get(key)?.length)) {
+        this.handlers.onRows(body.changed ?? []);
+      }
+      if (RESYNC_AFTER.has(op)) this.handlers.onResync();
       return false;
     }
     if (res.status === 409 && table && id) {

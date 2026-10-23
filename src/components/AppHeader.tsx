@@ -1,9 +1,11 @@
 "use client";
 import { useState } from "react";
 import { Menu } from "@base-ui/react/menu";
-import { Copy, Ellipsis, FileDown, History, LogOut, RotateCcw } from "lucide-react";
+import { Copy, Ellipsis, FileDown, History, LogOut, RotateCcw, UserPlus } from "lucide-react";
 import AuthButton from "@/components/auth/AuthButton";
-import { fmtTripDates } from "@/utils/tripDays";
+import InviteSheet from "@/components/invite/InviteSheet";
+import { Button } from "@/components/ui/button";
+import { UNDATED_LABEL, fmtTripDates, hasDates } from "@/utils/tripDays";
 import { cn } from "@/lib/utils";
 import type { SyncState } from "@/hooks/useTripOps";
 import { useNow } from "@/hooks/useNow";
@@ -48,6 +50,7 @@ export default function AppHeader({ roomCode, connected, saveState, lastSavedAt,
     ? { label: syncLabel(saveState), dot: DOT[saveState] }
     : { label: "Conectando…", dot: "bg-muted-foreground animate-pulse" };
   const [copied, setCopied] = useState(false);
+  const [inviting, setInviting] = useState(false);
 
   function download(kind: ReportKind) {
     onDownloadPdf(kind).catch(() => alert("No se pudo generar el PDF. Intenta de nuevo con internet."));
@@ -67,7 +70,7 @@ export default function AppHeader({ roomCode, connected, saveState, lastSavedAt,
         <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
           {trip ? (
             <>
-              {fmtTripDates(trip.startDate, trip.endDate)}
+              {hasDates(trip) ? fmtTripDates(trip.startDate, trip.endDate) : UNDATED_LABEL}
               {trip.destination && <> · {trip.destination}</>}
             </>
           ) : FALLBACK.subtitle}
@@ -89,6 +92,11 @@ export default function AppHeader({ roomCode, connected, saveState, lastSavedAt,
             </span>
           </span>
         )}
+
+        <Button aria-label="Invitar" onClick={() => setInviting(true)} className="h-9 w-9 gap-1.5 rounded-full px-0 sm:w-auto sm:px-3.5">
+          <UserPlus className="size-4" />
+          <span className="hidden sm:inline">Invitar</span>
+        </Button>
 
         <Menu.Root>
           <Menu.Trigger
@@ -142,6 +150,8 @@ export default function AppHeader({ roomCode, connected, saveState, lastSavedAt,
 
         <AuthButton />
       </div>
+
+      <InviteSheet open={inviting} onOpenChange={setInviting} roomCode={roomCode} tripName={trip?.name} />
     </header>
   );
 }

@@ -1,10 +1,17 @@
-import type { Day } from "@/types";
+import type { CalendarEvent, DatedTrip, Day, TripInfo } from "@/types";
 import { HOUR_END } from "@/constants/time";
 
 const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 export const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 export const MAX_TRIP_DAYS = 60;
+
+// False while the group hasn't settled on dates (or for a trip that hasn't loaded).
+export function hasDates(trip: TripInfo | null | undefined): trip is DatedTrip {
+  return !!trip?.startDate && !!trip.endDate;
+}
+
+export const UNDATED_LABEL = "Fechas por decidir";
 
 // Parses "yyyy-mm-dd" as a local date (avoids UTC off-by-one from Date("...")).
 // Rejects rollover dates like 2026-13-99, which the Date constructor would accept.
@@ -46,10 +53,31 @@ export function generateDays(startDate: string, endDate: string): Day[] | null {
   return days;
 }
 
+export const hasActivities = (days: Pick<Day, "events">[]) => days.some((d) => d.events.length > 0);
+
+export const activityCount = (days: Pick<Day, "events">[]) => days.reduce((n, d) => n + d.events.length, 0);
+
 // Next free slot for a quick "+ Actividad": right after the day's last activity.
 export function nextFreeHour(day: Day): number {
   const lastEnd = Math.max(0, ...day.events.map((e) => e.end));
   return lastEnd ? Math.min(Math.ceil(lastEnd), HOUR_END - 1) : 9;
+}
+
+// A punctual activity (end = start) still takes the snap step for collisions.
+const MIN_SLOT = 0.25;
+
+type Timed = Pick<CalendarEvent, "id" | "start" | "end">;
+
+// Where an activity moved to `day` starts: at its own hours when they're free there, otherwise
+// at the first whole hour after its start that fits before the day ends, or at its own hours
+// (shown as a conflict) when none does.
+export function moveStartHour(ev: Timed, day: { events: Timed[] }): number {
+  const dur = Math.max(ev.end - ev.start, MIN_SLOT);
+  const others = day.events.filter((o) => o.id !== ev.id);
+  const free = (s: number) => others.every((o) => s + dur <= o.start || Math.max(o.end, o.start + MIN_SLOT) <= s);
+  if (free(ev.start)) return ev.start;
+  for (let h = Math.floor(ev.start) + 1; h + dur <= HOUR_END; h++) if (free(h)) return h;
+  return ev.start;
 }
 
 export type TripPhase =

@@ -38,7 +38,8 @@ describe("GET /api/rooms/list", () => {
       name: "Japón 2027",
       trip: { name: "Japón 2027", destination: "Tokio · Kioto", startDate: "2027-03-25", endDate: "2027-04-06" },
     });
-    expect(body[1]).toMatchObject({ name: "Sin fechas", trip: null });
+    expect(body[1]).toMatchObject({ name: "Sin fechas" });
+    expect(body[1].trip).toEqual({ name: "Sin fechas" });
   });
 
   it("returns an empty list without querying rooms when the user has no trips", async () => {

@@ -11,8 +11,13 @@ function defined(obj: Record<string, unknown>): Record<string, unknown> {
 }
 
 function optionArgs(o: TaskOption): Record<string, unknown> {
-  return defined({ id: o.id, label: o.label, note: o.note, amount: o.amount, currency: o.currency, splitMode: o.splitMode });
+  return defined({
+    id: o.id, label: o.label, note: o.note, amount: o.amount, currency: o.currency, splitMode: o.splitMode,
+    startDate: o.startDate, endDate: o.endDate,
+  });
 }
+
+const OPTION_FIELDS = ["label", "note", "amount", "currency", "splitMode", "startDate", "endDate"] as const;
 
 // Options are edited as a whole list; the server stores one row each. New
 // options are created once they have a label (the server requires one).
@@ -27,9 +32,11 @@ function syncOptions(taskId: string, prev: TaskOption[], next: TaskOption[], sen
     }
     const old = prev.find((p) => p.id === o.id);
     const changed: Record<string, unknown> = { id: o.id };
-    for (const k of ["label", "note", "amount", "currency", "splitMode"] as const) {
+    for (const k of OPTION_FIELDS) {
       if (old?.[k] !== o[k]) changed[k] = o[k] ?? (k === "note" ? "" : null);
     }
+    // Dates travel together: the server checks the range as a whole.
+    if ("startDate" in changed || "endDate" in changed) Object.assign(changed, { startDate: o.startDate ?? null, endDate: o.endDate ?? null });
     const args = sendable(changed);
     if (args) send("taskOption.update", args);
   }
@@ -54,8 +61,8 @@ export function useTasks(send: SendOp, isKnown: IsKnown, notify?: Notify) {
     });
   }
 
-  function addTask(partial: Partial<Task> & { title: string }) {
-    insertTask({ id: crypto.randomUUID(), done: false, ...partial }, "Tarea creada");
+  function addTask(partial: Partial<Task> & { title: string }, message = "Tarea creada") {
+    insertTask({ id: crypto.randomUUID(), done: false, ...partial }, message);
   }
 
   function toggleTask(id: string) {
@@ -119,5 +126,21 @@ export function useTasks(send: SendOp, isKnown: IsKnown, notify?: Notify) {
     setTasks((prev) => applyToTasks(prev, table, id, row));
   }, []);
 
-  return { tasks, addTask, toggleTask, updateTask, deleteTask, chooseOption, swapTaskDays, loadTasks, applyRow };
+  // State only: changes one option in place, for writes sent by another hook (votes).
+  const patchOptionLocal = useCallback((optionId: string, update: (o: TaskOption) => TaskOption) => {
+    setTasks((prev) => prev.map((t) =>
+      t.options?.some((o) => o.id === optionId)
+        ? { ...t, options: t.options.map((o) => (o.id === optionId ? update(o) : o)) }
+        : t,
+    ));
+  }, []);
+
+  // State only: changes tasks in place, for writes the server makes in one op (closing a vote).
+  const patchTasksLocal = useCallback((update: (t: Task) => Task) => {
+    setTasks((prev) => prev.map(update));
+  }, []);
+
+  return {
+    tasks, addTask, toggleTask, updateTask, deleteTask, chooseOption, swapTaskDays, loadTasks, applyRow, patchOptionLocal, patchTasksLocal,
+  };
 }

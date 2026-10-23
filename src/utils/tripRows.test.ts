@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyToDays, applyToList, applyToTasks, rowToExtra, rowToTask, type Row } from "@/utils/tripRows";
+import { applyToDays, applyToList, applyToTasks, headerToTrip, rowToExtra, rowToTask, rowToTaskOption, type Row } from "@/utils/tripRows";
 import type { Day, Extra, Task } from "@/types";
 
 const days: Day[] = [
@@ -63,7 +63,49 @@ describe("lists and tasks", () => {
     expect(next[0].events[0].icon).toBe("🍽️");
   });
 
+  it("option rows carry their votes; null and junk read as no votes", () => {
+    const tasks: Task[] = [{ id: "k1", title: "T", done: false, options: [{ id: "o1", label: "A", votes: ["u1"], version: 1 }], version: 1 }];
+    const voted = applyToTasks(tasks, "trip_task_options", "o1", { id: "o1", task_id: "k1", label: "A", votes: ["u1", "u2"], version: 2 } as Row);
+    expect(voted[0].options?.[0].votes).toEqual(["u1", "u2"]);
+    expect(rowToTaskOption({ id: "o1", label: "A", votes: null, version: 3 } as Row).votes).toBeUndefined();
+    expect(rowToTaskOption({ id: "o1", label: "A", votes: ["u1", 3], version: 3 } as Row).votes).toEqual(["u1"]);
+    const stale = applyToTasks(voted, "trip_task_options", "o1", { id: "o1", task_id: "k1", label: "A", votes: ["u9"], version: 2 } as Row);
+    expect(stale[0].options?.[0].votes).toEqual(["u1", "u2"]);
+  });
+
+  it("reads what a vote settles and option dates; unknown kinds and junk read as nothing", () => {
+    expect(rowToTask({ id: "k", title: "x", done: false, decides: "dates", version: 1 } as Row).decides).toBe("dates");
+    expect(rowToTask({ id: "k", title: "x", done: false, decides: "budget", version: 1 } as Row).decides).toBeUndefined();
+    expect(rowToTask({ id: "k", title: "x", done: false, decides: null, version: 1 } as Row).decides).toBeUndefined();
+    expect(rowToTaskOption({ id: "o1", label: "A", start_date: "2026-11-26", end_date: "2026-11-28", version: 1 } as Row))
+      .toMatchObject({ startDate: "2026-11-26", endDate: "2026-11-28" });
+    expect(rowToTaskOption({ id: "o1", label: "A", start_date: null, end_date: 3, version: 1 } as Row)).toMatchObject({ startDate: undefined, endDate: undefined });
+  });
+
   it("rowToTask drops hours of backlog tasks", () => {
     expect(rowToTask({ id: "k", title: "x", done: false, day_id: null, start_hour: 9, end_hour: 10, version: 1 } as Row)).toMatchObject({ dayId: undefined, start: undefined, end: undefined });
+  });
+});
+
+describe("headerToTrip", () => {
+  const header = { code: "ABC123", name: "Cartagena", destination: "Cartagena", start_date: "2026-12-04", end_date: "2026-12-06", exchange_rate: 4000 };
+  const dated = { name: "Cartagena", destination: "Cartagena", startDate: "2026-12-04", endDate: "2026-12-06" };
+
+  it("reads the header columns of a dated trip", () => {
+    expect(headerToTrip(header, null)).toEqual(dated);
+    expect(headerToTrip({ ...header, name: "Caribe", destination: null }, dated)).toEqual({ ...dated, name: "Caribe", destination: undefined });
+  });
+
+  it("keeps the previous value of the columns a header leaves out", () => {
+    expect(headerToTrip({ name: "Caribe", destination: "Cartagena" }, dated)).toEqual({ ...dated, name: "Caribe" });
+  });
+
+  it("applies the header of a trip whose dates are still to be decided", () => {
+    expect(headerToTrip({ ...header, start_date: null, end_date: null }, null)).toEqual({ name: "Cartagena", destination: "Cartagena" });
+    expect(headerToTrip({ ...header, name: "Caribe", start_date: null, end_date: null }, { name: "Cartagena" })).toEqual({ name: "Caribe", destination: "Cartagena" });
+  });
+
+  it("ignores a header without a name or dates", () => {
+    expect(headerToTrip({ name: null, destination: null, start_date: null, end_date: null }, null)).toBeNull();
   });
 });

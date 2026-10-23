@@ -47,7 +47,7 @@ export default function AddIdeaForm({ onSubmit, onDone, initialText }: AddIdeaFo
           onChange={(e) => { setText(e.target.value); setMessage(""); }}
           placeholder="Pega uno o varios links de TikTok, Instagram o YouTube (también sirve un mensaje de WhatsApp completo)"
           rows={4}
-          className="min-h-24 resize-none bg-secondary text-sm"
+          className="min-h-24 resize-none bg-secondary text-sm wrap-anywhere"
         />
         {canPaste && (
           <button

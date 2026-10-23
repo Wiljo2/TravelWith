@@ -1,10 +1,30 @@
 // Trip identity — lives inside the room payload. A room IS a trip.
+// Dates are both set or both missing (dates still to be decided); check with `hasDates`.
 export interface TripInfo {
   name: string;
   destination?: string;
-  startDate: string;      // ISO yyyy-mm-dd
-  endDate: string;        // ISO yyyy-mm-dd
+  startDate?: string;     // ISO yyyy-mm-dd
+  endDate?: string;       // ISO yyyy-mm-dd
 }
+
+export type DatedTrip = TripInfo & { startDate: string; endDate: string };
+
+// A task created together with the trip (backlog, no day); with `decides`, a group vote.
+export interface StarterTask {
+  title: string;
+  cat?: string;
+  priority?: TaskPriority;
+  decides?: TaskDecides;
+}
+
+// Body of POST /api/rooms: the header plus the creation wizard's optional seed rows.
+export interface NewTrip extends TripInfo {
+  travelers?: string[];   // placeholder traveler names (the creator is a member, not a traveler)
+  tasks?: StarterTask[];
+}
+
+export type TripCompanion = "solo" | "pareja" | "amigos" | "familia";
+export type TripBooking = "vuelos" | "alojamiento";
 
 export interface CalendarEvent {
   id: string;
@@ -99,8 +119,14 @@ export interface TaskOption {
   amount?: number;                   // cost of this option, in `currency`
   currency?: "USD" | "COP";          // default "USD"
   splitMode?: "group" | "perPerson"; // default "group"
+  votes?: string[];                  // user ids of the members who back it (approval voting); default []
+  startDate?: string;                // ISO yyyy-mm-dd; set (with endDate) on the options of a dates vote
+  endDate?: string;
   version?: number;
 }
+
+// What a group vote settles once the owner closes it: the trip dates or the destination.
+export type TaskDecides = "dates" | "destination";
 
 export interface Task {
   id: string;
@@ -114,6 +140,7 @@ export interface Task {
   priority?: TaskPriority;
   icon?: string;          // emoji chosen by the user; absent = automatic (from the title)
   options?: TaskOption[];  // candidate choices (a decision to resolve); unchosen options never sum into the confirmed total
+  decides?: TaskDecides;   // set → a group vote on the trip dates or destination (check with `isVote`)
   version?: number;
 }
 
