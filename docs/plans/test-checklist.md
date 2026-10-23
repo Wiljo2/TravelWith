@@ -18,6 +18,14 @@ needs a dashboard or account action outside the repo goes under "Owner actions" 
       "Unirse con código" says there are no other people's trips locally; the created trip shows
       in "Mis viajes". Known limit: leaving the trip and re-entering starts it empty again.
       The sandbox lasts for the browser tab; open `?local=new` again to start over.
+- [ ] 4. **Onboarding 1 — welcome for a first-time creator** (`first-run-onboarding.md` step 1).
+- [ ] 5. **Onboarding 2 — short creation wizard** (step 2).
+- [ ] 6. **Onboarding 3 — "¿Cómo quieres empezar?"** invite / TikTok / AI (step 3).
+- [ ] 7. **Onboarding 4 — invite link, WhatsApp, visible "Invitar"** (step 4).
+- [ ] 8. **Onboarding 5 — "Primeros pasos" card on Inicio** (step 5).
+- [ ] 9. **Onboarding 6 — teaching empty states** (step 6).
+- [ ] 10. **Group voting on dates/destination via "Por decidir"** (step 7; design note first).
+- [ ] 11. **Welcome for someone joining by invitation** (step 8).
 
 ## Owner actions
 
