@@ -57,6 +57,11 @@ For item 10 (group voting) — migration `supabase/migrations/027_group_votes.sq
 - [ ] A trip created before the change loads and edits as before, with 0 votes.
 - [ ] Create a trip with "lo votamos" for dates and destination → undated trip with both votes;
       propose dates, close as owner → days appear for every member live.
+
+For item 11 (welcome for invited people) — needs two accounts:
+- [ ] Account A creates a trip; account B opens `/?join=CODE` → after joining, "¡Bienvenido a
+      <viaje>! 👋" with dates, who's in and "Lo que te espera"; reopening the trip from the list
+      doesn't show it again.
 - [ ] 7c on staging, dated trip with activities, owner A and member B: A taps "🗳️ Votar fechas" in
       Pendientes; both propose ranges on Inicio and vote with ✋ → counts live on both screens. B
       sees no "Elegir" and no × on the vote; a forced `task.closeVote` from B answers 403. A taps
@@ -138,3 +143,8 @@ For item 10 (group voting) — migration `supabase/migrations/027_group_votes.sq
   dates; `UndatedHero` on Inicio, `DatesPending` on Itinerario; StartChoices explains why to invite.
   No 028. tsc + 713 tests pass. **Browser walk pending** (the browser extension disconnected): walk
   `?local=new` with both "lo votamos" → votes on Inicio → propose + close → days appear.
+- 2026-10-23 — Item 11 done in code: `JoinWelcome` (Dialog / BottomSheet) after a first join by link or
+  code — not for the creator, not when opening a known trip, not on reload; "Lo que te espera" (open
+  votes, ideas, itinerary) from pure `utils/joinWelcome.ts`. Inviter name not shown (the roster has no
+  roles). Dev-only preview: `/?local=1&welcome`. tsc + 727 tests pass. **Browser walk pending** (the
+  browser extension disconnected).

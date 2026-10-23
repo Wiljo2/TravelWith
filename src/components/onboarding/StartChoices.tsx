@@ -5,9 +5,9 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import InviteSheet from "@/components/invite/InviteSheet";
 import ReelLinkForm from "@/components/onboarding/ReelLinkForm";
+import ChoiceCard from "@/components/onboarding/ChoiceCard";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import { VOTE_KINDS, VOTE_KIND_KEYS } from "@/constants/votes";
-import { cn } from "@/lib/utils";
 import type { TaskDecides } from "@/types";
 
 export interface StartChoicesProps {
@@ -108,36 +108,5 @@ function StartOptions({ inviteLine, onInvite, onPasteLink, onAskAssistant, onSki
         Saltar por ahora
       </Button>
     </div>
-  );
-}
-
-interface ChoiceCardProps {
-  icon: string;
-  title: string;
-  line: string;
-  highlighted?: boolean;
-  expanded?: boolean;
-  onClick: () => void;
-}
-
-function ChoiceCard({ icon, title, line, highlighted, expanded, onClick }: ChoiceCardProps) {
-  return (
-    <Button
-      variant="outline"
-      onClick={onClick}
-      aria-expanded={expanded}
-      className={cn(
-        "h-auto w-full justify-start gap-3 whitespace-normal rounded-xl bg-card px-3.5 py-3 text-left",
-        highlighted && "border-ring bg-accent text-accent-foreground hover:bg-accent/70 hover:text-accent-foreground",
-      )}
-    >
-      <span aria-hidden className="text-2xl leading-none">{icon}</span>
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-sm font-semibold">{title}</span>
-        <span className={cn("text-xs font-normal leading-snug", highlighted ? "text-accent-foreground/80" : "text-muted-foreground")}>
-          {line}
-        </span>
-      </span>
-    </Button>
   );
 }

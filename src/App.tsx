@@ -5,6 +5,8 @@ import { useTripData } from "@/hooks/useTripData";
 import { useSharedLink } from "@/hooks/useSharedLink";
 import { useStartChoices } from "@/hooks/useStartChoices";
 import StartChoices from "@/components/onboarding/StartChoices";
+import { useJoinWelcome } from "@/hooks/useJoinWelcome";
+import JoinWelcome from "@/components/onboarding/JoinWelcome";
 import DocumentsPanel from "@/components/documents/DocumentsPanel";
 import { chooseOption } from "@/utils/taskDecision";
 import { HOUR_START, HOUR_END } from "@/constants/time";
@@ -41,7 +43,7 @@ import ActivityDetail from "@/components/itinerary/ActivityDetail";
 import PasswordRecoveryDialog from "@/components/auth/PasswordRecoveryDialog";
 
 export default function App() {
-  const { roomCode, setRoomCode, resumeAttempted, localMode, auth, userRooms: rooms, invite } = useTripSession();
+  const { roomCode, setRoomCode, resumeAttempted, localMode, auth, userRooms: rooms, invite, joinedCode, markJoined } = useTripSession();
   const { user, session, loading: authLoading, recovering, updatePassword, signOut } = auth;
   const recoveryDialog = <PasswordRecoveryDialog open={recovering} onSubmit={updatePassword} />;
   const { rooms: userRooms, addRoom, removeRoom } = rooms;
@@ -77,6 +79,10 @@ export default function App() {
   const voting: OptionVoting = { voter, members, onVote: (optionId, on) => data.votes.vote(optionId, voter, on) };
   // Anyone proposes and votes; only the owner closes a date or destination vote (enforced server-side too).
   const votes: VoteControls = { ...data.votes, canClose: isOwner };
+  const welcome = useJoinWelcome({
+    joinedCode, roomCode, loaded: data.room.loaded, me: voter, trip, members,
+    placeholders: mockPeople.length, tasks, days, ideaCount: ideas.length, setActiveTab,
+  });
 
   // The server turns the task into an event and an expense in one transaction;
   // the LOCAL demo does it in memory.
@@ -149,6 +155,7 @@ export default function App() {
           onEnterLocal={LOCAL_MODE_ENABLED ? enterLocal : undefined}
           invite={invite}
           onCreated={start.markCreated}
+          onJoined={markJoined}
         />
       </>
     );
@@ -324,6 +331,7 @@ export default function App() {
       )}
 
       {start.choices && <StartChoices {...start.choices} />}
+      {welcome && <JoinWelcome {...welcome} />}
       <Snackbar snack={snack} onDismiss={dismissSnack} />
       <SyncNotice message={ops.notice} onDismiss={ops.dismissNotice} />
       {ops.maintenance && <MaintenanceBanner />}

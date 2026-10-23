@@ -118,6 +118,14 @@ together.
 - After joining (link or code), a one-time welcome sheet: "<nombre> te invitó a <viaje>", dates or
   "fechas por decidir", who's in, and what's waiting for them (open votes, "agrega tus ideas"),
   CTA "Ver el viaje". Seen-flag per trip in localStorage.
+- Built: in memory like step 3, not a localStorage flag (the join itself happens once, so a
+  reload never brings it back). `useTripSession.markJoined` keeps a `joined` outcome only when the
+  code wasn't in the user's trip list, for `?join=` and for `RoomGate.join` (code input; opening a
+  trip from the list goes through the same call but is known); `useJoinWelcome` shows
+  `onboarding/JoinWelcome` once that trip has loaded. The roster has no roles, so the inviter
+  isn't known client-side: the title is "¡Bienvenido a <viaje>! 👋". "Lo que te espera" (open
+  date/destination votes → Inicio, ideas → Ideas, itinerary with activities → Itinerario, max 3)
+  comes from `src/utils/joinWelcome.ts`. Dev preview: `/?local=1&welcome` on the demo trip.
 
 ### Backlog (not in this loop)
 - The assistant chat (`agentMessages` in `App.tsx`) is not cleared when switching trips, so one

@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { firstName } from "./userName";
+import { firstName, shortName } from "./userName";
+
+describe("shortName", () => {
+  it("keeps the first word of a roster name, without an email domain", () => {
+    expect(shortName("  Ana María López ")).toBe("Ana");
+    expect(shortName("luis@mail.com")).toBe("luis");
+    expect(shortName("   ")).toBe("Alguien");
+  });
+});
 
 describe("firstName", () => {
   it("takes the first word of the full name", () => {

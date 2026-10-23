@@ -1,6 +1,7 @@
 import type { Day, RoomMember, Task, TaskDecides, TaskOption, TripInfo } from "@/types";
 import { VOTE_KINDS } from "@/constants/votes";
 import { fmtTripDates, generateDays } from "@/utils/tripDays";
+import { shortName } from "@/utils/userName";
 
 // Approval voting on task options: each member backs as many options as they
 // like. Votes of people who left the trip stop counting; with no roster (local
@@ -106,10 +107,6 @@ export function voterNames(option: Voted, members: readonly RoomMember[], me: st
   const votes = countedVotes(option, members.map((m) => m.userId));
   const others = votes.filter((v) => v !== me).map((v) => shortName(byId.get(v) ?? "Alguien"));
   return votes.includes(me) ? ["Tú", ...others] : others;
-}
-
-function shortName(name: string): string {
-  return name.trim().split(/\s+/)[0].split("@")[0] || "Alguien";
 }
 
 // "Tú", "Tú y Ana", "Tú, Ana y Luis", "Tú, Ana y 3 más".

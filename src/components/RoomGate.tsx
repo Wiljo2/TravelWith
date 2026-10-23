@@ -36,10 +36,13 @@ interface RoomGateProps {
   invite?: InviteState;
   // Called right before entering a trip this browser just created.
   onCreated?: (code: string, trip: NewTrip) => void;
+  // Called with a trip joined by code or opened from the list, before addRoom, so the
+  // caller can still tell a first join from a trip already in `rooms`.
+  onJoined?: (code: string) => void;
 }
 
 export default function RoomGate({
-  onEnter, user, session, authLoading, signIn, signOut, rooms, addRoom, removeRoom, onEnterLocal, invite, onCreated,
+  onEnter, user, session, authLoading, signIn, signOut, rooms, addRoom, removeRoom, onEnterLocal, invite, onCreated, onJoined,
 }: RoomGateProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -69,6 +72,7 @@ export default function RoomGate({
       setLoading(false);
       return;
     }
+    onJoined?.(c);
     addRoom(c, "member");
     onEnter(c);
   }
