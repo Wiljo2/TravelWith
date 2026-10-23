@@ -78,7 +78,8 @@ For item 10 (group voting) — migration `supabase/migrations/027_group_votes.sq
 - [x] Apply 027 to **staging** (never production first; not during the trip Nov 26 – Dec 4). This
       branch must not be deployed anywhere before 027 is applied there: votes would answer 500.
       Done 2026-10-23 with 024 (staging was missing it too).
-- [ ] Apply 024 and 027 to **production** right before deploying this branch.
+- [x] Apply 024 and 027 to **production** right before deploying this branch. Done 2026-10-23:
+      024 before merging PR #20, 027 before this branch; `get_trip('NVHPCI')` unchanged (same md5).
 - [ ] ~~Turn on leaked password protection~~ — not available: it needs the Supabase Pro plan (the org
       is on Free). Revisit if the plan changes.
 - [ ] **Deploy blocker:** production has "Confirm email" on and **no custom SMTP**, so people outside
@@ -214,3 +215,7 @@ For item 11 (welcome for invited people) — needs two accounts:
   (9 days, 9 tasks, 6 expenses, dates and destination). Advisors: nothing new from these migrations;
   leaked password protection is off (owner action above). Two-account walk written in
   `docs/plans/staging-test/onboarding-and-votes.md`.
+- 2026-10-23 — Production: applied 024, merged PR #20 (wave 1 fixes) and Vercel deployed it; site 200,
+  `/api/rooms/list` 401 unauthenticated, trip `NVHPCI` intact. Applied 027; `get_trip('NVHPCI')` output
+  identical before/after. Email sign-up ships without custom SMTP by the owner's decision (only Supabase
+  team members get confirmation emails until SMTP is set).
