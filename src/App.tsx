@@ -28,6 +28,7 @@ import { useSnackbar } from "@/hooks/useSnackbar";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
 import type { OptionVoting } from "@/components/tasks/OptionVote";
+import type { VoteControls } from "@/components/votes/VoteCard";
 import IdeasTab from "@/components/ideas/IdeasTab";
 import ItineraryMap from "@/components/map/ItineraryMap";
 import type { AgentChatMessage } from "@/types";
@@ -74,6 +75,8 @@ export default function App() {
   // Option votes are keyed like idea votes: the signed-in user, "local" without an account.
   const voter = user?.id ?? "local";
   const voting: OptionVoting = { voter, members, onVote: (optionId, on) => data.votes.vote(optionId, voter, on) };
+  // Anyone proposes and votes; only the owner closes a date or destination vote (enforced server-side too).
+  const votes: VoteControls = { ...data.votes, canClose: isOwner };
 
   // The server turns the task into an event and an expense in one transaction;
   // the LOCAL demo does it in memory.
@@ -211,7 +214,7 @@ export default function App() {
 
       {activeTab === "home" && (
         <HomeView
-          roomCode={roomCode} loaded={data.room.loaded} memberCount={members.length} memberIds={members.map((m) => m.userId)}
+          roomCode={roomCode} loaded={data.room.loaded} memberCount={members.length} voting={voting} votes={votes}
           expenseCount={extras.length} documentCount={documents.length}
           trip={trip}
           days={days}
@@ -304,9 +307,11 @@ export default function App() {
         <TasksView
           days={days}
           tasks={tasks}
+          trip={trip}
           people={people}
           exchangeRate={exchangeRate}
           voting={voting}
+          votes={votes}
           onAdd={(title) => addTask({ title })}
           onToggle={toggleTask}
           onUpdateTask={updateTask}

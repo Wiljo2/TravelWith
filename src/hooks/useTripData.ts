@@ -49,8 +49,13 @@ export function useTripData(roomCode: string | null, accessToken: string | undef
   const itinerary = useItinerary(ops.send, { notify, flush: ops.flush });
   const budget = useBudget(ops.send, notify);
   const taskState = useTasks(ops.send, ops.isKnown, notify);
-  const votes = useVotes(ops.send, ops.isKnown, taskState.patchOptionLocal);
   const tripInfo = useTripInfo(ops.send);
+  const votes = useVotes({
+    send: ops.send, isKnown: ops.isKnown, notify, resync: () => room.reload(),
+    tasks: taskState.tasks, addTask: taskState.addTask, updateTask: taskState.updateTask,
+    patchOption: taskState.patchOptionLocal, patchTasks: taskState.patchTasksLocal,
+    trip: tripInfo.trip, applyHeader: tripInfo.applyHeader, loadDays: (days) => itinerary.loadItinerary(days, []),
+  });
   const ideasApi = useIdeas(roomCode, accessToken);
   const geoApi = useTripGeo();
   const docs = useDocuments();

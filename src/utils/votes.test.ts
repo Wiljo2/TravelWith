@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { hasVoted, leader, namesText, ranked, totalVotes, voteCount, voterNames, withVote } from "@/utils/votes";
-import type { RoomMember, TaskOption } from "@/types";
+import {
+  alreadyProposed, chosenOption, closedVoteChanges, dateOptionLabel, hasVoted, isVote, leader, namesText, openVote, optionDayCount,
+  ranked, totalVotes, voteCount, voterNames, withVote, type VoteTask,
+} from "@/utils/votes";
+import { headerToTrip } from "@/utils/tripRows";
+import type { RoomMember, Task, TaskOption } from "@/types";
 
 const member = (userId: string, name: string): RoomMember => ({ userId, name, joinedAt: "2026-10-01T00:00:00Z" });
 const members = [member("u1", "Ana Pérez"), member("u2", "luis@mail.com"), member("u3", "Sofía")];
@@ -47,5 +51,57 @@ describe("votes", () => {
     expect(namesText(["Tú", "Ana"])).toBe("Tú y Ana");
     expect(namesText(["Tú", "Ana", "Luis"])).toBe("Tú, Ana y Luis");
     expect(namesText(["Tú", "Ana", "Luis", "Sofía", "Leo"])).toBe("Tú, Ana y 3 más");
+  });
+});
+
+describe("date and destination votes", () => {
+  const dates: VoteTask = { id: "k1", title: "¿Cuándo viajamos?", done: false, decides: "dates", options: [
+    { id: "a", label: "Nov 26 – 28, 2026", startDate: "2026-11-26", endDate: "2026-11-28" },
+    { id: "b", label: "Dic 3 – 6, 2026", startDate: "2026-12-03", endDate: "2026-12-06" },
+  ] };
+  const place: VoteTask = { id: "k2", title: "¿A dónde vamos?", done: false, decides: "destination", options: [{ id: "c", label: " Cartagena " }] };
+  const trip = { name: "Caribe", destination: "Bogotá", startDate: "2026-10-01", endDate: "2026-10-03" };
+
+  it("tells votes from tasks and finds the open one of a kind", () => {
+    const regular: Task = { id: "k3", title: "Hotel", done: false };
+    expect(isVote(dates)).toBe(true);
+    expect(isVote(regular)).toBe(false);
+    expect(isVote({ ...regular, decides: "budget" as never })).toBe(false);
+    expect(openVote([regular, dates, place], "destination")?.id).toBe("k2");
+    expect(openVote([{ ...dates, done: true }], "dates")).toBeUndefined();
+  });
+
+  it("labels and measures date options", () => {
+    expect(dateOptionLabel("2026-11-26", "2026-12-04")).toBe("Nov 26 – Dic 4, 2026");
+    expect(optionDayCount(dates.options![1])).toBe(4);
+    expect(optionDayCount({})).toBeNull();
+    expect(optionDayCount({ startDate: "2026-12-04", endDate: "2026-11-26" })).toBeNull();
+  });
+
+  it("spots repeated proposals", () => {
+    expect(alreadyProposed(dates.options!, { label: "x", startDate: "2026-11-26", endDate: "2026-11-28" })).toBe(true);
+    expect(alreadyProposed(dates.options!, { label: "x", startDate: "2026-11-26", endDate: "2026-11-29" })).toBe(false);
+    expect(alreadyProposed(place.options!, { label: "cartagena" })).toBe(true);
+    expect(alreadyProposed(place.options!, { label: "Santa Marta" })).toBe(false);
+  });
+
+  it("closing changes the header, and for dates rebuilds the days", () => {
+    const byDates = closedVoteChanges(dates, dates.options![1], trip)!;
+    expect(headerToTrip(byDates.header, trip)).toEqual({ ...trip, startDate: "2026-12-03", endDate: "2026-12-06" });
+    expect(byDates.days?.map((d) => d.id)).toEqual(["d0", "d1", "d2", "d3"]);
+    const byPlace = closedVoteChanges(place, place.options![0], trip)!;
+    expect(headerToTrip(byPlace.header, trip)).toEqual({ ...trip, destination: "Cartagena" });
+    expect(byPlace.days).toBeNull();
+    expect(headerToTrip(closedVoteChanges(dates, dates.options![0], { name: "Caribe" })!.header, { name: "Caribe" }))
+      .toEqual({ name: "Caribe", startDate: "2026-11-26", endDate: "2026-11-28" });
+    expect(closedVoteChanges(dates, { id: "z", label: "Sin fechas" }, trip)).toBeNull();
+  });
+
+  it("finds what a closed vote chose from the trip header", () => {
+    const closed = { ...dates, done: true };
+    expect(chosenOption(closed, { ...trip, startDate: "2026-12-03", endDate: "2026-12-06" })?.id).toBe("b");
+    expect(chosenOption(closed, trip)).toBeUndefined();
+    expect(chosenOption(dates, { ...trip, startDate: "2026-12-03", endDate: "2026-12-06" })).toBeUndefined();
+    expect(chosenOption({ ...place, done: true }, { ...trip, destination: "cartagena" })?.id).toBe("c");
   });
 });

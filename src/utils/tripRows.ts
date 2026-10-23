@@ -1,4 +1,6 @@
-import type { CalendarEvent, Day, DaySpan, EventPlace, Extra, Idea, MockPerson, Task, TaskOption, TripDocument, TripInfo, TripSpan } from "@/types";
+import type {
+  CalendarEvent, Day, DaySpan, EventPlace, Extra, Idea, MockPerson, Task, TaskDecides, TaskOption, TripDocument, TripInfo, TripSpan,
+} from "@/types";
 
 // Pure helpers that apply one database row (as returned by the ops endpoint or
 // broadcast on the trip channel) to the client's trip state. `row = null`
@@ -25,6 +27,9 @@ const optNum = (v: unknown): number | undefined => (v == null ? undefined : Numb
 const optStr = (v: unknown): string | undefined => (v == null ? undefined : String(v));
 const optStrings = (v: unknown): string[] | undefined =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : undefined;
+// Date columns arrive as "yyyy-mm-dd".
+const optDate = (v: unknown): string | undefined => (typeof v === "string" && v ? v.slice(0, 10) : undefined);
+const optDecides = (v: unknown): TaskDecides | undefined => (v === "dates" || v === "destination" ? v : undefined);
 
 function isStale(current: { version?: number } | undefined, row: Row): boolean {
   return current?.version !== undefined && current.version >= row.version;
@@ -66,7 +71,7 @@ export function rowToTaskOption(r: Row): TaskOption {
   return {
     id: r.id, label: String(r.label), note: optStr(r.note), amount: optNum(r.amount),
     currency: optStr(r.currency) as TaskOption["currency"], splitMode: optStr(r.split_mode) as TaskOption["splitMode"],
-    votes: optStrings(r.votes), version: r.version,
+    votes: optStrings(r.votes), startDate: optDate(r.start_date), endDate: optDate(r.end_date), version: r.version,
   };
 }
 
@@ -74,7 +79,8 @@ export function rowToTask(r: Row, options: TaskOption[] = []): Task {
   return {
     id: r.id, title: String(r.title), done: Boolean(r.done), note: optStr(r.note), dayId: optStr(r.day_id),
     start: r.day_id == null ? undefined : optNum(r.start_hour), end: r.day_id == null ? undefined : optNum(r.end_hour),
-    cat: optStr(r.cat), priority: optStr(r.priority) as Task["priority"], icon: optStr(r.icon), options, version: r.version,
+    cat: optStr(r.cat), priority: optStr(r.priority) as Task["priority"], icon: optStr(r.icon), options,
+    decides: optDecides(r.decides), version: r.version,
   };
 }
 

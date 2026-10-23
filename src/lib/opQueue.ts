@@ -45,8 +45,12 @@ interface ChangeBody {
 }
 
 // Ops whose response rows hold more than the client's optimistic state (rows the
-// server created; votes others committed first): apply them.
-const APPLY_RESPONSE = new Set(["task.chooseOption", "taskOption.vote"]);
+// server created; votes others committed first; the days a closed vote rebuilt): apply them.
+const APPLY_RESPONSE = new Set(["task.chooseOption", "taskOption.vote", "task.closeVote"]);
+// Multi-row ops that also change rows the response leaves out: refetch the trip after them.
+const RESYNC_AFTER = new Set(["itinerary.reset", "task.closeVote"]);
+// Keyed by the task they settle, like any other write of that task.
+const TASK_KEYED = new Set(["task.chooseOption", "task.closeVote"]);
 // Applied only when nothing else is queued for the item: a later op of ours
 // (another toggle, an edit) already shows in the optimistic state.
 const APPLY_WHEN_IDLE = new Set(["taskOption.vote"]);
@@ -56,11 +60,11 @@ const MERGEABLE = (op: string) =>
   op === "taskOption.vote";
 const GUARDED = (op: string) =>
   op.endsWith(".update") || op.endsWith(".delete") || op === "event.move" || op === "task.toggle" ||
-  op === "task.chooseOption" || op === "traveler.remove";
+  op === "task.chooseOption" || op === "task.closeVote" || op === "traveler.remove";
 
 export function opTarget(op: string, args: Record<string, unknown>): { key: string; table?: TripTable; id?: string } {
   const prefix = op.split(".")[0];
-  if (op === "task.chooseOption") {
+  if (TASK_KEYED.has(op)) {
     const id = String(args.taskId);
     return { key: `trip_tasks:${id}`, table: "trip_tasks", id };
   }
@@ -222,7 +226,7 @@ export class OpQueue {
       if (APPLY_RESPONSE.has(op) && !(APPLY_WHEN_IDLE.has(op) && this.queues.get(key)?.length)) {
         this.handlers.onRows(body.changed ?? []);
       }
-      if (op === "itinerary.reset") this.handlers.onResync();
+      if (RESYNC_AFTER.has(op)) this.handlers.onResync();
       return false;
     }
     if (res.status === 409 && table && id) {

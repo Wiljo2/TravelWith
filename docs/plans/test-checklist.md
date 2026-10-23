@@ -55,6 +55,15 @@ For item 10 (group voting) — migration `supabase/migrations/027_group_votes.sq
 - [ ] On staging, two accounts vote on the same "Por decidir" option at the same time → both votes
       stay and show live on the other screen; history says "… votó en la opción …".
 - [ ] A trip created before the change loads and edits as before, with 0 votes.
+- [ ] 7c on staging, dated trip with activities, owner A and member B: A taps "🗳️ Votar fechas" in
+      Pendientes; both propose ranges on Inicio and vote with ✋ → counts live on both screens. B
+      sees no "Elegir" and no × on the vote; a forced `task.closeVote` from B answers 403. A taps
+      "Elegir" → dialog says "Se borrarán N actividades" → confirm → both see the new dates in the
+      header and the rebuilt days live; the vote moves to Completadas with "Elegida".
+- [ ] Same with "🗳️ Votar destino": closing updates the header destination for both, and the Ideas
+      places follow it.
+- [ ] While A's dialog is open, B adds an activity on a trip that had none → A's close is refused
+      (sync notice, trip reloads) instead of wiping it silently.
 
 ## Log
 
@@ -108,3 +117,17 @@ For item 10 (group voting) — migration `supabase/migrations/027_group_votes.sq
   count, "Tú, Ana y 2 más", "Más votada", confirm when removing a voted option; Inicio "2 opciones ·
   ✋ 1 voto". Walked in the demo trip (local, in memory): vote, unvote, revote, Inicio count. Real
   voting needs 027 on staging → owner actions above.
+- 2026-10-23 — Item 10, 7c (date / destination votes on a dated trip) done in code, needs 027 on
+  staging: `task.create` with `decides` (one open vote per kind, forced "decidir" backlog), option
+  dates (≤ 60 days, required on dates votes; destinations ≤ 80 chars; ≤ 5 options; closed votes
+  frozen), `task.closeVote` (owner only) → `close_task_vote` with the replace confirm; members get
+  403 marking done or deleting a vote; `task.chooseOption` refuses votes. UI: Pendientes "🗳️ Votar
+  fechas / destino", vote cards on Inicio and Pendientes, `CloseVoteDialog`. Assistant read views
+  wait for `feature/agent-tools`. Sandbox walk (in memory) not done yet (no browser in this session).
+- 2026-10-23 — Item 10, 7c (date/destination votes on a dated trip) done in code: "Votar fechas" /
+  "Votar destino" in Pendientes, `VoteCard` on Inicio + "Votaciones" in Pendientes, proposals (≤ 5),
+  owner-only "Elegir" → `CloseVoteDialog` → `task.closeVote` (`close_task_vote`; refuses to wipe
+  activities unless the owner confirms "Elegir y borrar N actividades"). No 028 needed. Walked in the
+  demo trip: start dates vote → propose Mar 10–13 → vote → Elegir (12 activities warning) → header
+  "Mar 10 – 13, 2027", 4 new empty days, vote in Completadas as "Elegida". Assistant read views wait
+  for `feature/agent-tools`.

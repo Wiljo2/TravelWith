@@ -1,19 +1,25 @@
 "use client";
 import { useState, useRef } from "react";
-import type { Task, Day } from "@/types";
+import type { Task, Day, TripInfo } from "@/types";
 import { fmtHour } from "@/utils/time";
+import { activityCount } from "@/utils/tripDays";
+import { isVote } from "@/utils/votes";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import TaskRow from "@/components/tasks/TaskRow";
 import type { OptionVoting } from "@/components/tasks/OptionVote";
+import VoteCard, { type VoteControls } from "@/components/votes/VoteCard";
+import StartVoteButtons from "@/components/votes/StartVoteButtons";
 import { LIMITS } from "@/constants/limits";
 
 interface TasksViewProps {
   days: Day[];
   tasks: Task[];
+  trip: TripInfo | null;
   people: number;
   exchangeRate: number;
   voting: OptionVoting;
+  votes: VoteControls;
   onAdd: (title: string) => void;
   onToggle: (id: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
@@ -21,15 +27,19 @@ interface TasksViewProps {
   onDelete: (id: string) => void;
 }
 
-export default function TasksView({ days, tasks, people, exchangeRate, voting, onAdd, onToggle, onUpdateTask, onChooseOption, onDelete }: TasksViewProps) {
+export default function TasksView({
+  days, tasks, trip, people, exchangeRate, voting, votes, onAdd, onToggle, onUpdateTask, onChooseOption, onDelete,
+}: TasksViewProps) {
   const [draft, setDraft] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const pending = tasks.filter((t) => !t.done);
+  const openVotes = tasks.filter((t) => isVote(t) && !t.done);
+  const pending = tasks.filter((t) => !t.done && !isVote(t));
   const done    = tasks.filter((t) => t.done);
+  const activities = activityCount(days);
 
   function submit() {
     const title = draft.trim();
@@ -54,7 +64,17 @@ export default function TasksView({ days, tasks, people, exchangeRate, voting, o
   function renderList(list: Task[]) {
     return (
       <div className="flex flex-col gap-2">
-        {list.map((task) => (
+        {list.map((task) => isVote(task) ? (
+          <VoteCard
+            key={task.id}
+            task={task}
+            trip={trip}
+            activityCount={activities}
+            voting={voting}
+            votes={votes}
+            onDelete={votes.canClose ? () => onDelete(task.id) : undefined}
+          />
+        ) : (
           <TaskRow
             key={task.id}
             task={task}
@@ -100,9 +120,17 @@ export default function TasksView({ days, tasks, people, exchangeRate, voting, o
             </Button>
           </div>
 
+          <StartVoteButtons tasks={tasks} onStart={votes.startVote} className="mb-3" />
           <p className="mb-6 text-[11.5px] leading-normal text-muted-foreground">
             Tip: en el calendario, toca o haz clic en un hueco libre para agendar una tarea o discusión a una hora concreta.
           </p>
+
+          {openVotes.length > 0 && (
+            <section className="mb-8">
+              <SectionLabel title="Votaciones" count={openVotes.length} />
+              {renderList(openVotes)}
+            </section>
+          )}
 
           {pending.length > 0 && (
             <section className="mb-8">

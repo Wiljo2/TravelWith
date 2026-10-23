@@ -34,15 +34,20 @@ export function tripHeaderPatch(current: RoomHeaderRow, args: unknown): Partial<
   if (Object.keys(patch).length === 0) throw new DomainError("nothing to update");
 
   if (patch.start_date !== undefined || patch.end_date !== undefined) {
-    const start = parseISODate(patch.start_date ?? current.start_date ?? "");
-    const end = parseISODate(patch.end_date ?? current.end_date ?? "");
-    if (!start || !end) throw new DomainError("startDate and endDate must be valid dates (yyyy-mm-dd)");
-    if (end < start) throw new DomainError("endDate must be on or after startDate");
-    if (Math.round((end.getTime() - start.getTime()) / DAY_MS) + 1 > MAX_TRIP_DAYS) {
-      throw new DomainError(`A trip can last at most ${MAX_TRIP_DAYS} days`);
-    }
+    checkDateRange(patch.start_date ?? current.start_date ?? "", patch.end_date ?? current.end_date ?? "");
   }
   return patch;
+}
+
+// Both dates valid (yyyy-mm-dd), in order, and at most MAX_TRIP_DAYS days counting both ends.
+export function checkDateRange(startDate: string, endDate: string): void {
+  const start = parseISODate(startDate);
+  const end = parseISODate(endDate);
+  if (!start || !end) throw new DomainError("startDate and endDate must be valid dates (yyyy-mm-dd)");
+  if (end < start) throw new DomainError("endDate must be on or after startDate");
+  if (Math.round((end.getTime() - start.getTime()) / DAY_MS) + 1 > MAX_TRIP_DAYS) {
+    throw new DomainError(`A trip can last at most ${MAX_TRIP_DAYS} days`);
+  }
 }
 
 export function newTravelerRow(args: unknown, position: number): NewRow<"trip_travelers"> {

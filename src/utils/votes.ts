@@ -1,10 +1,68 @@
-import type { RoomMember, TaskOption } from "@/types";
+import type { Day, RoomMember, Task, TaskDecides, TaskOption, TripInfo } from "@/types";
+import { VOTE_KINDS } from "@/constants/votes";
+import { fmtTripDates, generateDays } from "@/utils/tripDays";
 
 // Approval voting on task options: each member backs as many options as they
 // like. Votes of people who left the trip stop counting; with no roster (local
 // mode, or before the trip loads) every vote counts.
 
 type Voted = Pick<TaskOption, "votes">;
+
+export type VoteTask = Task & { decides: TaskDecides };
+
+// A date or destination vote (rows from older or newer clients may carry an unknown kind).
+export function isVote(task: Task): task is VoteTask {
+  return !!task.decides && Object.hasOwn(VOTE_KINDS, task.decides);
+}
+
+// The vote of that kind still waiting for the owner to close it.
+export function openVote(tasks: Task[], kind: TaskDecides): VoteTask | undefined {
+  return tasks.find((t): t is VoteTask => isVote(t) && t.decides === kind && !t.done);
+}
+
+// "Nov 26 – Dic 4, 2026"; the stored label of a date option.
+export function dateOptionLabel(startDate: string, endDate: string): string {
+  return fmtTripDates(startDate, endDate);
+}
+
+// Days in a date option, or null when it has no valid range.
+export function optionDayCount(option: Pick<TaskOption, "startDate" | "endDate">): number | null {
+  return option.startDate && option.endDate ? generateDays(option.startDate, option.endDate)?.length ?? null : null;
+}
+
+// The option a closed vote settled on, as the trip header shows it now.
+export function chosenOption(task: VoteTask, trip: TripInfo | null): TaskOption | undefined {
+  if (!task.done || !trip) return undefined;
+  const options = task.options ?? [];
+  if (task.decides === "dates") return options.find((o) => o.startDate === trip.startDate && o.endDate === trip.endDate);
+  const destination = trip.destination?.trim().toLowerCase();
+  return destination ? options.find((o) => o.label.trim().toLowerCase() === destination) : undefined;
+}
+
+// What closing a vote with `option` changes on the client: the trip header (as
+// rooms stores it, for headerToTrip) and, for dates, the days rebuilt like a
+// new trip's. Null when the option can't settle the vote.
+export function closedVoteChanges(
+  task: VoteTask,
+  option: TaskOption,
+  trip: TripInfo | null,
+): { header: Record<string, unknown>; days: Day[] | null } | null {
+  if (task.decides === "dates") {
+    const days = option.startDate && option.endDate ? generateDays(option.startDate, option.endDate) : null;
+    if (!days) return null;
+    return { header: { destination: trip?.destination ?? null, start_date: option.startDate, end_date: option.endDate }, days };
+  }
+  const destination = option.label.trim();
+  if (!destination) return null;
+  return { header: { destination, start_date: trip?.startDate ?? null, end_date: trip?.endDate ?? null }, days: null };
+}
+
+// Whether an option with this value is already proposed (same range, or same name ignoring case).
+export function alreadyProposed(options: TaskOption[], proposal: Pick<TaskOption, "label" | "startDate" | "endDate">): boolean {
+  if (proposal.startDate) return options.some((o) => o.startDate === proposal.startDate && o.endDate === proposal.endDate);
+  const label = proposal.label.trim().toLowerCase();
+  return options.some((o) => o.label.trim().toLowerCase() === label);
+}
 
 export function countedVotes(option: Voted, memberIds: readonly string[] = []): string[] {
   const votes = option.votes ?? [];

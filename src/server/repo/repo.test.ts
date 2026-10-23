@@ -13,6 +13,7 @@ vi.mock("@/lib/supabase-server", () => ({
 const { eventsRepo } = await import("./events");
 const { expensesRepo } = await import("./expenses");
 const { setOptionVote } = await import("./taskOptions");
+const { closeTaskVote } = await import("./tasks");
 const { RowConflictError, RowNotFoundError } = await import("./errors");
 
 const USER = "00000000-0000-0000-0000-000000000001";
@@ -182,5 +183,32 @@ describe("setOptionVote", () => {
     const err = await setOptionVote(CODE, "o1", false, USER).catch((e) => e);
     expect(err).toBeInstanceOf(HttpError);
     expect(err.status).toBe(404);
+  });
+});
+
+describe("closeTaskVote", () => {
+  it("calls close_task_vote with the acting user and returns task, days and header", async () => {
+    handler = () => ({ data: { task: { id: "k1", version: 3, done: true }, days: [{ id: "d0", version: 1 }], trip: { code: CODE } } });
+    const result = await closeTaskVote(CODE, "k1", "o1", 2, [{ id: "d0", label: "Jue · Nov 26", sub: "", flexible: false }], true, USER);
+    expect(result).toMatchObject({ task: { id: "k1", done: true }, days: [{ id: "d0" }] });
+    expect(mock.log[0]).toMatchObject({
+      op: "rpc",
+      table: "close_task_vote",
+      args: { p_code: CODE, p_task_id: "k1", p_option_id: "o1", p_expected_version: 2, p_replace: true, p_user: USER },
+    });
+  });
+
+  it("maps a stale or missing task to a conflict or a 404", async () => {
+    handler = () => ({ data: { conflict: true, current: { id: "k1", version: 7 } } });
+    expect(await closeTaskVote(CODE, "k1", "o1", 2, null, false, USER).catch((e) => e)).toBeInstanceOf(RowConflictError);
+    handler = () => ({ data: { conflict: true, current: null } });
+    expect(await closeTaskVote(CODE, "k1", "o1", 2, null, false, USER).catch((e) => e)).toBeInstanceOf(RowNotFoundError);
+  });
+
+  it("answers 400 when the itinerary got activities meanwhile", async () => {
+    handler = () => ({ error: { code: "22023", message: "the itinerary has activities" } });
+    const err = await closeTaskVote(CODE, "k1", "o1", 2, [], false, USER).catch((e) => e);
+    expect(err).toBeInstanceOf(HttpError);
+    expect(err.status).toBe(400);
   });
 });

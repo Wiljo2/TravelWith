@@ -5,13 +5,15 @@ import DayAgenda from "@/components/itinerary/DayAgenda";
 import TodayCard from "@/components/home/TodayCard";
 import VideoTipsPanel from "@/components/home/VideoTipsPanel";
 import FirstStepsCard from "@/components/home/FirstStepsCard";
+import VoteCard, { type VoteControls } from "@/components/votes/VoteCard";
+import type { OptionVoting } from "@/components/tasks/OptionVote";
 import { PANEL, Progress, SectionTitle } from "@/components/home/shared";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT } from "@/constants/taskCategories";
 import { fmtUSD, optionGroupUSD, fmtUSDNum } from "@/utils/currency";
 import { fmtHour } from "@/utils/time";
 import { taskIcon } from "@/utils/itemIcon";
-import { totalVotes } from "@/utils/votes";
-import { UNDATED_LABEL, hasDates, tripPhase } from "@/utils/tripDays";
+import { isVote, totalVotes } from "@/utils/votes";
+import { UNDATED_LABEL, activityCount, hasDates, tripPhase } from "@/utils/tripDays";
 import type { TripPhase } from "@/utils/tripDays";
 import { useNow } from "@/hooks/useNow";
 import { cn } from "@/lib/utils";
@@ -25,8 +27,9 @@ interface HomeViewProps {
   loaded: boolean;
   // People who joined the trip; placeholder travelers are not counted.
   memberCount: number;
-  // Their user ids: votes count only while the voter is still on the trip.
-  memberIds: string[];
+  // Votes count only while the voter is still on the trip (voting.members).
+  voting: OptionVoting;
+  votes: VoteControls;
   expenseCount: number;
   documentCount: number;
   trip: TripInfo | null;
@@ -55,7 +58,7 @@ function heroCopy(phase: TripPhase | null, dayCount: number, undated: boolean) {
 // Adapts to the moment: countdown and decisions before the trip, "now / next"
 // while it's underway, and a wrap-up once it's over.
 export default function HomeView({
-  roomCode, loaded, memberCount, memberIds, expenseCount, documentCount,
+  roomCode, loaded, memberCount, voting, votes, expenseCount, documentCount,
   trip, days, tasks, ideas, grandTotal, people, exchangeRate, onNavigate, documents, placed = [],
 }: HomeViewProps) {
   const now = useNow();
@@ -64,13 +67,15 @@ export default function HomeView({
   const phase = hasDates(trip) ? tripPhase(trip.startDate, days.length, now) : null;
   const during = phase?.phase === "during" ? phase : null;
   const after = phase?.phase === "after";
+  const memberIds = voting.members.map((m) => m.userId);
 
   const pending = tasks.filter((t) => !t.done);
   const today = during ? days[during.dayIdx] : undefined;
   const tomorrow = during ? days[during.dayIdx + 1] : undefined;
   const todayTasks = today ? pending.filter((t) => t.dayId === today.id) : [];
+  const openVotes = pending.filter(isVote);
   const toDecide = pending
-    .filter((t) => !todayTasks.includes(t))
+    .filter((t) => !todayTasks.includes(t) && !isVote(t))
     .filter((t) => (t.options?.length ?? 0) > 0 || t.priority === "alta")
     .slice(0, 4);
 
@@ -110,6 +115,10 @@ export default function HomeView({
         )}
 
         {!after && <VideoTipsPanel placed={placed} days={days} today={today} onOpenIdeas={() => onNavigate("ideas")} />}
+
+        {openVotes.map((t) => (
+          <VoteCard key={t.id} task={t} trip={trip} activityCount={activityCount(days)} voting={voting} votes={votes} />
+        ))}
 
         {!after && !(undated && days.length === 0) && (
           <section className={PANEL}>

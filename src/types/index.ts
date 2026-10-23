@@ -119,8 +119,13 @@ export interface TaskOption {
   currency?: "USD" | "COP";          // default "USD"
   splitMode?: "group" | "perPerson"; // default "group"
   votes?: string[];                  // user ids of the members who back it (approval voting); default []
+  startDate?: string;                // ISO yyyy-mm-dd; set (with endDate) on the options of a dates vote
+  endDate?: string;
   version?: number;
 }
+
+// What a group vote settles once the owner closes it: the trip dates or the destination.
+export type TaskDecides = "dates" | "destination";
 
 export interface Task {
   id: string;
@@ -134,6 +139,7 @@ export interface Task {
   priority?: TaskPriority;
   icon?: string;          // emoji chosen by the user; absent = automatic (from the title)
   options?: TaskOption[];  // candidate choices (a decision to resolve); unchosen options never sum into the confirmed total
+  decides?: TaskDecides;   // set → a group vote on the trip dates or destination (check with `isVote`)
   version?: number;
 }
 

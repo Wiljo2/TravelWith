@@ -73,6 +73,15 @@ describe("lists and tasks", () => {
     expect(stale[0].options?.[0].votes).toEqual(["u1", "u2"]);
   });
 
+  it("reads what a vote settles and option dates; unknown kinds and junk read as nothing", () => {
+    expect(rowToTask({ id: "k", title: "x", done: false, decides: "dates", version: 1 } as Row).decides).toBe("dates");
+    expect(rowToTask({ id: "k", title: "x", done: false, decides: "budget", version: 1 } as Row).decides).toBeUndefined();
+    expect(rowToTask({ id: "k", title: "x", done: false, decides: null, version: 1 } as Row).decides).toBeUndefined();
+    expect(rowToTaskOption({ id: "o1", label: "A", start_date: "2026-11-26", end_date: "2026-11-28", version: 1 } as Row))
+      .toMatchObject({ startDate: "2026-11-26", endDate: "2026-11-28" });
+    expect(rowToTaskOption({ id: "o1", label: "A", start_date: null, end_date: 3, version: 1 } as Row)).toMatchObject({ startDate: undefined, endDate: undefined });
+  });
+
   it("rowToTask drops hours of backlog tasks", () => {
     expect(rowToTask({ id: "k", title: "x", done: false, day_id: null, start_hour: 9, end_hour: 10, version: 1 } as Row)).toMatchObject({ dayId: undefined, start: undefined, end: undefined });
   });

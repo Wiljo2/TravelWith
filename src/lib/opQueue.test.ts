@@ -277,6 +277,7 @@ describe("helpers", () => {
   it("opTarget keys ops by item, days or trip", () => {
     expect(opTarget("event.move", { id: "e1" }).key).toBe("trip_events:e1");
     expect(opTarget("task.chooseOption", { taskId: "k1" }).key).toBe("trip_tasks:k1");
+    expect(opTarget("task.closeVote", { taskId: "k1", optionId: "o1" }).key).toBe("trip_tasks:k1");
     expect(opTarget("day.swap", { a: "d0", b: "d1" }).key).toBe("days");
     expect(opTarget("trip.update", { name: "x" }).key).toBe("trip");
   });
@@ -324,5 +325,32 @@ describe("OpQueue flush", () => {
     expect(versionEntries({ documents: [{ id: "d", version: 2 }], ideas: [{ id: "i", version: 3 }], eventPlaces: { e1: { version: 4 } } })).toEqual([
       ["trip_documents:d", 2], ["trip_ideas:i", 3], ["trip_event_places:e1", 4],
     ]);
+  });
+});
+
+describe("OpQueue closing a vote", () => {
+  it("guards the task version, applies the task and days, passes the header and resyncs", async () => {
+    const { queue, calls, handlers } = setup();
+    queue.seed([["trip_tasks:k1", 4]]);
+    queue.send("task.closeVote", { taskId: "k1", optionId: "o1" });
+    expect(calls[0]).toMatchObject({ op: "task.closeVote", expectedVersion: 4 });
+    const rows = [{ table: "trip_tasks", row: { id: "k1", version: 5 } }, { table: "trip_days", row: { id: "d0", version: 2 } }];
+    calls[0].resolve(ok(rows, { trip: { start_date: "2026-11-26", end_date: "2026-11-28" } }));
+    await flush();
+    expect(handlers.onRows).toHaveBeenCalledWith(rows);
+    expect(handlers.onTrip).toHaveBeenCalledWith({ start_date: "2026-11-26", end_date: "2026-11-28" });
+    expect(handlers.onResync).toHaveBeenCalled();
+    queue.send("task.update", { id: "k1", note: "x" });
+    expect(calls[1].expectedVersion).toBe(5);
+  });
+
+  it("adopts the current task on a conflict", async () => {
+    const { queue, calls, handlers } = setup();
+    queue.seed([["trip_tasks:k1", 4]]);
+    queue.send("task.closeVote", { taskId: "k1", optionId: "o1" });
+    calls[0].resolve({ status: 409, body: { table: "trip_tasks", current: { id: "k1", version: 6 } } });
+    await flush();
+    expect(handlers.onConflict).toHaveBeenCalledWith("trip_tasks", "k1", { id: "k1", version: 6 });
+    expect(handlers.onResync).not.toHaveBeenCalled();
   });
 });

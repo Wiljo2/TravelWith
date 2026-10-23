@@ -103,7 +103,7 @@ Server-side mutations do NOT talk to Supabase directly. The layering is:
 | POST | `/api/rooms` | Create trip (authenticated): validates `{name, destination?, startDate, endDate, travelers?: string[], tasks?: {title, cat?, priority?}[]}` (≤ `LIMITS.travelers` / `LIMITS.starterTasks`; malformed → 400 before anything is written), generates days, inserts room with a random 10-char code, makes the caller owner, seeds the travelers and backlog tasks |
 | GET | `/api/rooms/list` | Authenticated: trips of the current user (joins `user_rooms` + `rooms`, returns names) |
 | GET | `/api/rooms/[code]` | Trip in `RoomPayload` shape assembled from the tables (`get_trip`), every item with its `version`, plus members |
-| POST | `/api/rooms/[code]/ops` | One write `{ op, args, expectedVersion? }` (member; `itinerary.reset` owner only). 200 `{ changed, deleted, trip? }`; 400 invalid; 404 gone; 409 `{ table, current }` on a stale version; 503 in maintenance. Body ≤ 32 KB |
+| POST | `/api/rooms/[code]/ops` | One write `{ op, args, expectedVersion? }` (member; `itinerary.reset` and `task.closeVote` owner only, and so are marking done or deleting a date/destination vote task). 200 `{ changed, deleted, trip? }`; 400 invalid; 404 gone; 409 `{ table, current }` on a stale version; 503 in maintenance. Body ≤ 32 KB |
 | DELETE | `/api/rooms/[code]` | Hard-delete for everyone. Authenticated + **owner only** (403 otherwise). Not wired in the UI |
 | GET/POST/DELETE | `/api/rooms/[code]/members` | List / join (idempotent, authenticated) / **leave** |
 | POST | `/api/rooms/errors` | Browser error report (no auth: same origin only, body ≤ 8 KB) stored in `app_errors` |
