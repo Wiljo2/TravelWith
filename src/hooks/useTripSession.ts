@@ -32,7 +32,8 @@ export function useTripSession() {
   // auto-resume above (which is what redirects a returning user into their room).
   useEffect(() => {
     if (!LOCAL_MODE_ENABLED) return;
-    if (!new URLSearchParams(window.location.search).has("local")) return;
+    const local = new URLSearchParams(window.location.search).get("local");
+    if (local === null || local === "new") return;
     setResumeAttempted(true);
     setRoomCode(LOCAL_ROOM_CODE);
   }, []);

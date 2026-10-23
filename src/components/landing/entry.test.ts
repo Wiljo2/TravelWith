@@ -34,6 +34,10 @@ describe("shouldEnterApp", () => {
     expect(shouldEnterApp({ ...base, search: "?local=1", localModeEnabled: true })).toBe(true);
   });
 
+  it("shows the landing for the first-run sandbox, even with a session", () => {
+    expect(shouldEnterApp({ ...base, search: "?local=new", localModeEnabled: true, storageKeys: ["sb-abcdef-auth-token"] })).toBe(false);
+  });
+
   it("enters when a Supabase session exists", () => {
     expect(shouldEnterApp({ ...base, storageKeys: ["sb-abcdef-auth-token"] })).toBe(true);
   });

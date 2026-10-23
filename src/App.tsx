@@ -29,7 +29,7 @@ import TasksView from "@/components/tasks/TasksView";
 import IdeasTab from "@/components/ideas/IdeasTab";
 import ItineraryMap from "@/components/map/ItineraryMap";
 import type { AgentChatMessage, Task } from "@/types";
-import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE } from "@/data/localMode";
+import { LOCAL_MODE_ENABLED, LOCAL_ROOM_CODE, openLocalDemo, type LocalVariant } from "@/data/localMode";
 import { generateDays, tripDayIndex } from "@/utils/tripDays";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 import ItineraryView from "@/components/itinerary/ItineraryView";
@@ -37,10 +37,12 @@ import type { ItinerarySheet } from "@/components/itinerary/ItineraryView";
 import ItineraryAgenda from "@/components/itinerary/ItineraryAgenda";
 import ActivityDetail from "@/components/itinerary/ActivityDetail";
 import SpansManager from "@/components/itinerary/SpansManager";
+import PasswordRecoveryDialog from "@/components/auth/PasswordRecoveryDialog";
 
 export default function App() {
   const { roomCode, setRoomCode, resumeAttempted, localMode, auth, userRooms: rooms } = useTripSession();
-  const { user, session, loading: authLoading, signInWithGoogle, signOut } = auth;
+  const { user, session, loading: authLoading, recovering, updatePassword, signOut } = auth;
+  const recoveryDialog = <PasswordRecoveryDialog open={recovering} onSubmit={updatePassword} />;
   const { rooms: userRooms, addRoom, removeRoom } = rooms;
   // Beta: the assistant is owner-only, like resetting the itinerary (both enforced server-side too).
   const isOwner = localMode || userRooms.some((r) => r.room_code === roomCode && r.role === "owner");
@@ -120,6 +122,12 @@ export default function App() {
     }
   );
 
+  function enterLocal(variant: LocalVariant) {
+    if (variant === "new") return window.location.assign("/?local=new");
+    openLocalDemo();
+    setRoomCode(LOCAL_ROOM_CODE);
+  }
+
   if (!roomCode) {
     // Wait for the resume decision before rendering RoomGate, so a returning
     // user doesn't see a flash of "Mis viajes" before being auto-redirected.
@@ -131,18 +139,21 @@ export default function App() {
       );
     }
     return (
-      <RoomGate
-        onEnter={setRoomCode}
-        user={user}
-        session={session}
-        authLoading={authLoading}
-        signInWithGoogle={signInWithGoogle}
-        signOut={signOut}
-        rooms={userRooms}
-        addRoom={addRoom}
-        removeRoom={removeRoom}
-        onEnterLocal={LOCAL_MODE_ENABLED ? () => setRoomCode(LOCAL_ROOM_CODE) : undefined}
-      />
+      <>
+        {recoveryDialog}
+        <RoomGate
+          onEnter={setRoomCode}
+          user={user}
+          session={session}
+          authLoading={authLoading}
+          signIn={auth}
+          signOut={signOut}
+          rooms={userRooms}
+          addRoom={addRoom}
+          removeRoom={removeRoom}
+          onEnterLocal={LOCAL_MODE_ENABLED ? enterLocal : undefined}
+        />
+      </>
     );
   }
 
@@ -353,6 +364,7 @@ export default function App() {
       <Snackbar snack={snack} onDismiss={dismissSnack} />
       <SyncNotice message={ops.notice} onDismiss={ops.dismissNotice} />
       {ops.maintenance && <MaintenanceBanner />}
+      {recoveryDialog}
 
       {slotDraft && (
         <SlotCreateModal

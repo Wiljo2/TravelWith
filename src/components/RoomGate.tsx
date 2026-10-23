@@ -10,22 +10,25 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { loadSnapshot } from "@/lib/offline";
+import { LOCAL_ROOM_CODE, type LocalVariant } from "@/data/localMode";
+import { isSandbox, setSandboxTrip } from "@/data/localSandbox";
+import SignInOptions, { type SignInOptionsProps } from "@/components/auth/SignInOptions";
 
 interface RoomGateProps {
   onEnter: (code: string) => void;
   user: User | null;
   session: Session | null;
   authLoading: boolean;
-  signInWithGoogle: () => void;
+  signIn: SignInOptionsProps;
   signOut: () => void;
   rooms: UserRoom[];
   addRoom: (code: string, role?: "owner" | "member", name?: string | null) => void;
   removeRoom: (code: string, accessToken: string) => Promise<void>;
-  onEnterLocal?: () => void;
+  onEnterLocal?: (variant: LocalVariant) => void;
 }
 
 export default function RoomGate({
-  onEnter, user, session, authLoading, signInWithGoogle, signOut, rooms, addRoom, removeRoom, onEnterLocal,
+  onEnter, user, session, authLoading, signIn, signOut, rooms, addRoom, removeRoom, onEnterLocal,
 }: RoomGateProps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,6 +47,11 @@ export default function RoomGate({
   async function join(code?: string) {
     const c = (code ?? input).trim().toUpperCase();
     if (!c) return;
+    if (isSandbox()) {
+      if (c === LOCAL_ROOM_CODE) onEnter(c);
+      else setError("En modo local no hay viajes de otras personas a los que unirse.");
+      return;
+    }
     setLoading(true);
     setError("");
     const res = await apiFetch(`/api/rooms/${c}/members`, session?.access_token, { method: "POST" }).catch(() => null);
@@ -66,6 +74,13 @@ export default function RoomGate({
 
   async function create() {
     if (!canCreate) return;
+    if (isSandbox()) {
+      const name = tripName.trim();
+      setSandboxTrip({ name, destination: tripDestination.trim() || undefined, startDate: tripStart, endDate: tripEnd });
+      addRoom(LOCAL_ROOM_CODE, "owner", name);
+      onEnter(LOCAL_ROOM_CODE);
+      return;
+    }
     setLoading(true);
     setError("");
     const res = await apiFetch("/api/rooms", session?.access_token, {
@@ -92,9 +107,9 @@ export default function RoomGate({
   // Collaborative model: "delete" always means leaving MY view. The room lives
   // while anyone else still has it; the server deletes it when the last member leaves.
   async function confirmDelete() {
-    if (!deleteTarget || !session?.access_token) return;
+    if (!deleteTarget || (!session?.access_token && !isSandbox())) return;
     setDeleting(true);
-    await removeRoom(deleteTarget.code, session.access_token);
+    await removeRoom(deleteTarget.code, session?.access_token ?? "");
     setDeleting(false);
     setDeleteTarget(null);
   }
@@ -117,12 +132,9 @@ export default function RoomGate({
           <Card className="rounded-[14px]">
             <CardContent className="px-7 py-2 text-center">
               <p className="mb-5 text-sm leading-relaxed text-secondary-foreground">
-                Inicia sesión para ver tus viajes y colaborar en tiempo real con tu grupo.
+                Inicia sesión o crea tu cuenta para ver tus viajes y colaborar en tiempo real con tu grupo.
               </p>
-              <Button variant="outline" size="lg" onClick={signInWithGoogle} className="w-full gap-2.5 bg-secondary text-[15px]">
-                <GoogleIcon />
-                Continuar con Google
-              </Button>
+              <SignInOptions {...signIn} />
             </CardContent>
           </Card>
 
@@ -271,12 +283,20 @@ export default function RoomGate({
         )}
 
         {onEnterLocal && (
-          <button
-            onClick={onEnterLocal}
-            className="mt-6 w-full cursor-pointer border-none bg-transparent text-[11px] text-muted-foreground underline underline-offset-4 hover:text-foreground"
-          >
-            Modo local · datos de prueba, sin cuenta ni guardado
-          </button>
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <button
+              onClick={() => onEnterLocal("demo")}
+              className="cursor-pointer border-none bg-transparent text-[11px] text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              Modo local · datos de prueba, sin cuenta ni guardado
+            </button>
+            <button
+              onClick={() => onEnterLocal("new")}
+              className="cursor-pointer border-none bg-transparent text-[11px] text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              Modo local · viaje nuevo vacío, como un usuario recién llegado
+            </button>
+          </div>
         )}
       </div>
 
@@ -303,16 +323,5 @@ export default function RoomGate({
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24">
-      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-    </svg>
   );
 }

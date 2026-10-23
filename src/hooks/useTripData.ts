@@ -12,6 +12,7 @@ import type { Notify } from "@/hooks/useSnackbar";
 import { useFeatureSync } from "@/hooks/useFeatureSync";
 import { ideaPlanOf, type FeatureState, type IdeaPlan } from "@/utils/featureSync";
 import type { RoomPayload } from "@/types";
+import { localVariant } from "@/data/localSandbox";
 import { rowToDocument, rowToEventPlace, rowToIdea, type Row, type TripTable } from "@/utils/tripRows";
 
 // The ideas, documents and map places of a loaded trip, as their hooks hold them.
@@ -121,14 +122,14 @@ export function useTripData(roomCode: string | null, accessToken: string | undef
     canResync: ops.idle,
   });
 
-  // useRoom fetches nothing for LOCAL, so the demo (or a local snapshot) is
+  // useRoom fetches nothing for LOCAL, so the demo, a local snapshot or an empty trip is
   // seeded here, once. It is imported lazily and never in production builds.
   const localSeeded = useRef(false);
   useEffect(() => {
     // Inline NODE_ENV check (not LOCAL_MODE_ENABLED) so the bundler can drop the import.
     if (process.env.NODE_ENV === "production" || !localMode || localSeeded.current) return;
     localSeeded.current = true;
-    import("@/data/localPayload").then(({ loadLocalPayload }) => loadLocalPayload()).then(onLoad);
+    import("@/data/localPayload").then(({ loadLocalPayload }) => loadLocalPayload(localVariant())).then(onLoad);
   }, [localMode, onLoad]);
   const resetLocalSeed = useCallback(() => {
     localSeeded.current = false;
