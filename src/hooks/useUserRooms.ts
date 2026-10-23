@@ -5,13 +5,14 @@ import { apiFetch } from "@/lib/api";
 import { loadRoomList, saveRoomList } from "@/lib/offline";
 import { LOCAL_ROOM_CODE } from "@/data/localMode";
 import { isSandbox, onSandboxChange, sandboxTrip, setSandboxTrip } from "@/data/localSandbox";
+import { tripHeader } from "@/utils/tripSetup";
 
-// The sandbox has at most one trip: the one created in its "Nuevo viaje" form.
+// The sandbox has at most one trip: the one created in its "Nuevo viaje" wizard.
 function sandboxRooms(): UserRoom[] {
   const trip = sandboxTrip();
   if (!trip) return [];
   const now = new Date().toISOString();
-  return [{ room_code: LOCAL_ROOM_CODE, role: "owner", joined_at: now, last_active_at: now, name: trip.name, trip }];
+  return [{ room_code: LOCAL_ROOM_CODE, role: "owner", joined_at: now, last_active_at: now, name: trip.name, trip: tripHeader(trip) }];
 }
 
 export interface UserRoom {

@@ -13,6 +13,7 @@ export const LIMITS = {
   documents: 100,
   documentTitle: 120,
   travelers: 50,
+  starterTasks: 5,
   title: 200,
   label: 200,
   name: 80,

@@ -1,5 +1,5 @@
 import type { User } from "@supabase/supabase-js";
-import type { TripInfo } from "@/types";
+import type { NewTrip } from "@/types";
 import { LOCAL_MODE_ENABLED, type LocalVariant } from "@/data/localMode";
 
 // "Brand-new user" local mode (`?local=new`, dev builds only): the tab walks the real
@@ -64,12 +64,14 @@ export function signOutSandbox() {
   write(USER_KEY, null);
 }
 
-export function sandboxTrip(): TripInfo | null {
+// The trip created in the sandbox, with the wizard's travelers and tasks (absent in
+// trips stored before the wizard).
+export function sandboxTrip(): NewTrip | null {
   const raw = read(TRIP_KEY);
-  return raw ? (JSON.parse(raw) as TripInfo) : null;
+  return raw ? (JSON.parse(raw) as NewTrip) : null;
 }
 
-export function setSandboxTrip(trip: TripInfo | null) {
+export function setSandboxTrip(trip: NewTrip | null) {
   write(TRIP_KEY, trip ? JSON.stringify(trip) : null);
 }
 

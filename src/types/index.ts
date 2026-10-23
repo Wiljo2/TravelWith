@@ -6,6 +6,22 @@ export interface TripInfo {
   endDate: string;        // ISO yyyy-mm-dd
 }
 
+// A task created together with the trip (backlog, no day).
+export interface StarterTask {
+  title: string;
+  cat?: string;
+  priority?: TaskPriority;
+}
+
+// Body of POST /api/rooms: the header plus the creation wizard's optional seed rows.
+export interface NewTrip extends TripInfo {
+  travelers?: string[];   // placeholder traveler names (the creator is a member, not a traveler)
+  tasks?: StarterTask[];
+}
+
+export type TripCompanion = "solo" | "pareja" | "amigos" | "familia";
+export type TripBooking = "vuelos" | "alojamiento";
+
 export interface CalendarEvent {
   id: string;
   start: number;

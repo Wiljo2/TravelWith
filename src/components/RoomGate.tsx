@@ -2,7 +2,7 @@
 import { useState } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import type { UserRoom } from "@/hooks/useUserRooms";
-import type { TripInfo } from "@/types";
+import type { NewTrip } from "@/types";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import { firstName } from "@/utils/userName";
 import SignInOptions, { type SignInOptionsProps } from "@/components/auth/SignInOptions";
 import TripList from "@/components/gate/TripList";
 import JoinByCode from "@/components/gate/JoinByCode";
-import CreateTripForm from "@/components/gate/CreateTripForm";
+import CreateTripWizard from "@/components/gate/CreateTripWizard";
 import WelcomeFirstTrip from "@/components/gate/WelcomeFirstTrip";
 
 interface RoomGateProps {
@@ -70,7 +70,7 @@ export default function RoomGate({
     onEnter(c);
   }
 
-  async function create(trip: TripInfo) {
+  async function create(trip: NewTrip) {
     if (isSandbox()) {
       setSandboxTrip(trip);
       addRoom(LOCAL_ROOM_CODE, "owner", trip.name);
@@ -117,9 +117,7 @@ export default function RoomGate({
     setError("");
   }
 
-  const panel = showCreate ? (
-    <CreateTripForm loading={loading} error={error} onSubmit={create} onCancel={closePanel} />
-  ) : showJoin ? (
+  const joinPanel = showJoin ? (
     <JoinByCode loading={loading} error={error} onSubmit={join} onCancel={closePanel} />
   ) : null;
 
@@ -169,10 +167,12 @@ export default function RoomGate({
               </Button>
             </div>
 
-            {rooms.length === 0 ? (
+            {showCreate ? (
+              <CreateTripWizard loading={loading} error={error} onSubmit={create} onCancel={closePanel} />
+            ) : rooms.length === 0 ? (
               <WelcomeFirstTrip
                 name={firstName(user)}
-                panel={panel}
+                panel={joinPanel}
                 onCreate={() => openPanel("create")}
                 onJoin={() => openPanel("join")}
               />
@@ -181,11 +181,11 @@ export default function RoomGate({
                 <TripList
                   rooms={rooms}
                   disabled={loading}
-                  error={panel ? "" : error}
+                  error={joinPanel ? "" : error}
                   onOpen={join}
                   onRemove={setDeleteTarget}
                 />
-                {panel ?? (
+                {joinPanel ?? (
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={() => openPanel("join")} className="flex-1 bg-card">
                       Unirse con código

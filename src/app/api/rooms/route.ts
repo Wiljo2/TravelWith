@@ -8,15 +8,21 @@ import { assertWritable } from "@/server/maintenance";
 import { HttpError, errorResponse } from "@/server/http";
 import { deleteRoom, joinRoom } from "@/server/members";
 import { generateRoomCode } from "@/server/room-code";
+import { DomainError } from "@/server/domain/core";
+import { tripSeedRows, type TripSeedRows } from "@/server/domain/seedRows";
 import { resetItinerary } from "@/server/repo/days";
+import { tasksRepo } from "@/server/repo/tasks";
+import { travelersRepo } from "@/server/repo/travelers";
 import type { TripInfo } from "@/types";
 
 const MAX_ATTEMPTS = 3;
 
 // POST /api/rooms — create a trip: the header in the rooms columns, the empty
-// days in trip_days (rooms.payload stays empty, it is only the pre-cut-over
-// backup). Built server-side so a fresh room never inherits the client's local
-// state, and the creator becomes owner here: roles are never chosen by the client.
+// days in trip_days and the optional seed rows from the creation wizard
+// (placeholder travelers, starter tasks); rooms.payload stays empty, it is only
+// the pre-cut-over backup. Built server-side so a fresh room never inherits the
+// client's local state, and the creator becomes owner here: roles are never
+// chosen by the client. Any failure after the insert deletes the room.
 export async function POST(req: Request) {
   try {
     assertWritable();
@@ -34,11 +40,14 @@ export async function POST(req: Request) {
 
     const days = generateDays(trip.startDate, trip.endDate);
     if (!days) throw new HttpError(400, "Rango de fechas inválido");
+    const seed = seedRows(body as Record<string, unknown>);
 
     const code = await insertRoom(trip);
     try {
       await joinRoom(code, user, "owner");
       await resetItinerary(code, days.map(({ id, label, sub, flexible }) => ({ id, label, sub, flexible })), user.id);
+      await travelersRepo.insertMany(code, seed.travelers, user.id);
+      await tasksRepo.insertMany(code, seed.tasks, user.id);
     } catch (e) {
       await deleteRoom(code).catch(() => {});
       throw e;
@@ -47,6 +56,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ code, trip }, { status: 201 });
   } catch (e) {
     return errorResponse(e, "POST /api/rooms");
+  }
+}
+
+function seedRows(body: Record<string, unknown>): TripSeedRows {
+  try {
+    return tripSeedRows(body);
+  } catch (e) {
+    if (e instanceof DomainError) throw new HttpError(400, e.message);
+    throw e;
   }
 }
 

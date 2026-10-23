@@ -19,7 +19,7 @@ needs a dashboard or account action outside the repo goes under "Owner actions" 
       in "Mis viajes". Known limit: leaving the trip and re-entering starts it empty again.
       The sandbox lasts for the browser tab; open `?local=new` again to start over.
 - [x] 4. **Onboarding 1 — welcome for a first-time creator** (`first-run-onboarding.md` step 1).
-- [ ] 5. **Onboarding 2 — short creation wizard** (step 2).
+- [x] 5. **Onboarding 2 — short creation wizard** (step 2).
 - [ ] 6. **Onboarding 3 — "¿Cómo quieres empezar?"** invite / TikTok / AI (step 3).
 - [ ] 7. **Onboarding 4 — invite link, WhatsApp, visible "Invitar"** (step 4).
 - [ ] 8. **Onboarding 5 — "Primeros pasos" card on Inicio** (step 5).
@@ -54,3 +54,9 @@ For item 1 (Supabase dashboard → Authentication):
   CreateTripForm, WelcomeFirstTrip) + `utils/userName.ts`; zero trips shows "Hola, <nombre> 👋" with
   "Crear mi primer viaje" / "Tengo un código de invitación"; list errors now show without a form open.
   Walked in the sandbox: welcome → create → leave → list → remove → welcome again.
+- 2026-10-22 — Item 5 done: `CreateTripWizard` (destination → dates → companions + count → what's
+  resolved → confirm with suggested name); `POST /api/rooms` seeds placeholder travelers and starter
+  tasks (`server/domain/seedRows.ts`, `tableRepo.insertMany`); double-click guard on "Crear viaje".
+  Walked in the sandbox: Cartagena, Dec 4–7, friends ×4, flights resolved → "Cartagena con amigos ·
+  Dic 2026" with "Reservar alojamiento" in Por decidir. Sandbox-only difference: Inicio counts 3
+  travelers (the sandbox user is not a room member; in production the creator is, so 4).
