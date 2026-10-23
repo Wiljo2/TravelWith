@@ -24,8 +24,8 @@ needs a dashboard or account action outside the repo goes under "Owner actions" 
 - [x] 7. **Onboarding 4 — invite link, WhatsApp, visible "Invitar"** (step 4).
 - [x] 8. **Onboarding 5 — "Primeros pasos" card on Inicio** (step 5).
 - [x] 9. **Onboarding 6 — teaching empty states** (step 6).
-- [ ] 10. **Group voting on dates/destination via "Por decidir"** (step 7; design note first).
-- [ ] 11. **Welcome for someone joining by invitation** (step 8).
+- [x] 10. **Group voting on dates/destination via "Por decidir"** (step 7; design note first).
+- [x] 11. **Welcome for someone joining by invitation** (step 8).
 
 ## Owner actions
 
@@ -148,3 +148,9 @@ For item 11 (welcome for invited people) — needs two accounts:
   votes, ideas, itinerary) from pure `utils/joinWelcome.ts`. Inviter name not shown (the roster has no
   roles). Dev-only preview: `/?local=1&welcome`. tsc + 727 tests pass. **Browser walk pending** (the
   browser extension disconnected).
+- 2026-10-23 — Items 10 (7d) and 11 walked with Playwright (system Chrome, headless; the Chrome
+  extension was unavailable in the session), desktop 1440×900 and phone 390×844, 24/24 checks: wizard
+  with both "lo votamos" → confirm "Destino: lo votan / Fechas: las votan" → StartChoices explains why
+  to invite → undated Inicio with both votes → Itinerario "Primero decidamos las fechas" → propose two
+  ranges → vote → owner closes (no activity warning) → header dates + days; `/?local=1&welcome` sheet →
+  "Agrega tus ideas" closes it. Real-database checks stay under Owner actions.
