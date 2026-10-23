@@ -30,6 +30,24 @@ describe("freshRoomPayload", () => {
     expect(payload.tasks).toHaveLength(1);
   });
 
+  it("seeds the wizard's votes as open \"Por decidir\" tasks", () => {
+    const payload = freshRoomPayload({
+      name: "Mi viaje con amigos",
+      tasks: [
+        { title: "¿Cuándo viajamos?", cat: "decidir", decides: "dates" },
+        { title: "¿A dónde vamos?", cat: "reservar", priority: "alta", decides: "destination" },
+        { title: "Reservar vuelos", cat: "reservar", priority: "alta" },
+      ],
+    });
+    expect(payload.trip).toStrictEqual({ name: "Mi viaje con amigos", destination: undefined });
+    expect(payload.days).toEqual([]);
+    expect(payload.tasks).toEqual([
+      { id: "task-1", title: "¿Cuándo viajamos?", done: false, cat: "decidir", decides: "dates" },
+      { id: "task-2", title: "¿A dónde vamos?", done: false, cat: "decidir", decides: "destination" },
+      { id: "task-3", title: "Reservar vuelos", done: false, cat: "reservar", priority: "alta" },
+    ]);
+  });
+
   it("defaults to a 5-day trip a month from now", () => {
     const payload = freshRoomPayload(null, new Date(2026, 9, 22));
     expect(payload.trip).toEqual({ name: "Mi viaje", startDate: "2026-11-21", endDate: "2026-11-25" });

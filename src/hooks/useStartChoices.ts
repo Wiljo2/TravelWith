@@ -43,6 +43,7 @@ export function useStartChoices({ roomCode, mobile, canUseAssistant, chatLength,
     onClose: close,
     roomCode: current.code,
     tripName: current.trip.name,
+    toVote: (current.trip.tasks ?? []).flatMap((t) => (t.decides ? [t.decides] : [])),
     onPasteLink: (text) => { close(); share(text); },
     onAskAssistant: canUseAssistant ? () => askAssistant(current.trip) : undefined,
   };

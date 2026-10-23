@@ -5,6 +5,7 @@ import DayAgenda from "@/components/itinerary/DayAgenda";
 import TodayCard from "@/components/home/TodayCard";
 import VideoTipsPanel from "@/components/home/VideoTipsPanel";
 import FirstStepsCard from "@/components/home/FirstStepsCard";
+import UndatedHero from "@/components/home/UndatedHero";
 import VoteCard, { type VoteControls } from "@/components/votes/VoteCard";
 import type { OptionVoting } from "@/components/tasks/OptionVote";
 import { PANEL, Progress, SectionTitle } from "@/components/home/shared";
@@ -13,7 +14,7 @@ import { fmtUSD, optionGroupUSD, fmtUSDNum } from "@/utils/currency";
 import { fmtHour } from "@/utils/time";
 import { taskIcon } from "@/utils/itemIcon";
 import { isVote, totalVotes } from "@/utils/votes";
-import { UNDATED_LABEL, activityCount, hasDates, tripPhase } from "@/utils/tripDays";
+import { activityCount, hasDates, tripPhase } from "@/utils/tripDays";
 import type { TripPhase } from "@/utils/tripDays";
 import { useNow } from "@/hooks/useNow";
 import { cn } from "@/lib/utils";
@@ -44,8 +45,7 @@ interface HomeViewProps {
   placed?: PlacedInsight[];   // video advice placed on the plan
 }
 
-function heroCopy(phase: TripPhase | null, dayCount: number, undated: boolean) {
-  if (undated) return { big: UNDATED_LABEL, small: "Cuando las decidan, armamos el itinerario día por día" };
+function heroCopy(phase: TripPhase | null, dayCount: number) {
   if (phase?.phase === "before") {
     return phase.daysLeft === 1
       ? { big: "Mañana", small: "empieza el viaje" }
@@ -55,8 +55,9 @@ function heroCopy(phase: TripPhase | null, dayCount: number, undated: boolean) {
   return { big: `${dayCount} días`, small: "de viaje" };
 }
 
-// Adapts to the moment: countdown and decisions before the trip, "now / next"
-// while it's underway, and a wrap-up once it's over.
+// Adapts to the moment: the votes while the dates are to be decided, countdown
+// and decisions before the trip, "now / next" while it's underway, and a
+// wrap-up once it's over.
 export default function HomeView({
   roomCode, loaded, memberCount, voting, votes, expenseCount, documentCount,
   trip, days, tasks, ideas, grandTotal, people, exchangeRate, onNavigate, documents, placed = [],
@@ -110,13 +111,15 @@ export default function HomeView({
             tomorrow={tomorrow}
             onOpenItinerary={toItinerary}
           />
+        ) : trip && !hasDates(trip) ? (
+          <UndatedHero trip={trip} openVotes={openVotes} activityCount={activityCount(days)} voting={voting} votes={votes} />
         ) : (
-          <Hero phase={phase} undated={undated} days={days} people={people} />
+          <Hero phase={phase} days={days} people={people} />
         )}
 
         {!after && <VideoTipsPanel placed={placed} days={days} today={today} onOpenIdeas={() => onNavigate("ideas")} />}
 
-        {openVotes.map((t) => (
+        {!undated && openVotes.map((t) => (
           <VoteCard key={t.id} task={t} trip={trip} activityCount={activityCount(days)} voting={voting} votes={votes} />
         ))}
 
@@ -188,8 +191,8 @@ export default function HomeView({
   );
 }
 
-function Hero({ phase, undated, days, people }: { phase: TripPhase | null; undated: boolean; days: Day[]; people: number }) {
-  const hero = heroCopy(phase, days.length, undated);
+function Hero({ phase, days, people }: { phase: TripPhase | null; days: Day[]; people: number }) {
+  const hero = heroCopy(phase, days.length);
   const activities = days.reduce((n, d) => n + d.events.length, 0);
   return (
     <section className={cn(PANEL, "bg-linear-to-br from-accent to-card")}>

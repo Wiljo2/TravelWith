@@ -55,6 +55,8 @@ For item 10 (group voting) — migration `supabase/migrations/027_group_votes.sq
 - [ ] On staging, two accounts vote on the same "Por decidir" option at the same time → both votes
       stay and show live on the other screen; history says "… votó en la opción …".
 - [ ] A trip created before the change loads and edits as before, with 0 votes.
+- [ ] Create a trip with "lo votamos" for dates and destination → undated trip with both votes;
+      propose dates, close as owner → days appear for every member live.
 - [ ] 7c on staging, dated trip with activities, owner A and member B: A taps "🗳️ Votar fechas" in
       Pendientes; both propose ranges on Inicio and vote with ✋ → counts live on both screens. B
       sees no "Elegir" and no × on the vote; a forced `task.closeVote` from B answers 403. A taps
@@ -131,3 +133,8 @@ For item 10 (group voting) — migration `supabase/migrations/027_group_votes.sq
   demo trip: start dates vote → propose Mar 10–13 → vote → Elegir (12 activities warning) → header
   "Mar 10 – 13, 2027", 4 new empty days, vote in Completadas as "Elegida". Assistant read views wait
   for `feature/agent-tools`.
+- 2026-10-23 — Item 10, 7d (undated trips + wizard) done in code: POST /api/rooms takes both dates or
+  neither and seeds `decides` vote tasks; wizard "🗳️ Aún no sabemos, lo votamos" for destination and
+  dates; `UndatedHero` on Inicio, `DatesPending` on Itinerario; StartChoices explains why to invite.
+  No 028. tsc + 713 tests pass. **Browser walk pending** (the browser extension disconnected): walk
+  `?local=new` with both "lo votamos" → votes on Inicio → propose + close → days appear.

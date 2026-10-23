@@ -232,6 +232,7 @@ export default function App() {
       {activeTab === "calendar" && (
         <ItineraryTab
           mobile={isMobile}
+          trip={trip}
           itinerary={itinerary}
           taskState={taskState}
           drag={drag}
@@ -245,6 +246,8 @@ export default function App() {
           onSelect={handleSelect}
           slotDraft={slotDraft}
           onSlotDraft={setSlotDraft}
+          onStartVote={votes.startVote}
+          onOpenVotes={() => setActiveTab("home")}
         />
       )}
 

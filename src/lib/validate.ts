@@ -1,5 +1,5 @@
-import type { DatedTrip, RoomPayload, TripInfo } from "@/types";
-import { hasDates, parseISODate } from "@/utils/tripDays";
+import type { RoomPayload, TripInfo } from "@/types";
+import { parseISODate } from "@/utils/tripDays";
 
 // Accepts legacy 6-char codes and the 10-char codes from generateRoomCode.
 const CODE_RE = /^[A-Z0-9]{4,12}$/;
@@ -29,12 +29,6 @@ export function validateTripHeader(body: unknown): TripInfo | null {
   if (!start || !end || end < start) return null;
 
   return { name: t.name.trim(), destination, startDate: t.startDate, endDate: t.endDate };
-}
-
-// A new trip (POST /api/rooms): dates are still required.
-export function validateTripInput(body: unknown): DatedTrip | null {
-  const trip = validateTripHeader(body);
-  return hasDates(trip) ? trip : null;
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);

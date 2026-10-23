@@ -8,7 +8,10 @@ import ItineraryView from "@/components/itinerary/ItineraryView";
 import type { ItinerarySheet } from "@/components/itinerary/ItineraryView";
 import ItineraryAgenda from "@/components/itinerary/ItineraryAgenda";
 import SpansManager from "@/components/itinerary/SpansManager";
-import type { Task } from "@/types";
+import DatesPending from "@/components/itinerary/DatesPending";
+import { hasDates } from "@/utils/tripDays";
+import { openVote } from "@/utils/votes";
+import type { Task, TaskDecides, TripInfo } from "@/types";
 
 // A new activity or task at a free slot (task null), or an existing scheduled task, opened at (x, y).
 export interface SlotDraft {
@@ -21,6 +24,7 @@ export interface SlotDraft {
 
 interface ItineraryTabProps {
   mobile: boolean;
+  trip: TripInfo | null;
   itinerary: ReturnType<typeof useItinerary>;
   taskState: ReturnType<typeof useTasks>;
   drag: ReturnType<typeof useDragDrop>;
@@ -35,11 +39,16 @@ interface ItineraryTabProps {
   onSelect: (id: string | null) => void;
   slotDraft: SlotDraft | null;
   onSlotDraft: (draft: SlotDraft) => void;
+  // A trip without dates has no days: these lead to its dates vote (on Inicio).
+  onStartVote: (kind: TaskDecides) => void;
+  onOpenVotes: () => void;
 }
 
-// The Itinerario tab: agenda or hour grid, with the detail, assistant and calendar backgrounds.
+// The Itinerario tab: agenda or hour grid, with the detail, assistant and calendar
+// backgrounds; "Primero decidamos las fechas" while the trip has no dates or days.
 export default function ItineraryTab({
-  mobile, itinerary, taskState, drag, todayIdx, tipsByEvent, detail, agent, focusAgent, sheet, onSheet, onSelect, slotDraft, onSlotDraft,
+  mobile, trip, itinerary, taskState, drag, todayIdx, tipsByEvent, detail, agent, focusAgent, sheet, onSheet, onSelect, slotDraft, onSlotDraft,
+  onStartVote, onOpenVotes,
 }: ItineraryTabProps) {
   const { days, tripSpans, selectedId, setSelectedId, swapDays, setDaySub, removeDaySpan, updateDaySpan, removeTripSpan, updateTripSpan } = itinerary;
   const { tasks, toggleTask, swapTaskDays } = taskState;
@@ -58,6 +67,14 @@ export default function ItineraryTab({
 
   const editTask = (task: Task, x: number, y: number) => onSlotDraft({ dayId: task.dayId!, hour: task.start ?? 8, x, y, task });
 
+  const datesPending = !!trip && !hasDates(trip) && days.length === 0 && (
+    <DatesPending
+      vote={openVote(tasks, "dates")}
+      onOpenVote={onOpenVotes}
+      onStartVote={() => { onStartVote("dates"); onOpenVotes(); }}
+    />
+  );
+
   return (
     <ItineraryView
       mobile={mobile}
@@ -68,6 +85,7 @@ export default function ItineraryTab({
       sheet={sheet}
       onOpenSheet={onSheet}
       onCloseSheet={() => { onSheet(null); setSelectedId(null); }}
+      pending={datesPending || undefined}
       settings={
         <SpansManager
           days={days}

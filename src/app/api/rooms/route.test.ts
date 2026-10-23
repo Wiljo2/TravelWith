@@ -68,6 +68,53 @@ describe("POST /api/rooms", () => {
     ]);
   });
 
+  it("creates a trip whose dates are to be decided without days", async () => {
+    resetDb(created);
+    const res = await POST(request("POST", "tok", { name: "Viaje", destination: "Cartagena" }));
+    expect(res.status).toBe(201);
+    const { code, trip: header } = await res.json();
+    expect(header).toEqual({ name: "Viaje", destination: "Cartagena" });
+    expect(inserts("rooms")[0].values).toEqual({
+      code, name: "Viaje", destination: "Cartagena", start_date: null, end_date: null, exchange_rate: 4000,
+    });
+    expect(db.mock.log.some((q) => q.op === "rpc" && q.table === "reset_itinerary")).toBe(false);
+    expect(db.mock.log.some((q) => q.op === "rpc" && q.table === "join_room")).toBe(true);
+  });
+
+  it("accepts null dates as no dates", async () => {
+    resetDb(created);
+    expect((await POST(request("POST", "tok", { name: "Viaje", startDate: null, endDate: null }))).status).toBe(201);
+    expect(inserts("rooms")[0].values).toMatchObject({ start_date: null, end_date: null });
+  });
+
+  it("seeds date and destination votes as open \"Por decidir\" tasks in the backlog", async () => {
+    resetDb(created);
+    const res = await POST(request("POST", "tok", {
+      name: "Mi viaje con amigos",
+      tasks: [
+        { title: "¿A dónde vamos?", cat: "reservar", priority: "alta", decides: "destination" },
+        { title: "¿Cuándo viajamos?", cat: "decidir", decides: "dates" },
+        { title: "Reservar vuelos", cat: "reservar", priority: "alta" },
+      ],
+    }));
+    expect(res.status).toBe(201);
+    const [tasks] = inserts("trip_tasks");
+    expect(tasks.values).toEqual([
+      expect.objectContaining({ position: 0, title: "¿A dónde vamos?", cat: "decidir", decides: "destination", done: false, day_id: null }),
+      expect.objectContaining({ position: 1, title: "¿Cuándo viajamos?", cat: "decidir", decides: "dates", done: false, day_id: null }),
+      expect.objectContaining({ position: 2, title: "Reservar vuelos", cat: "reservar", priority: "alta" }),
+    ]);
+    expect((tasks.values as Record<string, unknown>[])[2]).not.toHaveProperty("decides");
+  });
+
+  it("seeds a dates vote on a dated trip too", async () => {
+    resetDb(created);
+    const res = await POST(request("POST", "tok", { ...trip, tasks: [{ title: "¿Cuándo viajamos?", decides: "dates" }] }));
+    expect(res.status).toBe(201);
+    expect(inserts("trip_tasks")[0].values).toEqual([expect.objectContaining({ decides: "dates", cat: "decidir" })]);
+    expect(db.mock.log.some((q) => q.op === "rpc" && q.table === "reset_itinerary")).toBe(true);
+  });
+
   it("accepts the traveler limit and empty seed lists", async () => {
     resetDb(created);
     const travelers = Array.from({ length: LIMITS.travelers }, (_, i) => `Viajero ${i + 2}`);
@@ -86,6 +133,12 @@ describe("POST /api/rooms", () => {
     ["a task without a title", { tasks: [{ cat: "reservar" }] }],
     ["a task with an unknown category", { tasks: [{ title: "Reservar vuelos", cat: "otra" }] }],
     ["a task with an unknown priority", { tasks: [{ title: "Reservar vuelos", priority: "urgente" }] }],
+    ["a task that decides something unknown", { tasks: [{ title: "¿Qué comemos?", decides: "food" }] }],
+    ["two votes of the same kind", { tasks: [{ title: "¿Cuándo?", decides: "dates" }, { title: "¿Cuándo viajamos?", decides: "dates" }] }],
+    ["only a start date", { startDate: "2026-03-01", endDate: undefined }],
+    ["only an end date", { startDate: undefined }],
+    ["empty dates", { startDate: "", endDate: "" }],
+    ["a trip longer than the day limit", { endDate: "2026-06-01" }],
   ])("rejects %s before creating the room", async (_, seed) => {
     resetDb(created);
     const res = await POST(request("POST", "tok", { ...trip, ...seed }));
@@ -123,7 +176,8 @@ describe("POST /api/rooms", () => {
 
   it("rejects invalid trips", async () => {
     resetDb(() => ({}));
-    const res = await POST(request("POST", "tok", { ...trip, endDate: "2026-01-01" }));
-    expect(res.status).toBe(400);
+    expect((await POST(request("POST", "tok", { ...trip, endDate: "2026-01-01" }))).status).toBe(400);
+    expect((await POST(request("POST", "tok", { startDate: trip.startDate, endDate: trip.endDate }))).status).toBe(400);
+    expect(db.mock.log).toHaveLength(0);
   });
 });

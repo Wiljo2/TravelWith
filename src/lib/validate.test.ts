@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeRoomCode, validateRoomPayload, validateTripHeader, validateTripInput } from "./validate";
+import { normalizeRoomCode, validateRoomPayload, validateTripHeader } from "./validate";
 
 describe("normalizeRoomCode", () => {
   it("uppercases and trims valid codes", () => {
@@ -10,28 +10,6 @@ describe("normalizeRoomCode", () => {
     expect(normalizeRoomCode("ab")).toBeNull();
     expect(normalizeRoomCode("ABC-123")).toBeNull();
     expect(normalizeRoomCode("A".repeat(20))).toBeNull();
-  });
-});
-
-describe("validateTripInput", () => {
-  it("accepts a named trip with ordered dates", () => {
-    expect(validateTripInput({ name: " Viaje ", startDate: "2026-01-01", endDate: "2026-01-03" })).toEqual({
-      name: "Viaje",
-      destination: undefined,
-      startDate: "2026-01-01",
-      endDate: "2026-01-03",
-    });
-  });
-
-  it("rejects missing names, reversed ranges and long names", () => {
-    expect(validateTripInput({ name: "", startDate: "2026-01-01", endDate: "2026-01-02" })).toBeNull();
-    expect(validateTripInput({ name: "X", startDate: "2026-01-05", endDate: "2026-01-02" })).toBeNull();
-    expect(validateTripInput({ name: "X".repeat(81), startDate: "2026-01-01", endDate: "2026-01-02" })).toBeNull();
-  });
-
-  it("still requires both dates", () => {
-    expect(validateTripInput({ name: "X" })).toBeNull();
-    expect(validateTripInput({ name: "X", startDate: "2026-01-01" })).toBeNull();
   });
 });
 
@@ -49,8 +27,19 @@ describe("validateTripHeader", () => {
     expect(validateTripHeader({ name: "X", startDate: "", endDate: "" })).toBeNull();
   });
 
-  it("requires a name", () => {
+  it("trims a named trip with ordered dates", () => {
+    expect(validateTripHeader({ name: " Viaje ", startDate: "2026-01-01", endDate: "2026-01-03" })).toEqual({
+      name: "Viaje",
+      destination: undefined,
+      startDate: "2026-01-01",
+      endDate: "2026-01-03",
+    });
+  });
+
+  it("requires a name within the limit", () => {
     expect(validateTripHeader({ name: " " })).toBeNull();
+    expect(validateTripHeader({ name: "", startDate: "2026-01-01", endDate: "2026-01-02" })).toBeNull();
+    expect(validateTripHeader({ name: "X".repeat(81), startDate: "2026-01-01", endDate: "2026-01-02" })).toBeNull();
     expect(validateTripHeader(null)).toBeNull();
   });
 });

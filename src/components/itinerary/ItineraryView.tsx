@@ -27,6 +27,8 @@ interface ItineraryViewProps {
   onCloseSheet: () => void;
   // Desktop: show the assistant in the side panel (on mount, or when it turns true).
   focusAgent?: boolean;
+  // Shown instead of the agenda, the grid and their toolbar while there is nothing to plan (no dates yet).
+  pending?: React.ReactNode;
 }
 
 function readMode(): Mode {
@@ -46,7 +48,7 @@ const SHEET_TITLE: Record<ItinerarySheet, string> = {
 // Itinerary section: agenda list by default, hour grid on demand. The detail /
 // assistant live in a side panel on desktop and in bottom sheets on phones.
 export default function ItineraryView({
-  mobile, selectedId, agenda, grid, detail, settings, agent, sheet, onOpenSheet, onCloseSheet, focusAgent,
+  mobile, selectedId, agenda, grid, detail, settings, agent, sheet, onOpenSheet, onCloseSheet, focusAgent, pending,
 }: ItineraryViewProps) {
   const [mode, setMode] = useState<Mode>(readMode);
   const [panel, setPanel] = useState<"detail" | "agent">(focusAgent ? "agent" : "detail");
@@ -92,8 +94,7 @@ export default function ItineraryView({
   if (mobile) {
     return (
       <>
-        {toolbar}
-        {main}
+        {pending ?? <>{toolbar}{main}</>}
         {agent && (
           <button
             onClick={() => onOpenSheet("agent")}
@@ -112,6 +113,15 @@ export default function ItineraryView({
           {shownSheet === "agent" ? agent : shownSheet === "settings" ? settings : detail}
         </BottomSheet>
       </>
+    );
+  }
+
+  if (pending) {
+    return (
+      <div className="flex items-start gap-5">
+        <div className="min-w-0 flex-1">{pending}</div>
+        {agent && <aside className="sticky top-4 w-[340px] shrink-0">{agent}</aside>}
+      </div>
     );
   }
 

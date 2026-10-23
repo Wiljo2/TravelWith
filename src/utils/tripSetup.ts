@@ -1,5 +1,6 @@
-import type { StarterTask, TripBooking, TripCompanion, TripInfo } from "@/types";
+import type { StarterTask, TaskDecides, TripBooking, TripCompanion, TripInfo } from "@/types";
 import { LIMITS } from "@/constants/limits";
+import { VOTE_KINDS, VOTE_KIND_KEYS, VOTE_TASK_CAT } from "@/constants/votes";
 import {
   BOOKINGS, BOOKING_KEYS, COMPANIONS, MAX_TRIP_PEOPLE, STARTER_TASK_CAT, STARTER_TASK_PRIORITY,
 } from "@/constants/tripSetup";
@@ -32,6 +33,13 @@ export function starterTasks(resolved: TripBooking[]): StarterTask[] {
   return BOOKING_KEYS
     .filter((key) => !resolved.includes(key))
     .map((key) => ({ title: BOOKINGS[key].task, cat: STARTER_TASK_CAT, priority: STARTER_TASK_PRIORITY }));
+}
+
+// The votes the wizard leaves open ("Aún no sabemos, lo votamos"), dates first.
+export function voteStarterTasks(kinds: TaskDecides[]): StarterTask[] {
+  return VOTE_KIND_KEYS
+    .filter((kind) => kinds.includes(kind))
+    .map((kind) => ({ title: VOTE_KINDS[kind].title, cat: VOTE_TASK_CAT, decides: kind }));
 }
 
 export function tripHeader(trip: TripInfo): TripInfo {

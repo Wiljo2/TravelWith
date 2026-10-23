@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { LIMITS } from "@/constants/limits";
 import type { NewTrip } from "@/types";
-import { clampPeople, placeholderTravelers, starterTasks, suggestTripName, tripHeader } from "./tripSetup";
+import { clampPeople, placeholderTravelers, starterTasks, suggestTripName, tripHeader, voteStarterTasks } from "./tripSetup";
 
 describe("suggestTripName", () => {
   it("joins destination, companions and the start month", () => {
@@ -63,5 +63,19 @@ describe("starterTasks", () => {
     ]);
     expect(starterTasks(["vuelos"])).toEqual([{ title: "Reservar alojamiento", cat: "reservar", priority: "alta" }]);
     expect(starterTasks(["vuelos", "alojamiento"])).toEqual([]);
+  });
+});
+
+describe("voteStarterTasks", () => {
+  it("opens one \"Por decidir\" vote per kind left to the group, dates first", () => {
+    expect(voteStarterTasks([])).toEqual([]);
+    expect(voteStarterTasks(["destination", "dates"])).toEqual([
+      { title: "¿Cuándo viajamos?", cat: "decidir", decides: "dates" },
+      { title: "¿A dónde vamos?", cat: "decidir", decides: "destination" },
+    ]);
+  });
+
+  it("fits with every booking task in the starter task limit", () => {
+    expect(starterTasks([]).length + voteStarterTasks(["dates", "destination"]).length).toBeLessThanOrEqual(LIMITS.starterTasks);
   });
 });

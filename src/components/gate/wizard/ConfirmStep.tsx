@@ -5,7 +5,7 @@ import { fmtTripDates } from "@/utils/tripDays";
 import { starterTasks } from "@/utils/tripSetup";
 import { Input } from "@/components/ui/input";
 import { StepHeading } from "@/components/gate/wizard/QuestionSteps";
-import { onEnterKey, type WizardAnswers } from "@/components/gate/wizard/model";
+import { onEnterKey, votedKinds, type WizardAnswers } from "@/components/gate/wizard/model";
 
 interface ConfirmStepProps {
   answers: WizardAnswers;
@@ -25,15 +25,25 @@ function whoText({ companion, people }: WizardAnswers): string {
 export default function ConfirmStep({ answers, dayCount, name, suggestedName, onName, onSubmit }: ConfirmStepProps) {
   const tasks = starterTasks(answers.resolved);
   const rows = [
-    { icon: "📍", text: answers.destination.trim() || "Destino por definir" },
-    { icon: "📅", text: `${fmtTripDates(answers.startDate, answers.endDate)} · ${dayCount} ${dayCount === 1 ? "día" : "días"}` },
+    { icon: "📍", text: answers.voteDestination ? "Destino: lo votan" : answers.destination.trim() || "Destino por definir" },
+    {
+      icon: "📅",
+      text: answers.voteDates
+        ? "Fechas: las votan"
+        : `${fmtTripDates(answers.startDate, answers.endDate)} · ${dayCount} ${dayCount === 1 ? "día" : "días"}`,
+    },
     { icon: "👥", text: whoText(answers) },
     { icon: "📝", text: tasks.length ? `En Pendientes: ${tasks.map((t) => t.title).join(", ")}` : "Vuelos y alojamiento listos" },
   ];
 
   return (
     <>
-      <StepHeading title="Tu viaje" hint="Revisa y crea. Todo se puede cambiar después." />
+      <StepHeading
+        title="Tu viaje"
+        hint={votedKinds(answers).length > 0
+          ? "Revisa y crea. Las votaciones quedan en Inicio: propongan opciones e inviten al grupo a votar."
+          : "Revisa y crea. Todo se puede cambiar después."}
+      />
       <label className="text-[11px] text-secondary-foreground">
         Nombre del viaje
         <Input

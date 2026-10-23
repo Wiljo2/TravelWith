@@ -6,6 +6,7 @@ export interface VoteKind {
   propose: string;   // action that adds an option
   close: string;     // title of the owner's closing dialog
   empty: string;     // hint while the vote has no options
+  subject: string;   // what the group decides, inside a sentence
 }
 
 export const VOTE_KINDS: Record<TaskDecides, VoteKind> = {
@@ -15,6 +16,7 @@ export const VOTE_KINDS: Record<TaskDecides, VoteKind> = {
     propose: "Agregar fechas",
     close: "Elegir las fechas",
     empty: "Propongan 2 o 3 rangos de fechas y voten con ✋ los que les sirvan.",
+    subject: "las fechas",
   },
   destination: {
     title: "¿A dónde vamos?",
@@ -22,6 +24,7 @@ export const VOTE_KINDS: Record<TaskDecides, VoteKind> = {
     propose: "Agregar destino",
     close: "Elegir el destino",
     empty: "Propongan 2 o 3 destinos y voten con ✋ los que les gusten.",
+    subject: "el destino",
   },
 };
 

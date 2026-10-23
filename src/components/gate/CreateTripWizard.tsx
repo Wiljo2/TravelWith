@@ -4,11 +4,11 @@ import { X } from "lucide-react";
 import type { NewTrip, TripBooking, TripCompanion } from "@/types";
 import { COMPANIONS } from "@/constants/tripSetup";
 import { generateDays } from "@/utils/tripDays";
-import { clampPeople, placeholderTravelers, starterTasks, suggestTripName } from "@/utils/tripSetup";
+import { clampPeople, suggestTripName } from "@/utils/tripSetup";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { INITIAL_ANSWERS, type WizardAnswers } from "@/components/gate/wizard/model";
+import { INITIAL_ANSWERS, wizardTrip, type WizardAnswers } from "@/components/gate/wizard/model";
 import { BookingsStep, CompanionStep, DatesStep, DestinationStep } from "@/components/gate/wizard/QuestionSteps";
 import ConfirmStep from "@/components/gate/wizard/ConfirmStep";
 
@@ -34,8 +34,10 @@ export default function CreateTripWizard({ loading, error, onSubmit, onCancel }:
   const suggestedName = suggestTripName(answers.destination, answers.companion, answers.startDate);
   const name = customName ?? suggestedName;
   const confirming = step === QUESTIONS;
-  const canAdvance = step === 0 ? answers.destination.trim().length > 0 : step === 1 ? !!dayCount : true;
-  const canCreate = !!dayCount && name.trim().length > 0;
+  const hasWhere = answers.destination.trim().length > 0 || answers.voteDestination;
+  const hasWhen = !!dayCount || answers.voteDates;
+  const canAdvance = step === 0 ? hasWhere : step === 1 ? hasWhen : true;
+  const canCreate = hasWhere && hasWhen && name.trim().length > 0;
 
   function next() {
     if (!canAdvance) return;
@@ -43,9 +45,15 @@ export default function CreateTripWizard({ loading, error, onSubmit, onCancel }:
     setStep((s) => Math.min(s + 1, QUESTIONS));
   }
 
-  function skipDestination() {
-    update({ destination: "" });
+  // "Aún no sabemos, lo votamos": the answer is a vote, so the step is done.
+  function voteDestination() {
+    update({ destination: "", voteDestination: true });
     setStep(1);
+  }
+
+  function voteDates() {
+    update({ startDate: "", endDate: "", voteDates: true });
+    setStep(2);
   }
 
   function chooseCompanion(companion: TripCompanion) {
@@ -61,25 +69,27 @@ export default function CreateTripWizard({ loading, error, onSubmit, onCancel }:
 
   function submit() {
     if (!canCreate || loading || Date.now() - confirmShownAt.current < CONFIRM_CLICK_GUARD_MS) return;
-    onSubmit({
-      name: name.trim(),
-      destination: answers.destination.trim() || undefined,
-      startDate: answers.startDate,
-      endDate: answers.endDate,
-      travelers: placeholderTravelers(answers.people),
-      tasks: starterTasks(answers.resolved),
-    });
+    onSubmit(wizardTrip(answers, name));
   }
 
   const body = [
     <DestinationStep
       key="destination"
       value={answers.destination}
-      onChange={(destination) => update({ destination })}
+      voting={answers.voteDestination}
+      onChange={(destination) => update({ destination, voteDestination: false })}
       onNext={next}
-      onSkip={skipDestination}
+      onVote={voteDestination}
     />,
-    <DatesStep key="dates" startDate={answers.startDate} endDate={answers.endDate} dayCount={dayCount} onChange={update} />,
+    <DatesStep
+      key="dates"
+      startDate={answers.startDate}
+      endDate={answers.endDate}
+      dayCount={dayCount}
+      voting={answers.voteDates}
+      onChange={(dates) => update({ ...dates, voteDates: false })}
+      onVote={voteDates}
+    />,
     <CompanionStep
       key="companion"
       companion={answers.companion}

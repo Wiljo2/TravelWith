@@ -9,11 +9,12 @@ export interface TripInfo {
 
 export type DatedTrip = TripInfo & { startDate: string; endDate: string };
 
-// A task created together with the trip (backlog, no day).
+// A task created together with the trip (backlog, no day); with `decides`, a group vote.
 export interface StarterTask {
   title: string;
   cat?: string;
   priority?: TaskPriority;
+  decides?: TaskDecides;
 }
 
 // Body of POST /api/rooms: the header plus the creation wizard's optional seed rows.

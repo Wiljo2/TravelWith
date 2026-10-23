@@ -1,4 +1,5 @@
 import { LIMITS } from "@/constants/limits";
+import { VOTE_KINDS } from "@/constants/votes";
 import { DomainError } from "@/server/domain/core";
 import { newTaskRow } from "@/server/domain/taskRows";
 import { newTravelerRow } from "@/server/domain/tripRows";
@@ -12,9 +13,13 @@ export interface TripSeedRows {
 // Optional rows POST /api/rooms creates with a new trip (the creation wizard's
 // placeholder travelers and starter tasks). Absent fields seed nothing.
 export function tripSeedRows(body: Record<string, unknown>): TripSeedRows {
+  const tasks = seedList(body.tasks, "tasks", LIMITS.starterTasks).map((task, i) => newTaskRow(starterTaskArgs(task), i));
+  for (const kind of Object.keys(VOTE_KINDS)) {
+    if (tasks.filter((t) => t.decides === kind).length > 1) throw new DomainError(`tasks can open only one "${kind}" vote`);
+  }
   return {
     travelers: seedList(body.travelers, "travelers", LIMITS.travelers).map((name, i) => newTravelerRow({ name }, i)),
-    tasks: seedList(body.tasks, "tasks", LIMITS.starterTasks).map((task, i) => newTaskRow(starterTaskArgs(task), i)),
+    tasks,
   };
 }
 
@@ -25,9 +30,11 @@ function seedList(value: unknown, field: string, max: number): unknown[] {
   return value;
 }
 
-// Starter tasks go to the backlog: only the title, category and priority are read.
+// Starter tasks go to the backlog: only the title, category, priority and vote
+// kind are read. One with `decides` is a dates or destination vote, built like
+// task.create builds it (always open and "Por decidir").
 function starterTaskArgs(task: unknown) {
   if (typeof task !== "object" || task === null || Array.isArray(task)) throw new DomainError("each task must be an object");
-  const { title, cat, priority } = task as Record<string, unknown>;
-  return { title, cat, priority };
+  const { title, cat, priority, decides } = task as Record<string, unknown>;
+  return { title, cat, priority, decides };
 }

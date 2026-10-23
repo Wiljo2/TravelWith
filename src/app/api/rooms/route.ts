@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
-import { validateTripInput } from "@/lib/validate";
-import { generateDays } from "@/utils/tripDays";
+import { validateTripHeader } from "@/lib/validate";
+import { generateDays, hasDates } from "@/utils/tripDays";
 import { DEFAULT_RATE } from "@/utils/currency";
 import { requireUser } from "@/server/auth";
 import { assertWritable } from "@/server/maintenance";
@@ -18,8 +18,9 @@ import type { TripInfo } from "@/types";
 const MAX_ATTEMPTS = 3;
 
 // POST /api/rooms — create a trip: the header in the rooms columns, the empty
-// days in trip_days and the optional seed rows from the creation wizard
-// (placeholder travelers, starter tasks); rooms.payload stays empty, it is only
+// days in trip_days (none while the dates are to be decided: both dates or
+// neither) and the optional seed rows from the creation wizard (placeholder
+// travelers, starter tasks and votes); rooms.payload stays empty, it is only
 // the pre-cut-over backup. Built server-side so a fresh room never inherits the
 // client's local state, and the creator becomes owner here: roles are never
 // chosen by the client. Any failure after the insert deletes the room.
@@ -35,17 +36,19 @@ export async function POST(req: Request) {
       throw new HttpError(400, "Body inválido");
     }
 
-    const trip = validateTripInput(body);
-    if (!trip) throw new HttpError(400, "Datos del viaje inválidos: se requiere nombre y fechas (inicio ≤ fin)");
+    const trip = validateTripHeader(body);
+    if (!trip) throw new HttpError(400, "Datos del viaje inválidos: se requiere nombre y las dos fechas (inicio ≤ fin) o ninguna");
 
-    const days = generateDays(trip.startDate, trip.endDate);
+    const days = hasDates(trip) ? generateDays(trip.startDate, trip.endDate) : [];
     if (!days) throw new HttpError(400, "Rango de fechas inválido");
     const seed = seedRows(body as Record<string, unknown>);
 
     const code = await insertRoom(trip);
     try {
       await joinRoom(code, user, "owner");
-      await resetItinerary(code, days.map(({ id, label, sub, flexible }) => ({ id, label, sub, flexible })), user.id);
+      if (days.length > 0) {
+        await resetItinerary(code, days.map(({ id, label, sub, flexible }) => ({ id, label, sub, flexible })), user.id);
+      }
       await travelersRepo.insertMany(code, seed.travelers, user.id);
       await tasksRepo.insertMany(code, seed.tasks, user.id);
     } catch (e) {
@@ -76,8 +79,8 @@ async function insertRoom(trip: TripInfo): Promise<string> {
       code,
       name: trip.name,
       destination: trip.destination ?? null,
-      start_date: trip.startDate,
-      end_date: trip.endDate,
+      start_date: trip.startDate ?? null,
+      end_date: trip.endDate ?? null,
       exchange_rate: DEFAULT_RATE,
     });
     if (!error) return code;

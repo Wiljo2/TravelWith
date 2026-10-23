@@ -6,13 +6,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import InviteSheet from "@/components/invite/InviteSheet";
 import ReelLinkForm from "@/components/onboarding/ReelLinkForm";
 import { useIsMobile } from "@/hooks/useMediaQuery";
+import { VOTE_KINDS, VOTE_KIND_KEYS } from "@/constants/votes";
 import { cn } from "@/lib/utils";
+import type { TaskDecides } from "@/types";
 
 export interface StartChoicesProps {
   open: boolean;
   onClose: () => void;
   roomCode: string;
   tripName?: string | null;
+  // What the wizard left to a group vote: the invite card says the group is needed for it.
+  toVote?: TaskDecides[];
   // A link that `findIdeaUrls` accepts: it lands in the Ideas form, like a link shared from the phone.
   onPasteLink: (text: string) => void;
   // Hidden without it (local mode and members have no assistant).
@@ -21,9 +25,16 @@ export interface StartChoicesProps {
 
 const TITLE = "Tu viaje está listo 🎉";
 
+// "Para votar las fechas y el destino necesitan al grupo: …".
+function inviteLine(toVote: TaskDecides[]): string {
+  const subjects = VOTE_KIND_KEYS.filter((k) => toVote.includes(k)).map((k) => VOTE_KINDS[k].subject);
+  if (subjects.length === 0) return "Comparte el enlace por WhatsApp y planeen juntos.";
+  return `Para votar ${subjects.join(" y ")} necesitan al grupo: comparte el enlace por WhatsApp.`;
+}
+
 // "¿Cómo quieres empezar?": offered once, right after creating a trip. Nothing is saved;
 // the choice only decides where the creator lands.
-export default function StartChoices({ open, onClose, roomCode, tripName, onPasteLink, onAskAssistant }: StartChoicesProps) {
+export default function StartChoices({ open, onClose, roomCode, tripName, toVote = [], onPasteLink, onAskAssistant }: StartChoicesProps) {
   const mobile = useIsMobile();
   const [inviting, setInviting] = useState(false);
   const onOpenChange = (next: boolean) => { if (!next) onClose(); };
@@ -33,7 +44,9 @@ export default function StartChoices({ open, onClose, roomCode, tripName, onPast
     onClose();
   }
 
-  const body = <StartOptions onInvite={invite} onPasteLink={onPasteLink} onAskAssistant={onAskAssistant} onSkip={onClose} />;
+  const body = (
+    <StartOptions inviteLine={inviteLine(toVote)} onInvite={invite} onPasteLink={onPasteLink} onAskAssistant={onAskAssistant} onSkip={onClose} />
+  );
 
   return (
     <>
@@ -55,13 +68,14 @@ export default function StartChoices({ open, onClose, roomCode, tripName, onPast
 }
 
 interface StartOptionsProps {
+  inviteLine: string;
   onInvite: () => void;
   onPasteLink: (text: string) => void;
   onAskAssistant?: () => void;
   onSkip: () => void;
 }
 
-function StartOptions({ onInvite, onPasteLink, onAskAssistant, onSkip }: StartOptionsProps) {
+function StartOptions({ inviteLine, onInvite, onPasteLink, onAskAssistant, onSkip }: StartOptionsProps) {
   const [pasting, setPasting] = useState(false);
 
   return (
@@ -70,7 +84,7 @@ function StartOptions({ onInvite, onPasteLink, onAskAssistant, onSkip }: StartOp
       <ChoiceCard
         icon="👥"
         title="Invitar a mi grupo"
-        line="Comparte el enlace por WhatsApp y planeen juntos."
+        line={inviteLine}
         highlighted
         onClick={onInvite}
       />

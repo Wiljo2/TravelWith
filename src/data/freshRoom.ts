@@ -1,5 +1,6 @@
 import type { MockPerson, NewTrip, RoomPayload, StarterTask, Task, TripInfo } from "@/types";
 import { LIMITS } from "@/constants/limits";
+import { VOTE_KINDS, VOTE_TASK_CAT } from "@/constants/votes";
 import { generateDays, hasDates } from "@/utils/tripDays";
 import { DEFAULT_RATE } from "@/utils/currency";
 import { tripHeader } from "@/utils/tripSetup";
@@ -13,7 +14,7 @@ function isoDate(d: Date): string {
 
 // What POST /api/rooms leaves behind: the header, empty days (none while the
 // dates are to be decided) and the wizard's placeholder travelers and starter
-// tasks. Without a trip from the wizard, a 5-day trip a month from today.
+// tasks and votes. Without a trip from the wizard, a 5-day trip a month from today.
 export function freshRoomPayload(trip: NewTrip | null, now = new Date()): RoomPayload {
   const header = trip ? tripHeader(trip) : defaultTrip(now);
   return {
@@ -31,15 +32,15 @@ function seedTravelers(names: unknown): MockPerson[] {
   return names.slice(0, LIMITS.travelers).map((name, i) => ({ id: `mp-${i + 1}`, name: String(name) }));
 }
 
+// A vote is always an open "Por decidir" task, as the server builds it.
 function seedTasks(tasks: unknown): Task[] {
   if (!Array.isArray(tasks)) return [];
-  return tasks.slice(0, LIMITS.starterTasks).map((t: StarterTask, i) => ({
-    id: `task-${i + 1}`,
-    title: t.title,
-    done: false,
-    cat: t.cat,
-    priority: t.priority,
-  }));
+  return tasks.slice(0, LIMITS.starterTasks).map((t: StarterTask, i) => {
+    const base = { id: `task-${i + 1}`, title: t.title, done: false };
+    return t.decides && Object.hasOwn(VOTE_KINDS, t.decides)
+      ? { ...base, cat: VOTE_TASK_CAT, decides: t.decides }
+      : { ...base, cat: t.cat, priority: t.priority };
+  });
 }
 
 function defaultTrip(now: Date): TripInfo {

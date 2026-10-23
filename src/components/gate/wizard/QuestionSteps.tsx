@@ -2,7 +2,6 @@
 import type { TripBooking, TripCompanion } from "@/types";
 import { LIMITS } from "@/constants/limits";
 import { BOOKINGS, BOOKING_KEYS, COMPANIONS, COMPANION_KEYS, MAX_TRIP_PEOPLE } from "@/constants/tripSetup";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import DateRangeFields from "@/components/DateRangeFields";
 import ChoiceChip from "@/components/gate/wizard/ChoiceChip";
@@ -18,14 +17,24 @@ export function StepHeading({ title, hint }: { title: string; hint: string }) {
   );
 }
 
-interface DestinationStepProps {
-  value: string;
-  onChange: (value: string) => void;
-  onNext: () => void;
-  onSkip: () => void;
+// "Aún no sabemos, lo votamos": the trip starts with that vote open on Inicio.
+function VoteChip({ selected, onClick }: { selected: boolean; onClick: () => void }) {
+  return (
+    <ChoiceChip selected={selected} onClick={onClick} className="h-9 self-start">
+      <span aria-hidden>🗳️</span> Aún no sabemos, lo votamos
+    </ChoiceChip>
+  );
 }
 
-export function DestinationStep({ value, onChange, onNext, onSkip }: DestinationStepProps) {
+interface DestinationStepProps {
+  value: string;
+  voting: boolean;
+  onChange: (value: string) => void;
+  onNext: () => void;
+  onVote: () => void;
+}
+
+export function DestinationStep({ value, voting, onChange, onNext, onVote }: DestinationStepProps) {
   return (
     <>
       <StepHeading title="¿A dónde van?" hint="Una ciudad, un país o una región. Lo puedes cambiar después." />
@@ -39,9 +48,7 @@ export function DestinationStep({ value, onChange, onNext, onSkip }: Destination
         enterKeyHint="next"
         className="h-10 bg-secondary text-[15px]"
       />
-      <Button variant="outline" onClick={onSkip} className="h-9 self-start rounded-full bg-card px-3.5 text-[13px]">
-        🤔 Aún no sé
-      </Button>
+      <VoteChip selected={voting} onClick={onVote} />
     </>
   );
 }
@@ -50,14 +57,17 @@ interface DatesStepProps {
   startDate: string;
   endDate: string;
   dayCount: number | null;
+  voting: boolean;
   onChange: (dates: { startDate?: string; endDate?: string }) => void;
+  onVote: () => void;
 }
 
-export function DatesStep({ startDate, endDate, dayCount, onChange }: DatesStepProps) {
+export function DatesStep({ startDate, endDate, dayCount, voting, onChange, onVote }: DatesStepProps) {
   return (
     <>
       <StepHeading title="¿Cuándo?" hint="Con las fechas armamos un día del itinerario por cada día del viaje." />
       <DateRangeFields startDate={startDate} endDate={endDate} dayCount={dayCount} onChange={onChange} />
+      <VoteChip selected={voting} onClick={onVote} />
     </>
   );
 }
