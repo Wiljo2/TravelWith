@@ -158,6 +158,7 @@ export default function BudgetView({
             </table>
           </section>
 
+        {(days.length > 0 || dayExtras.length > 0) && (
           <section className={TABLE_PANEL}>
             <SectionHeader className={TABLE_HEAD} label="Gastos por día" hint="Hospedaje, comidas y excursiones repartidas en un rango de días" />
             {dayExtras.length > 0 ? (
@@ -197,6 +198,7 @@ export default function BudgetView({
               </div>
             )}
           </section>
+        )}
 
           {(dayExtras.length > 0 || linkedExtras.length > 0) && (
             <section className={cn(PANEL, "py-1 md:py-1")}>

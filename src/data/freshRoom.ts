@@ -1,6 +1,6 @@
 import type { MockPerson, NewTrip, RoomPayload, StarterTask, Task, TripInfo } from "@/types";
 import { LIMITS } from "@/constants/limits";
-import { generateDays } from "@/utils/tripDays";
+import { generateDays, hasDates } from "@/utils/tripDays";
 import { DEFAULT_RATE } from "@/utils/currency";
 import { tripHeader } from "@/utils/tripSetup";
 
@@ -11,13 +11,13 @@ function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// What POST /api/rooms leaves behind: the header, empty days and the wizard's
-// placeholder travelers and starter tasks. Without a trip from the wizard, a
-// 5-day trip a month from today.
+// What POST /api/rooms leaves behind: the header, empty days (none while the
+// dates are to be decided) and the wizard's placeholder travelers and starter
+// tasks. Without a trip from the wizard, a 5-day trip a month from today.
 export function freshRoomPayload(trip: NewTrip | null, now = new Date()): RoomPayload {
   const header = trip ? tripHeader(trip) : defaultTrip(now);
   return {
-    days: generateDays(header.startDate, header.endDate) ?? [],
+    days: hasDates(header) ? generateDays(header.startDate, header.endDate) ?? [] : [],
     extras: [],
     exchangeRate: DEFAULT_RATE,
     trip: header,

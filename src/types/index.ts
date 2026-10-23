@@ -1,10 +1,13 @@
 // Trip identity — lives inside the room payload. A room IS a trip.
+// Dates are both set or both missing (dates still to be decided); check with `hasDates`.
 export interface TripInfo {
   name: string;
   destination?: string;
-  startDate: string;      // ISO yyyy-mm-dd
-  endDate: string;        // ISO yyyy-mm-dd
+  startDate?: string;     // ISO yyyy-mm-dd
+  endDate?: string;       // ISO yyyy-mm-dd
 }
+
+export type DatedTrip = TripInfo & { startDate: string; endDate: string };
 
 // A task created together with the trip (backlog, no day).
 export interface StarterTask {

@@ -1,7 +1,8 @@
 import type { TripInfo } from "@/types";
-import { parseISODate } from "@/utils/tripDays";
+import { hasDates, parseISODate } from "@/utils/tripDays";
 
 const ASK = "Propón un primer plan día por día.";
+const UNDATED = "aún sin fechas (las vamos a votar)";
 
 const monthName = (d: Date) => d.toLocaleDateString("es-CO", { month: "long" });
 
@@ -28,6 +29,11 @@ export function firstPlanDraft(trip: TripInfo, people: number): string {
     ? `${group ? "vamos" : "Voy"} a ${destination}`
     : `${group ? "nos vamos" : "Me voy"} de viaje`;
   const subject = group ? `Somos ${Math.round(people)} y ${going}` : going;
+  return `${subject}${datesText(trip)}. ${ASK}`;
+}
+
+function datesText(trip: TripInfo): string {
+  if (!hasDates(trip)) return `, ${UNDATED}`;
   const when = spokenTripDates(trip.startDate, trip.endDate);
-  return `${subject}${when ? ` ${when}` : ""}. ${ASK}`;
+  return when ? ` ${when}` : "";
 }

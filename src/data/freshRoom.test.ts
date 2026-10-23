@@ -23,6 +23,13 @@ describe("freshRoomPayload", () => {
     expect(payload.tasks).toEqual([]);
   });
 
+  it("has no days while the dates are to be decided", () => {
+    const payload = freshRoomPayload({ name: "Cartagena con amigos", destination: "Cartagena", tasks: [{ title: "Reservar vuelos" }] });
+    expect(payload.trip).toStrictEqual({ name: "Cartagena con amigos", destination: "Cartagena" });
+    expect(payload.days).toEqual([]);
+    expect(payload.tasks).toHaveLength(1);
+  });
+
   it("defaults to a 5-day trip a month from now", () => {
     const payload = freshRoomPayload(null, new Date(2026, 9, 22));
     expect(payload.trip).toEqual({ name: "Mi viaje", startDate: "2026-11-21", endDate: "2026-11-25" });

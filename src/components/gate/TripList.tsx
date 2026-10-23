@@ -1,5 +1,6 @@
 "use client";
 import type { UserRoom } from "@/hooks/useUserRooms";
+import { UNDATED_LABEL, hasDates } from "@/utils/tripDays";
 
 interface TripListProps {
   rooms: UserRoom[];
@@ -34,6 +35,7 @@ export default function TripList({ rooms, disabled, error, onOpen, onRemove }: T
                   <span className="font-mono tracking-wider">{r.room_code}</span>
                   {" · "}{r.role === "owner" ? "Creador" : "Miembro"}
                   {r.trip?.destination && <> · {r.trip.destination}</>}
+                  {r.trip && !hasDates(r.trip) && <> · {UNDATED_LABEL}</>}
                 </div>
               </div>
               <span className="text-xl opacity-35">→</span>

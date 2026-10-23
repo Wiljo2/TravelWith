@@ -1,10 +1,17 @@
-import type { Day } from "@/types";
+import type { DatedTrip, Day, TripInfo } from "@/types";
 import { HOUR_END } from "@/constants/time";
 
 const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 export const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 export const MAX_TRIP_DAYS = 60;
+
+// False while the group hasn't settled on dates (or for a trip that hasn't loaded).
+export function hasDates(trip: TripInfo | null | undefined): trip is DatedTrip {
+  return !!trip?.startDate && !!trip.endDate;
+}
+
+export const UNDATED_LABEL = "Fechas por decidir";
 
 // Parses "yyyy-mm-dd" as a local date (avoids UTC off-by-one from Date("...")).
 // Rejects rollover dates like 2026-13-99, which the Date constructor would accept.

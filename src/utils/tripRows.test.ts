@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyToDays, applyToList, applyToTasks, rowToExtra, rowToTask, type Row } from "@/utils/tripRows";
+import { applyToDays, applyToList, applyToTasks, headerToTrip, rowToExtra, rowToTask, type Row } from "@/utils/tripRows";
 import type { Day, Extra, Task } from "@/types";
 
 const days: Day[] = [
@@ -65,5 +65,28 @@ describe("lists and tasks", () => {
 
   it("rowToTask drops hours of backlog tasks", () => {
     expect(rowToTask({ id: "k", title: "x", done: false, day_id: null, start_hour: 9, end_hour: 10, version: 1 } as Row)).toMatchObject({ dayId: undefined, start: undefined, end: undefined });
+  });
+});
+
+describe("headerToTrip", () => {
+  const header = { code: "ABC123", name: "Cartagena", destination: "Cartagena", start_date: "2026-12-04", end_date: "2026-12-06", exchange_rate: 4000 };
+  const dated = { name: "Cartagena", destination: "Cartagena", startDate: "2026-12-04", endDate: "2026-12-06" };
+
+  it("reads the header columns of a dated trip", () => {
+    expect(headerToTrip(header, null)).toEqual(dated);
+    expect(headerToTrip({ ...header, name: "Caribe", destination: null }, dated)).toEqual({ ...dated, name: "Caribe", destination: undefined });
+  });
+
+  it("keeps the previous value of the columns a header leaves out", () => {
+    expect(headerToTrip({ name: "Caribe", destination: "Cartagena" }, dated)).toEqual({ ...dated, name: "Caribe" });
+  });
+
+  it("applies the header of a trip whose dates are still to be decided", () => {
+    expect(headerToTrip({ ...header, start_date: null, end_date: null }, null)).toEqual({ name: "Cartagena", destination: "Cartagena" });
+    expect(headerToTrip({ ...header, name: "Caribe", start_date: null, end_date: null }, { name: "Cartagena" })).toEqual({ name: "Caribe", destination: "Cartagena" });
+  });
+
+  it("ignores a header without a name or dates", () => {
+    expect(headerToTrip({ name: null, destination: null, start_date: null, end_date: null }, null)).toBeNull();
   });
 });

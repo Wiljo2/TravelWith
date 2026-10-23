@@ -11,7 +11,7 @@ export interface TripListItem {
   role: string;
   joined_at: string;
   last_active_at: string;
-  trip: TripInfo | null;
+  trip: TripInfo;
 }
 
 // GET /api/rooms/list — trips of the authenticated user, with trip metadata.
@@ -63,13 +63,11 @@ async function listTrips(user: User): Promise<TripListItem[]> {
     });
 }
 
-// Same shape get_trip builds from the header columns: only with both dates.
-function tripInfo(r: { name: string | null; destination: string | null; start_date: string | null; end_date: string | null }): TripInfo | null {
-  if (!r.start_date || !r.end_date) return null;
+// The trip header from its columns; the dates only when both are set (dates to decide otherwise).
+function tripInfo(r: { name: string | null; destination: string | null; start_date: string | null; end_date: string | null }): TripInfo {
   return {
     name: r.name ?? "",
     ...(r.destination ? { destination: r.destination } : {}),
-    startDate: r.start_date,
-    endDate: r.end_date,
+    ...(r.start_date && r.end_date ? { startDate: r.start_date, endDate: r.end_date } : {}),
   };
 }

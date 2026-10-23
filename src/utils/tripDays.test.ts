@@ -1,5 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { generateDays, parseISODate, fmtTripDates, tripPhase, hasActivities, MAX_TRIP_DAYS } from "./tripDays";
+import { generateDays, parseISODate, fmtTripDates, tripPhase, hasActivities, hasDates, MAX_TRIP_DAYS } from "./tripDays";
+
+describe("hasDates", () => {
+  it("is true only with both dates", () => {
+    expect(hasDates({ name: "Cartagena", startDate: "2026-12-04", endDate: "2026-12-06" })).toBe(true);
+    expect(hasDates({ name: "Cartagena" })).toBe(false);
+    expect(hasDates({ name: "Cartagena", startDate: "2026-12-04" })).toBe(false);
+    expect(hasDates({ name: "Cartagena", startDate: "", endDate: "" })).toBe(false);
+  });
+
+  it("is false while there is no trip", () => {
+    expect(hasDates(null)).toBe(false);
+    expect(hasDates(undefined)).toBe(false);
+  });
+});
 
 describe("hasActivities", () => {
   it("is false for an empty or activity-free itinerary", () => {

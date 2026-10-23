@@ -2,9 +2,9 @@
 import type { TripBooking, TripCompanion } from "@/types";
 import { LIMITS } from "@/constants/limits";
 import { BOOKINGS, BOOKING_KEYS, COMPANIONS, COMPANION_KEYS, MAX_TRIP_PEOPLE } from "@/constants/tripSetup";
-import { MAX_TRIP_DAYS, fmtTripDates } from "@/utils/tripDays";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import DateRangeFields from "@/components/DateRangeFields";
 import ChoiceChip from "@/components/gate/wizard/ChoiceChip";
 import PeopleStepper from "@/components/gate/wizard/PeopleStepper";
 import { onEnterKey } from "@/components/gate/wizard/model";
@@ -54,41 +54,10 @@ interface DatesStepProps {
 }
 
 export function DatesStep({ startDate, endDate, dayCount, onChange }: DatesStepProps) {
-  const problem = startDate && endDate && !dayCount
-    ? endDate < startDate ? "El regreso tiene que ser el mismo día de la ida o después." : `Un viaje puede durar hasta ${MAX_TRIP_DAYS} días.`
-    : "";
-
   return (
     <>
       <StepHeading title="¿Cuándo?" hint="Con las fechas armamos un día del itinerario por cada día del viaje." />
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-[11px] text-secondary-foreground">
-          Ida
-          <Input
-            type="date"
-            value={startDate}
-            onChange={(e) => onChange({ startDate: e.target.value })}
-            className="mt-1 h-10 bg-secondary text-[13px]"
-          />
-        </label>
-        <label className="text-[11px] text-secondary-foreground">
-          Regreso
-          <Input
-            type="date"
-            value={endDate}
-            min={startDate || undefined}
-            onChange={(e) => onChange({ endDate: e.target.value })}
-            className="mt-1 h-10 bg-secondary text-[13px]"
-          />
-        </label>
-      </div>
-      {problem ? (
-        <p className="text-xs text-destructive">{problem}</p>
-      ) : dayCount ? (
-        <p className="text-xs text-muted-foreground">
-          {fmtTripDates(startDate, endDate)} · {dayCount} {dayCount === 1 ? "día" : "días"}
-        </p>
-      ) : null}
+      <DateRangeFields startDate={startDate} endDate={endDate} dayCount={dayCount} onChange={onChange} />
     </>
   );
 }

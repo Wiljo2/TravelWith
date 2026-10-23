@@ -10,7 +10,7 @@ import { TASK_CATEGORIES, DEFAULT_TASK_CAT } from "@/constants/taskCategories";
 import { fmtUSD, optionGroupUSD, fmtUSDNum } from "@/utils/currency";
 import { fmtHour } from "@/utils/time";
 import { taskIcon } from "@/utils/itemIcon";
-import { tripPhase } from "@/utils/tripDays";
+import { UNDATED_LABEL, hasDates, tripPhase } from "@/utils/tripDays";
 import type { TripPhase } from "@/utils/tripDays";
 import { useNow } from "@/hooks/useNow";
 import { cn } from "@/lib/utils";
@@ -38,7 +38,8 @@ interface HomeViewProps {
   placed?: PlacedInsight[];   // video advice placed on the plan
 }
 
-function heroCopy(phase: TripPhase | null, dayCount: number) {
+function heroCopy(phase: TripPhase | null, dayCount: number, undated: boolean) {
+  if (undated) return { big: UNDATED_LABEL, small: "Cuando las decidan, armamos el itinerario día por día" };
   if (phase?.phase === "before") {
     return phase.daysLeft === 1
       ? { big: "Mañana", small: "empieza el viaje" }
@@ -56,7 +57,8 @@ export default function HomeView({
 }: HomeViewProps) {
   const now = useNow();
   const documentsRef = useRef<HTMLDivElement>(null);
-  const phase = trip ? tripPhase(trip.startDate, days.length, now) : null;
+  const undated = !!trip && !hasDates(trip);
+  const phase = hasDates(trip) ? tripPhase(trip.startDate, days.length, now) : null;
   const during = phase?.phase === "during" ? phase : null;
   const after = phase?.phase === "after";
 
@@ -101,12 +103,12 @@ export default function HomeView({
             onOpenItinerary={toItinerary}
           />
         ) : (
-          <Hero phase={phase} days={days} people={people} />
+          <Hero phase={phase} undated={undated} days={days} people={people} />
         )}
 
         {!after && <VideoTipsPanel placed={placed} days={days} today={today} onOpenIdeas={() => onNavigate("ideas")} />}
 
-        {!after && (
+        {!after && !(undated && days.length === 0) && (
           <section className={PANEL}>
             <SectionTitle title={during ? "Mañana" : "Primeros días"} action="Itinerario" onAction={toItinerary} />
             {during ? (
@@ -174,8 +176,8 @@ export default function HomeView({
   );
 }
 
-function Hero({ phase, days, people }: { phase: TripPhase | null; days: Day[]; people: number }) {
-  const hero = heroCopy(phase, days.length);
+function Hero({ phase, undated, days, people }: { phase: TripPhase | null; undated: boolean; days: Day[]; people: number }) {
+  const hero = heroCopy(phase, days.length, undated);
   const activities = days.reduce((n, d) => n + d.events.length, 0);
   return (
     <section className={cn(PANEL, "bg-linear-to-br from-accent to-card")}>

@@ -5,7 +5,7 @@ import { Copy, Ellipsis, FileDown, History, LogOut, RotateCcw, UserPlus } from "
 import AuthButton from "@/components/auth/AuthButton";
 import InviteSheet from "@/components/invite/InviteSheet";
 import { Button } from "@/components/ui/button";
-import { fmtTripDates } from "@/utils/tripDays";
+import { UNDATED_LABEL, fmtTripDates, hasDates } from "@/utils/tripDays";
 import { cn } from "@/lib/utils";
 import type { SyncState } from "@/hooks/useTripOps";
 import { useNow } from "@/hooks/useNow";
@@ -70,7 +70,7 @@ export default function AppHeader({ roomCode, connected, saveState, lastSavedAt,
         <p className="mt-0.5 truncate text-[13px] text-muted-foreground">
           {trip ? (
             <>
-              {fmtTripDates(trip.startDate, trip.endDate)}
+              {hasDates(trip) ? fmtTripDates(trip.startDate, trip.endDate) : UNDATED_LABEL}
               {trip.destination && <> · {trip.destination}</>}
             </>
           ) : FALLBACK.subtitle}

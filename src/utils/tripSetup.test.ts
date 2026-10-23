@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { LIMITS } from "@/constants/limits";
-import { clampPeople, placeholderTravelers, starterTasks, suggestTripName } from "./tripSetup";
+import type { NewTrip } from "@/types";
+import { clampPeople, placeholderTravelers, starterTasks, suggestTripName, tripHeader } from "./tripSetup";
 
 describe("suggestTripName", () => {
   it("joins destination, companions and the start month", () => {
@@ -21,6 +22,7 @@ describe("suggestTripName", () => {
 
   it("omits the month without a valid start date", () => {
     expect(suggestTripName(" Cartagena ", "amigos", "")).toBe("Cartagena con amigos");
+    expect(suggestTripName("Cartagena", "amigos")).toBe("Cartagena con amigos");
   });
 
   it("stays within the name limit and keeps the month", () => {
@@ -41,6 +43,15 @@ describe("placeholderTravelers", () => {
     expect(placeholderTravelers(500)).toHaveLength(LIMITS.travelers);
     expect(clampPeople(Number.NaN)).toBe(1);
     expect(clampPeople(2.6)).toBe(3);
+  });
+});
+
+describe("tripHeader", () => {
+  it("keeps only the header fields, with dates when both are set", () => {
+    const trip = { name: "Cartagena", destination: "Cartagena", startDate: "2026-12-04", endDate: "2026-12-06" };
+    const withSeeds: NewTrip = { ...trip, travelers: ["Viajero 2"] };
+    expect(tripHeader(withSeeds)).toStrictEqual(trip);
+    expect(tripHeader({ name: "Cartagena", destination: "Cartagena" })).toStrictEqual({ name: "Cartagena", destination: "Cartagena" });
   });
 });
 

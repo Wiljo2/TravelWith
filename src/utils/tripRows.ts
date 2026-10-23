@@ -1,4 +1,4 @@
-import type { CalendarEvent, Day, DaySpan, EventPlace, Extra, Idea, MockPerson, Task, TaskOption, TripDocument, TripSpan } from "@/types";
+import type { CalendarEvent, Day, DaySpan, EventPlace, Extra, Idea, MockPerson, Task, TaskOption, TripDocument, TripInfo, TripSpan } from "@/types";
 
 // Pure helpers that apply one database row (as returned by the ops endpoint or
 // broadcast on the trip channel) to the client's trip state. `row = null`
@@ -90,6 +90,17 @@ export function rowToEventPlace(r: Row): EventPlace {
 
 export function rowToTraveler(r: Row): MockPerson {
   return { id: r.id, name: String(r.name), version: r.version };
+}
+
+// The trip header as stored on rooms (op responses and the trip channel). Columns
+// the header leaves out keep their previous value; null dates mean dates to decide.
+export function headerToTrip(h: Record<string, unknown>, prev: TripInfo | null): TripInfo | null {
+  const startDate = "start_date" in h ? h.start_date : prev?.startDate;
+  const endDate = "end_date" in h ? h.end_date : prev?.endDate;
+  const name = String(h.name ?? prev?.name ?? "");
+  const destination = h.destination == null ? undefined : String(h.destination);
+  if (startDate && endDate) return { name, destination, startDate: String(startDate), endDate: String(endDate) };
+  return name ? { name, destination } : prev;
 }
 
 // Upsert or remove one item of a flat list, keeping its place on update.

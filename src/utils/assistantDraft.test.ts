@@ -47,8 +47,14 @@ describe("firstPlanDraft", () => {
   });
 
   it("leaves the dates out when they are not valid", () => {
-    expect(firstPlanDraft({ ...TRIP, startDate: "", endDate: "" }, 3)).toBe(
+    expect(firstPlanDraft({ ...TRIP, startDate: "2026-12-07", endDate: "2026-12-04" }, 3)).toBe(
       "Somos 3 y vamos a Cartagena. Propón un primer plan día por día.",
+    );
+  });
+
+  it("says the dates are still to be decided", () => {
+    expect(firstPlanDraft({ name: TRIP.name, destination: "Cartagena" }, 3)).toBe(
+      "Somos 3 y vamos a Cartagena, aún sin fechas (las vamos a votar). Propón un primer plan día por día.",
     );
   });
 

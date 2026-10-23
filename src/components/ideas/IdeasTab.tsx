@@ -6,7 +6,7 @@ import { useFreshThumbnails } from "@/hooks/useFreshThumbnails";
 import { useIdeaVideo } from "@/hooks/useIdeaVideo";
 import { CLASSIFIER_VERSION, placeIndex } from "@/utils/ideas";
 import { isVenue, tripPlaces } from "@/utils/places";
-import { tripPhase } from "@/utils/tripDays";
+import { hasDates, tripPhase } from "@/utils/tripDays";
 import type { useIdeas } from "@/hooks/useIdeas";
 import { apiFetch } from "@/lib/api";
 import type { Day, IdeaLink, IdeaPlanResult, InsightLink, RoomPayload, Task, TripInfo } from "@/types";
@@ -46,7 +46,7 @@ export default function IdeasTab({
   // Expired TikTok covers are renewed in the background, for the whole group.
   useFreshThumbnails(roomCode, api.ideas, (id, thumbnail) => api.updateIdea(id, { thumbnail }));
   const video = useIdeaVideo(roomCode, accessToken, api.ideas, !localMode);
-  const phase = trip ? tripPhase(trip.startDate, days.length) : null;
+  const phase = hasDates(trip) ? tripPhase(trip.startDate, days.length) : null;
   const voter = user?.id ?? "local";
   const addedBy = user ? String(user.user_metadata?.full_name ?? user.email ?? "").split(" ")[0] || undefined : undefined;
 

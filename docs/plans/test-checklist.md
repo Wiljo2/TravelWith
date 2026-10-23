@@ -90,3 +90,8 @@ For item 7 (needs a real database — staging or production with a test trip):
   Mapa card with "Ir al itinerario" (hidden offline so the map's own error shows), Gastos explains
   global vs per-day and group vs per-person, Pendientes empty state with "Escribir la primera tarea".
   Ideas and Documentos already explained themselves. Walked all four tabs in the sandbox.
+- 2026-10-22 — Item 10, 7a (groundwork) done: design note `docs/plans/group-voting.md` (+ decisions);
+  `ItineraryTab` out of `App.tsx` (400 → 340), `TaskRow` out of `TasksView` (345 → 145),
+  `DateRangeFields`; `TripInfo` dates optional behind `hasDates` with undated fallbacks ("Fechas por
+  decidir"); POST /api/rooms still requires dates. Regression walk on the demo trip: Inicio, Agenda,
+  Horas, Pendientes (task detail), Gastos unchanged.
