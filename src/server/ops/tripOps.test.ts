@@ -68,7 +68,7 @@ describe("op registry", () => {
       "daySpan.create", "daySpan.update", "daySpan.delete", "tripSpan.create", "tripSpan.update", "tripSpan.delete",
       "expense.create", "expense.update", "expense.delete", "trip.setExchangeRate",
       "task.create", "task.update", "task.toggle", "task.delete", "task.chooseOption",
-      "taskOption.create", "taskOption.update", "taskOption.delete",
+      "taskOption.create", "taskOption.update", "taskOption.delete", "taskOption.vote",
       "traveler.add", "traveler.remove", "trip.update",
       "document.create", "document.update", "document.delete", "idea.create", "idea.update", "idea.delete",
       "eventPlace.set", "trip.setIdeaSettings", "idea.applyVideo",

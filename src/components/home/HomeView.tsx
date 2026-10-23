@@ -10,6 +10,7 @@ import { TASK_CATEGORIES, DEFAULT_TASK_CAT } from "@/constants/taskCategories";
 import { fmtUSD, optionGroupUSD, fmtUSDNum } from "@/utils/currency";
 import { fmtHour } from "@/utils/time";
 import { taskIcon } from "@/utils/itemIcon";
+import { totalVotes } from "@/utils/votes";
 import { UNDATED_LABEL, hasDates, tripPhase } from "@/utils/tripDays";
 import type { TripPhase } from "@/utils/tripDays";
 import { useNow } from "@/hooks/useNow";
@@ -24,6 +25,8 @@ interface HomeViewProps {
   loaded: boolean;
   // People who joined the trip; placeholder travelers are not counted.
   memberCount: number;
+  // Their user ids: votes count only while the voter is still on the trip.
+  memberIds: string[];
   expenseCount: number;
   documentCount: number;
   trip: TripInfo | null;
@@ -52,7 +55,7 @@ function heroCopy(phase: TripPhase | null, dayCount: number, undated: boolean) {
 // Adapts to the moment: countdown and decisions before the trip, "now / next"
 // while it's underway, and a wrap-up once it's over.
 export default function HomeView({
-  roomCode, loaded, memberCount, expenseCount, documentCount,
+  roomCode, loaded, memberCount, memberIds, expenseCount, documentCount,
   trip, days, tasks, ideas, grandTotal, people, exchangeRate, onNavigate, documents, placed = [],
 }: HomeViewProps) {
   const now = useNow();
@@ -128,7 +131,7 @@ export default function HomeView({
         {todayTasks.length > 0 && (
           <section className={PANEL}>
             <SectionTitle title="Pendientes de hoy" count={todayTasks.length} action="Ver" onAction={toTasks} />
-            <TaskList tasks={todayTasks} people={people} exchangeRate={exchangeRate} onOpen={toTasks} />
+            <TaskList tasks={todayTasks} people={people} exchangeRate={exchangeRate} memberIds={memberIds} onOpen={toTasks} />
           </section>
         )}
 
@@ -141,7 +144,7 @@ export default function HomeView({
                 {pending.length === 0 ? "Todo al día. ¡Nada pendiente!" : "Nada urgente por ahora."}
               </p>
             ) : (
-              <TaskList tasks={toDecide} people={people} exchangeRate={exchangeRate} onOpen={toTasks} />
+              <TaskList tasks={toDecide} people={people} exchangeRate={exchangeRate} memberIds={memberIds} onOpen={toTasks} />
             )}
           </section>
         )}
@@ -192,8 +195,8 @@ function Hero({ phase, undated, days, people }: { phase: TripPhase | null; undat
   );
 }
 
-function TaskList({ tasks, people, exchangeRate, onOpen }: {
-  tasks: Task[]; people: number; exchangeRate: number; onOpen: () => void;
+function TaskList({ tasks, people, exchangeRate, memberIds, onOpen }: {
+  tasks: Task[]; people: number; exchangeRate: number; memberIds: string[]; onOpen: () => void;
 }) {
   return (
     <ul className="-mx-2 flex flex-col">
@@ -201,8 +204,10 @@ function TaskList({ tasks, people, exchangeRate, onOpen }: {
         const cat = TASK_CATEGORIES[t.cat ?? DEFAULT_TASK_CAT] ?? TASK_CATEGORIES[DEFAULT_TASK_CAT];
         const options = t.options ?? [];
         const costs = options.map((o) => optionGroupUSD(o, people, exchangeRate));
+        const votes = totalVotes(options, memberIds);
         const detail = options.length > 0
-          ? `${options.length} opciones · desde ${fmtUSDNum(Math.min(...costs))}`
+          ? [`${options.length} opciones`, votes > 0 && `✋ ${votes} ${votes === 1 ? "voto" : "votos"}`, `desde ${fmtUSDNum(Math.min(...costs))}`]
+              .filter(Boolean).join(" · ")
           : t.start != null
             ? fmtHour(t.start)
             : t.priority === "alta" ? "Prioridad alta" : cat.label;

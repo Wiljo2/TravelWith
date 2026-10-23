@@ -119,5 +119,14 @@ export function useTasks(send: SendOp, isKnown: IsKnown, notify?: Notify) {
     setTasks((prev) => applyToTasks(prev, table, id, row));
   }, []);
 
-  return { tasks, addTask, toggleTask, updateTask, deleteTask, chooseOption, swapTaskDays, loadTasks, applyRow };
+  // State only: changes one option in place, for writes sent by another hook (votes).
+  const patchOptionLocal = useCallback((optionId: string, update: (o: TaskOption) => TaskOption) => {
+    setTasks((prev) => prev.map((t) =>
+      t.options?.some((o) => o.id === optionId)
+        ? { ...t, options: t.options.map((o) => (o.id === optionId ? update(o) : o)) }
+        : t,
+    ));
+  }, []);
+
+  return { tasks, addTask, toggleTask, updateTask, deleteTask, chooseOption, swapTaskDays, loadTasks, applyRow, patchOptionLocal };
 }

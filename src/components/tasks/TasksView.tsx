@@ -5,6 +5,7 @@ import { fmtHour } from "@/utils/time";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import TaskRow from "@/components/tasks/TaskRow";
+import type { OptionVoting } from "@/components/tasks/OptionVote";
 import { LIMITS } from "@/constants/limits";
 
 interface TasksViewProps {
@@ -12,6 +13,7 @@ interface TasksViewProps {
   tasks: Task[];
   people: number;
   exchangeRate: number;
+  voting: OptionVoting;
   onAdd: (title: string) => void;
   onToggle: (id: string) => void;
   onUpdateTask: (id: string, patch: Partial<Task>) => void;
@@ -19,7 +21,7 @@ interface TasksViewProps {
   onDelete: (id: string) => void;
 }
 
-export default function TasksView({ days, tasks, people, exchangeRate, onAdd, onToggle, onUpdateTask, onChooseOption, onDelete }: TasksViewProps) {
+export default function TasksView({ days, tasks, people, exchangeRate, voting, onAdd, onToggle, onUpdateTask, onChooseOption, onDelete }: TasksViewProps) {
   const [draft, setDraft] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -62,6 +64,7 @@ export default function TasksView({ days, tasks, people, exchangeRate, onAdd, on
             expanded={expandedId === task.id}
             editing={editingId === task.id}
             editValue={editValue}
+            voting={voting}
             onToggleExpand={() => setExpandedId((p) => p === task.id ? null : task.id)}
             onToggleDone={() => onToggle(task.id)}
             onStartEdit={() => startEdit(task)}

@@ -6,6 +6,7 @@ import { FEATURE_OPS } from "@/server/ops/features";
 import { SPAN_OPS } from "@/server/ops/spans";
 import { TASK_OPS } from "@/server/ops/tasks";
 import { TRIP_OPS } from "@/server/ops/trip";
+import { VOTE_OPS } from "@/server/ops/votes";
 import type { OpContext, OpDefinition, OpInput, OpResult } from "@/server/ops/types";
 
 // Every trip write goes through here: the ops route and the agent tools.
@@ -15,6 +16,7 @@ export const OPS: Record<string, OpDefinition> = {
   ...SPAN_OPS,
   ...EXPENSE_OPS,
   ...TASK_OPS,
+  ...VOTE_OPS,
   ...TRIP_OPS,
   ...FEATURE_OPS,
 };

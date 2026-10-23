@@ -49,6 +49,13 @@ For item 7 (needs a real database — staging or production with a test trip):
 - [ ] Item 6 on a real trip you own: "Contarle a la IA" opens the assistant (desktop panel and phone
       sheet) with the draft filled in, not sent.
 
+For item 10 (group voting) — migration `supabase/migrations/027_group_votes.sql`:
+- [ ] Apply 027 to **staging** (never production first; not during the trip Nov 26 – Dec 4). This
+      branch must not be deployed anywhere before 027 is applied there: votes would answer 500.
+- [ ] On staging, two accounts vote on the same "Por decidir" option at the same time → both votes
+      stay and show live on the other screen; history says "… votó en la opción …".
+- [ ] A trip created before the change loads and edits as before, with 0 votes.
+
 ## Log
 
 - 2026-10-22 — Item 2 done: `?local=new` / `npm run local:new` / second link under the sign-in
@@ -95,3 +102,9 @@ For item 7 (needs a real database — staging or production with a test trip):
   `DateRangeFields`; `TripInfo` dates optional behind `hasDates` with undated fallbacks ("Fechas por
   decidir"); POST /api/rooms still requires dates. Regression walk on the demo trip: Inicio, Agenda,
   Horas, Pendientes (task detail), Gastos unchanged.
+- 2026-10-22 — Item 10, 7b (votes on "Por decidir" options) done in code: migration 027 written,
+  not applied (columns for 7c/7d, `set_task_option_vote`, `close_task_vote`, `get_trip` with a static
+  test that no key is lost); op `taskOption.vote` (voter = signed-in user, no version guard); ✋ with
+  count, "Tú, Ana y 2 más", "Más votada", confirm when removing a voted option; Inicio "2 opciones ·
+  ✋ 1 voto". Walked in the demo trip (local, in memory): vote, unvote, revote, Inicio count. Real
+  voting needs 027 on staging → owner actions above.

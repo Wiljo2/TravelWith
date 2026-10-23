@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useItinerary } from "@/hooks/useItinerary";
 import { useBudget } from "@/hooks/useBudget";
 import { useTasks } from "@/hooks/useTasks";
+import { useVotes } from "@/hooks/useVotes";
 import { useTripInfo } from "@/hooks/useTripInfo";
 import { useTripOps } from "@/hooks/useTripOps";
 import { useRoom } from "@/hooks/useRoom";
@@ -48,6 +49,7 @@ export function useTripData(roomCode: string | null, accessToken: string | undef
   const itinerary = useItinerary(ops.send, { notify, flush: ops.flush });
   const budget = useBudget(ops.send, notify);
   const taskState = useTasks(ops.send, ops.isKnown, notify);
+  const votes = useVotes(ops.send, ops.isKnown, taskState.patchOptionLocal);
   const tripInfo = useTripInfo(ops.send);
   const ideasApi = useIdeas(roomCode, accessToken);
   const geoApi = useTripGeo();
@@ -154,5 +156,5 @@ export function useTripData(roomCode: string | null, accessToken: string | undef
   const { flush } = ops;
   const save = useCallback(async () => (localMode ? true : flush()), [localMode, flush]);
 
-  return { ops, itinerary, budget, taskState, tripInfo, ideasApi, geoApi, docs, room, payloadNow, resetLocalSeed, save };
+  return { ops, itinerary, budget, taskState, votes, tripInfo, ideasApi, geoApi, docs, room, payloadNow, resetLocalSeed, save };
 }

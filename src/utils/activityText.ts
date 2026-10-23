@@ -23,6 +23,7 @@ const FIELD: Record<string, string> = {
   maps_url: "link de Maps", document_id: "documento", drive_file_id: "archivo", kind: "tipo",
   data: "detalles", bg: "color", border: "color", start_event_id: "inicio", end_event_id: "fin",
   flexible: "flexible", z_index: "orden",
+  votes: "votos", start_date: "fechas", end_date: "fechas",
 };
 
 const VERB: Record<ActivityEntry["op"], string> = { INSERT: "agregó", UPDATE: "editó", DELETE: "borró" };
@@ -36,6 +37,9 @@ export function activitySentence(e: ActivityEntry): string {
   const detail = e.op === "UPDATE" && fields.length ? ` (${fields.join(", ")})` : "";
   if (e.table === "trip_tasks" && e.op === "UPDATE" && e.fields.length === 1 && e.fields[0] === "done") {
     return `${who} marcó el pendiente${name}`;
+  }
+  if (e.table === "trip_task_options" && e.op === "UPDATE" && e.fields.length === 1 && e.fields[0] === "votes") {
+    return `${who} votó en la opción${name}`;
   }
   return `${who} ${VERB[e.op]} ${item}${name}${detail}`;
 }

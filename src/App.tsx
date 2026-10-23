@@ -27,6 +27,7 @@ import Snackbar from "@/components/Snackbar";
 import { useSnackbar } from "@/hooks/useSnackbar";
 import RoomGate from "@/components/RoomGate";
 import TasksView from "@/components/tasks/TasksView";
+import type { OptionVoting } from "@/components/tasks/OptionVote";
 import IdeasTab from "@/components/ideas/IdeasTab";
 import ItineraryMap from "@/components/map/ItineraryMap";
 import type { AgentChatMessage } from "@/types";
@@ -70,6 +71,9 @@ export default function App() {
   const tipsByEvent = useMemo(() => countByEvent(placed), [placed]);
   const { documents, addDocument, updateDocument, removeDocument } = docs;
   const { connected, offlineSince, members } = data.room;
+  // Option votes are keyed like idea votes: the signed-in user, "local" without an account.
+  const voter = user?.id ?? "local";
+  const voting: OptionVoting = { voter, members, onVote: (optionId, on) => data.votes.vote(optionId, voter, on) };
 
   // The server turns the task into an event and an expense in one transaction;
   // the LOCAL demo does it in memory.
@@ -207,7 +211,8 @@ export default function App() {
 
       {activeTab === "home" && (
         <HomeView
-          roomCode={roomCode} loaded={data.room.loaded} memberCount={members.length} expenseCount={extras.length} documentCount={documents.length}
+          roomCode={roomCode} loaded={data.room.loaded} memberCount={members.length} memberIds={members.map((m) => m.userId)}
+          expenseCount={extras.length} documentCount={documents.length}
           trip={trip}
           days={days}
           tasks={tasks}
@@ -301,6 +306,7 @@ export default function App() {
           tasks={tasks}
           people={people}
           exchangeRate={exchangeRate}
+          voting={voting}
           onAdd={(title) => addTask({ title })}
           onToggle={toggleTask}
           onUpdateTask={updateTask}

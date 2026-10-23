@@ -118,6 +118,7 @@ export interface TaskOption {
   amount?: number;                   // cost of this option, in `currency`
   currency?: "USD" | "COP";          // default "USD"
   splitMode?: "group" | "perPerson"; // default "group"
+  votes?: string[];                  // user ids of the members who back it (approval voting); default []
   version?: number;
 }
 

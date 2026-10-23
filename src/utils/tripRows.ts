@@ -23,6 +23,8 @@ export type Row = Record<string, unknown> & { id: string; version: number };
 const num = (v: unknown): number => Number(v);
 const optNum = (v: unknown): number | undefined => (v == null ? undefined : Number(v));
 const optStr = (v: unknown): string | undefined => (v == null ? undefined : String(v));
+const optStrings = (v: unknown): string[] | undefined =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : undefined;
 
 function isStale(current: { version?: number } | undefined, row: Row): boolean {
   return current?.version !== undefined && current.version >= row.version;
@@ -64,7 +66,7 @@ export function rowToTaskOption(r: Row): TaskOption {
   return {
     id: r.id, label: String(r.label), note: optStr(r.note), amount: optNum(r.amount),
     currency: optStr(r.currency) as TaskOption["currency"], splitMode: optStr(r.split_mode) as TaskOption["splitMode"],
-    version: r.version,
+    votes: optStrings(r.votes), version: r.version,
   };
 }
 

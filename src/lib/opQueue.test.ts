@@ -112,6 +112,48 @@ describe("OpQueue", () => {
   });
 });
 
+describe("OpQueue votes", () => {
+  const optionRow = (version: number, votes: string[]) => ({ table: "trip_task_options", row: { id: "o1", version, votes } });
+
+  it("sends votes unguarded on the option's key and applies the response", async () => {
+    const { queue, calls, handlers } = setup();
+    queue.seed([["trip_task_options:o1", 3]]);
+    queue.send("taskOption.vote", { id: "o1", on: true });
+    expect(calls[0]).toMatchObject({ op: "taskOption.vote", expectedVersion: undefined });
+    expect(opTarget("taskOption.vote", { id: "o1" }).key).toBe("trip_task_options:o1");
+    calls[0].resolve(ok([optionRow(5, ["u2", "u1"])]));
+    await flush();
+    expect(handlers.onRows).toHaveBeenCalledWith([optionRow(5, ["u2", "u1"])]);
+    queue.send("taskOption.update", { id: "o1", label: "B" });
+    expect(calls[1].expectedVersion).toBe(5);
+  });
+
+  it("merges queued toggles and applies only the last response", async () => {
+    const { queue, calls, handlers } = setup();
+    queue.send("taskOption.vote", { id: "o1", on: true });
+    queue.send("taskOption.vote", { id: "o1", on: false });
+    queue.send("taskOption.vote", { id: "o1", on: true });
+    calls[0].resolve(ok([optionRow(2, ["u1"])]));
+    await flush();
+    expect(handlers.onRows).not.toHaveBeenCalled();
+    expect(calls.map((c) => c.args)).toEqual([{ id: "o1", on: true }, { id: "o1", on: true }]);
+    calls[1].resolve(ok([optionRow(2, ["u1"])]));
+    await flush();
+    expect(handlers.onRows).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the response while an edit of the option is queued", async () => {
+    const { queue, calls, handlers } = setup();
+    queue.seed([["trip_task_options:o1", 1]]);
+    queue.send("taskOption.vote", { id: "o1", on: true });
+    queue.send("taskOption.update", { id: "o1", label: "Nuevo" });
+    calls[0].resolve(ok([optionRow(2, ["u1"])]));
+    await flush();
+    expect(handlers.onRows).not.toHaveBeenCalled();
+    expect(calls[1]).toMatchObject({ op: "taskOption.update", expectedVersion: 2 });
+  });
+});
+
 describe("OpQueue outcomes", () => {
   it("resolves ok, and records lastSavedAt for onState", async () => {
     const { queue, calls, handlers } = setup();

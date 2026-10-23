@@ -8,10 +8,12 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import TaskOptions from "@/components/tasks/TaskOptions";
+import type { OptionVoting } from "@/components/tasks/OptionVote";
 import NoteLinks from "@/components/NoteLinks";
 import IconPicker from "@/components/IconPicker";
 import { LIMITS } from "@/constants/limits";
 import { useIsTouch } from "@/hooks/useMediaQuery";
+import { totalVotes } from "@/utils/votes";
 
 interface TaskRowProps {
   task: Task;
@@ -21,6 +23,7 @@ interface TaskRowProps {
   expanded: boolean;
   editing: boolean;
   editValue: string;
+  voting: OptionVoting;
   onToggleExpand: () => void;
   onToggleDone: () => void;
   onStartEdit: () => void;
@@ -33,7 +36,7 @@ interface TaskRowProps {
 }
 
 export default function TaskRow({
-  task, people, exchangeRate, scheduledLabel, expanded, editing, editValue,
+  task, people, exchangeRate, scheduledLabel, expanded, editing, editValue, voting,
   onToggleExpand, onToggleDone, onStartEdit,
   onEditChange, onCommitEdit, onCancelEdit, onUpdate, onChoose, onDelete,
 }: TaskRowProps) {
@@ -48,6 +51,7 @@ export default function TaskRow({
         return { low: Math.min(...costs), high: Math.max(...costs) };
       })()
     : null;
+  const votes = totalVotes(options, voting.members.map((m) => m.userId));
 
   useEffect(() => {
     if (expanded && noteRef.current) {
@@ -103,7 +107,7 @@ export default function TaskRow({
             className="shrink-0 whitespace-nowrap rounded-full border border-[#F59E0B55] bg-[#F59E0B18] px-2 py-0.5 text-[9.5px] font-semibold text-[#B45309]"
             title="Decisión pendiente: elige una opción para confirmarla"
           >
-            🔀 {options.length} opc · {optionRange.low === optionRange.high
+            🔀 {options.length} opc{votes > 0 && ` · ✋ ${votes}`} · {optionRange.low === optionRange.high
               ? fmtUSDNum(optionRange.low)
               : `${fmtUSDNum(optionRange.low)}–${fmtUSDNum(optionRange.high)}`}
           </span>
@@ -195,6 +199,8 @@ export default function TaskRow({
               people={people}
               exchangeRate={exchangeRate}
               scheduled={!!task.dayId && task.start != null}
+              closed={task.done}
+              voting={voting}
               onChange={(next) => onUpdate({ options: next })}
               onChoose={onChoose}
             />

@@ -83,7 +83,7 @@ Server-side mutations do NOT talk to Supabase directly. The layering is:
 
 - `src/server/ops/*` — the **op registry** (`runOp(name, ctx, args)`): one entry per write (`event.create`, `task.chooseOption`, …, 28 today), each with its `minRole`. The only way to change trip data: the ops route and the agent both call it. Any future feature that writes trip data (REST endpoints, agents, cron) adds an op — never inline Supabase writes.
 - `src/server/domain/*Rows.ts` — **pure validation** of op arguments into rows (`DomainError` with an actionable message; no I/O, unit-tested). `domain/read.ts` builds the agent's compact read views from a `RoomPayload`.
-- `src/server/repo/*` — one module per table. Updates and deletes are **version-guarded** (`... and version = expected`): 0 rows → `RowConflictError` carrying the current row (409). Multi-row changes are SQL functions called with `rpc` (`swap_days`, `reset_itinerary`, `choose_task_option`, `get_trip`), so they are atomic.
+- `src/server/repo/*` — one module per table. Updates and deletes are **version-guarded** (`... and version = expected`): 0 rows → `RowConflictError` carrying the current row (409). Multi-row changes are SQL functions called with `rpc` (`swap_days`, `reset_itinerary`, `choose_task_option`, `get_trip`), so they are atomic. One exception to the guard: an option vote (`taskOption.vote` → `set_task_option_vote`, 027) adds or removes only the caller's id in one statement, so concurrent voters never 409; it still bumps the option version.
 - `src/server/agent/*` — the Claude assistant: tool definitions + executor (`tools.ts`, thin wrappers over `runOp` and `getTrip`) and the stable system prompt (`prompt.ts`).
 
 ### AI assistant (Claude agent)

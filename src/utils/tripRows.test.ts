@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyToDays, applyToList, applyToTasks, headerToTrip, rowToExtra, rowToTask, type Row } from "@/utils/tripRows";
+import { applyToDays, applyToList, applyToTasks, headerToTrip, rowToExtra, rowToTask, rowToTaskOption, type Row } from "@/utils/tripRows";
 import type { Day, Extra, Task } from "@/types";
 
 const days: Day[] = [
@@ -61,6 +61,16 @@ describe("lists and tasks", () => {
     expect(rowToTask({ id: "k", title: "x", done: false, icon: null, version: 1 } as Row).icon).toBeUndefined();
     const next = applyToDays(days, "trip_events", "e1", eventRow({ icon: "🍽️" }));
     expect(next[0].events[0].icon).toBe("🍽️");
+  });
+
+  it("option rows carry their votes; null and junk read as no votes", () => {
+    const tasks: Task[] = [{ id: "k1", title: "T", done: false, options: [{ id: "o1", label: "A", votes: ["u1"], version: 1 }], version: 1 }];
+    const voted = applyToTasks(tasks, "trip_task_options", "o1", { id: "o1", task_id: "k1", label: "A", votes: ["u1", "u2"], version: 2 } as Row);
+    expect(voted[0].options?.[0].votes).toEqual(["u1", "u2"]);
+    expect(rowToTaskOption({ id: "o1", label: "A", votes: null, version: 3 } as Row).votes).toBeUndefined();
+    expect(rowToTaskOption({ id: "o1", label: "A", votes: ["u1", 3], version: 3 } as Row).votes).toEqual(["u1"]);
+    const stale = applyToTasks(voted, "trip_task_options", "o1", { id: "o1", task_id: "k1", label: "A", votes: ["u9"], version: 2 } as Row);
+    expect(stale[0].options?.[0].votes).toEqual(["u1", "u2"]);
   });
 
   it("rowToTask drops hours of backlog tasks", () => {

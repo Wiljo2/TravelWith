@@ -12,6 +12,7 @@ vi.mock("@/lib/supabase-server", () => ({
 
 const { eventsRepo } = await import("./events");
 const { expensesRepo } = await import("./expenses");
+const { setOptionVote } = await import("./taskOptions");
 const { RowConflictError, RowNotFoundError } = await import("./errors");
 
 const USER = "00000000-0000-0000-0000-000000000001";
@@ -161,5 +162,25 @@ describe("tableRepo.remove", () => {
     handler = () => ({ data: { deleted: null, current: null } });
     expect(await eventsRepo.remove(CODE, "e1", undefined, USER)).toBeNull();
     expect(mock.log[0].args).toMatchObject({ p_expected_version: null });
+  });
+});
+
+describe("setOptionVote", () => {
+  it("calls set_task_option_vote with the acting user and returns the option", async () => {
+    handler = () => ({ data: { id: "o1", version: 4, votes: [USER] } });
+    const row = await setOptionVote(CODE, "o1", true, USER);
+    expect(row).toMatchObject({ id: "o1", version: 4, votes: [USER] });
+    expect(mock.log[0]).toMatchObject({
+      op: "rpc",
+      table: "set_task_option_vote",
+      args: { p_code: CODE, p_option_id: "o1", p_on: true, p_user: USER },
+    });
+  });
+
+  it("maps a missing option to a 404", async () => {
+    handler = () => ({ error: { code: "P0002", message: "option not found" } });
+    const err = await setOptionVote(CODE, "o1", false, USER).catch((e) => e);
+    expect(err).toBeInstanceOf(HttpError);
+    expect(err.status).toBe(404);
   });
 });

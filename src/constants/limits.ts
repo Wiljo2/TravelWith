@@ -10,6 +10,9 @@ export const LIMITS = {
   extras: 500,
   tasks: 500,
   optionsPerTask: 20,
+  // Options of a date or destination vote; regular tasks keep optionsPerTask.
+  voteOptions: 5,
+  votesPerOption: 200,
   documents: 100,
   documentTitle: 120,
   travelers: 50,
