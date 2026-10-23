@@ -72,8 +72,13 @@ For item 7 (needs a real database — staging or production with a test trip):
       sheet) with the draft filled in, not sent.
 
 For item 10 (group voting) — migration `supabase/migrations/027_group_votes.sql`:
-- [ ] Apply 027 to **staging** (never production first; not during the trip Nov 26 – Dec 4). This
+- [x] Apply 027 to **staging** (never production first; not during the trip Nov 26 – Dec 4). This
       branch must not be deployed anywhere before 027 is applied there: votes would answer 500.
+      Done 2026-10-23 with 024 (staging was missing it too).
+- [ ] Apply 024 and 027 to **production** right before deploying this branch.
+- [ ] Turn on **leaked password protection** (Auth → Passwords) in staging and production, now that
+      email + password sign-up exists (Supabase security advisor warning).
+- [ ] Run the two-account walk: `docs/plans/staging-test/onboarding-and-votes.md`.
 - [ ] On staging, two accounts vote on the same "Por decidir" option at the same time → both votes
       stay and show live on the other screen; history says "… votó en la opción …".
 - [ ] A trip created before the change loads and edits as before, with 0 votes.
@@ -195,3 +200,9 @@ For item 11 (welcome for invited people) — needs two accounts:
   activity keeping its hours or at the next free hour (`moveStartHour`). Same-spot drops are no-ops.
   Walked with Playwright touch emulation (iPhone 390×844, Pixel 412×915), 13 scenarios each, all pass
   (re-run by the orchestrator). Real-device check → owner actions above.
+- 2026-10-23 — Staging (`ddxxpcrgudllkgkyqqzw`, via the Supabase MCP after confirming the project URL):
+  applied 024 and 027; verified the 4 new columns, 3 checks, `set_task_option_vote` / `close_task_vote`
+  / `get_trip` executable only by `service_role`, `app_errors` with RLS, and `get_trip('NVHPCI')` intact
+  (9 days, 9 tasks, 6 expenses, dates and destination). Advisors: nothing new from these migrations;
+  leaked password protection is off (owner action above). Two-account walk written in
+  `docs/plans/staging-test/onboarding-and-votes.md`.
