@@ -1,8 +1,10 @@
 import { createServerClient } from "@/lib/supabase-server";
+import { memberProfile } from "@/server/members";
 import type { Json } from "@/types/database";
 import type { ActivityEntry, RoomMember } from "@/types";
 
 export const ACTIVITY_PAGE = 50;
+const MAX_NAME_LOOKUPS = 20;
 
 // Columns every trip row carries; a change that only touches these is not
 // something a traveler did (version bumps, reordering).
@@ -71,8 +73,22 @@ export async function listActivity(code: string, before?: number): Promise<{ ent
   const roster = Array.isArray(room.data?.members) ? (room.data.members as unknown as RoomMember[]) : [];
   const names = new Map(roster.map((m) => [m.userId, m.name]));
   const rows = (data ?? []) as ChangeRow[];
+  await addFormerMembers(db, rows, names);
   return {
     entries: rows.map((r) => summarizeChange(r, names)).filter((e): e is ActivityEntry => e !== null),
     next: rows.length === ACTIVITY_PAGE ? rows[rows.length - 1].id : null,
   };
+}
+
+// People who left the trip are no longer in the roster: their name comes from
+// their account (same profile rules as the roster). Deleted accounts stay unnamed.
+async function addFormerMembers(db: ReturnType<typeof createServerClient>, rows: ChangeRow[], names: Map<string, string>) {
+  const missing = [...new Set(rows.map((r) => r.user_id).filter((id): id is string => !!id && !names.has(id)))];
+  const found = await Promise.all(
+    missing.slice(0, MAX_NAME_LOOKUPS).map(async (id) => {
+      const { data, error } = await db.auth.admin.getUserById(id);
+      return !error && data.user ? ([id, memberProfile(data.user).name] as const) : null;
+    }),
+  );
+  for (const entry of found) if (entry) names.set(entry[0], entry[1]);
 }

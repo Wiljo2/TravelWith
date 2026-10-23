@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { initialDays } from "@/test/fixtures/initialDays";
-import { distanceKm, eventKey, inTripRegion, mapStops, offlineTiles, staleEvents, stopOrder, tilesInBBox } from "./tripGeo";
+import { distanceKm, eventKey, inBBox, mapStops, offlineTiles, staleEvents, stopOrder, tilesInBBox, tripRegion, type MapStop } from "./tripGeo";
 import type { Day, EventPlace } from "@/types";
 
 const day = (id: string, events: [string, string, number][]): Day => ({
@@ -51,10 +51,31 @@ describe("trip map", () => {
     expect(mapStops(days, edited).some((s) => s.name === "Disney Springs")).toBe(true);
   });
 
-  it("keeps only the trip's region", () => {
-    expect(inTripRegion({ lat: 28.378, lng: -81.5 })).toBe(true);    // Orlando
-    expect(inTripRegion({ lat: 25.08, lng: -77.34 })).toBe(true);    // Nassau
-    expect(inTripRegion({ lat: 3.54, lng: -76.38 })).toBe(false);    // Cali
+  const pin = (name: string, lat: number, lng: number, visits = 1): MapStop => ({
+    id: name, name, lat, lng,
+    visits: Array.from({ length: visits }, (_, i) => ({ dayIdx: i, dayId: `d${i}`, eventId: `${name}${i}`, title: name, start: 9 })),
+  });
+  const cali = pin("Cali", 3.54, -76.38, 2);
+  const florida = [pin("Orlando", 28.378, -81.5, 4), pin("Miami", 25.77, -80.19, 2), pin("Nassau", 25.08, -77.34), pin("CocoCay", 25.82, -77.94)];
+
+  it("finds the trip's region and leaves the home airport out, even with two visits", () => {
+    const region = tripRegion([cali, ...florida])!;
+    for (const p of florida) expect(inBBox(region, p)).toBe(true);
+    expect(inBBox(region, cali)).toBe(false);
+  });
+
+  it("works for any destination", () => {
+    const japan = [pin("Tokio", 35.68, 139.69, 3), pin("Kioto", 35.01, 135.77, 2), pin("Osaka", 34.69, 135.5)];
+    const region = tripRegion([pin("Bogotá", 4.7, -74.07), ...japan])!;
+    for (const p of japan) expect(inBBox(region, p)).toBe(true);
+    expect(region.west).toBeGreaterThan(130);
+  });
+
+  it("gives a one-place trip room around it, and none without pins", () => {
+    const region = tripRegion([pin("Cartagena", 10.42, -75.55)])!;
+    expect(region.east - region.west).toBeCloseTo(0.3);
+    expect(region.north - region.south).toBeCloseTo(0.3);
+    expect(tripRegion([])).toBeNull();
   });
 
   it("locates an activity again when its Google Maps link is added, and only then", () => {
@@ -76,6 +97,13 @@ describe("trip map", () => {
     expect(new Set(keys).size).toBe(keys.length);
     expect(tiles.some((t) => t.z === 14)).toBe(true);
     expect(tiles.length).toBeLessThan(400);
+  });
+
+  it("keeps a continent-wide trip's overview to a bounded number of tiles", () => {
+    const europe = [pin("Lisboa", 38.72, -9.14), pin("Madrid", 40.42, -3.7), pin("París", 48.86, 2.35), pin("Berlín", 52.52, 13.4), pin("Roma", 41.9, 12.5), pin("Atenas", 37.98, 23.73)];
+    const overview = offlineTiles(europe).filter((t) => t.z <= 9);
+    expect(overview.length).toBeLessThanOrEqual(3000);
+    expect(overview.some((t) => t.z === 4)).toBe(true);
   });
 
   it("handles the demo trip", () => {
