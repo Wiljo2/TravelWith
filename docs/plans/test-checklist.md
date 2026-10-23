@@ -52,13 +52,16 @@ needs a dashboard or account action outside the repo goes under "Owner actions" 
 ## Owner actions
 
 For item 1 (Supabase dashboard → Authentication):
-- [ ] **Sign In / Providers → Email**: enabled. Decide on "Confirm email" (on = the user must open the
-      link before signing in; the UI handles both).
+- [x] **Sign In / Providers → Email**: enabled. Decide on "Confirm email" (on = the user must open the
+      link before signing in; the UI handles both). Checked 2026-10-23: enabled, sign-ups allowed,
+      "Confirm email" on, in both projects.
 - [ ] **Emails → SMTP**: set a custom SMTP (e.g. Resend). Supabase's built-in sender only delivers to
       the project's team members and is rate limited, so real users would never get the
       confirmation or reset email.
-- [ ] **URL Configuration → Redirect URLs**: includes `http://localhost:3000/**` and the production
-      origin, otherwise confirmation/reset links fall back to the Site URL.
+- [x] **URL Configuration → Redirect URLs**: includes `http://localhost:3000/**` and the production
+      origin, otherwise confirmation/reset links fall back to the Site URL. Done 2026-10-23:
+      production + `https://travelwith-five.vercel.app/**`, `http://localhost:3000/**`; staging +
+      `http://localhost:3001/**`, `http://localhost:3000/**`.
 - [ ] **Apple** (optional): Apple Developer Program, a Services ID + Sign in with Apple key, then
       **Providers → Apple** in Supabase; finally `NEXT_PUBLIC_AUTH_APPLE=1` in `.env.local` / Vercel.
 - [ ] Verify end to end: create an account, confirm by email, sign in, sign out, reset the password.
@@ -76,8 +79,13 @@ For item 10 (group voting) — migration `supabase/migrations/027_group_votes.sq
       branch must not be deployed anywhere before 027 is applied there: votes would answer 500.
       Done 2026-10-23 with 024 (staging was missing it too).
 - [ ] Apply 024 and 027 to **production** right before deploying this branch.
-- [ ] Turn on **leaked password protection** (Auth → Passwords) in staging and production, now that
-      email + password sign-up exists (Supabase security advisor warning).
+- [ ] ~~Turn on leaked password protection~~ — not available: it needs the Supabase Pro plan (the org
+      is on Free). Revisit if the plan changes.
+- [ ] **Deploy blocker:** production has "Confirm email" on and **no custom SMTP**, so people outside
+      the Supabase team never get the confirmation email and can't finish an email sign-up. Set up
+      SMTP (e.g. Resend) before deploying email sign-up.
+- [ ] Optional: raise "Minimum password length" from 6 to 8 in both projects to match the app
+      (`MIN_PASSWORD_LENGTH` = 8); today only the client enforces 8.
 - [ ] Run the two-account walk: `docs/plans/staging-test/onboarding-and-votes.md`.
 - [ ] On staging, two accounts vote on the same "Por decidir" option at the same time → both votes
       stay and show live on the other screen; history says "… votó en la opción …".
