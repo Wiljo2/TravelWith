@@ -24,10 +24,16 @@ export function useSharedLink() {
     try { setText(sessionStorage.getItem(KEY)); } catch { /* storage blocked */ }
   }, []);
 
+  // A link pasted inside the app (the start choices) takes the same path.
+  const share = useCallback((incoming: string) => {
+    setText(incoming);
+    try { sessionStorage.setItem(KEY, incoming); } catch { /* storage blocked: keep it in memory */ }
+  }, []);
+
   const clear = useCallback(() => {
     setText(null);
     try { sessionStorage.removeItem(KEY); } catch { /* storage blocked */ }
   }, []);
 
-  return { text, clear };
+  return { text, share, clear };
 }

@@ -3,6 +3,8 @@ import { useDragDrop } from "@/hooks/useDragDrop";
 import { useTripSession } from "@/hooks/useTripSession";
 import { useTripData } from "@/hooks/useTripData";
 import { useSharedLink } from "@/hooks/useSharedLink";
+import { useStartChoices } from "@/hooks/useStartChoices";
+import StartChoices from "@/components/onboarding/StartChoices";
 import DocumentsPanel from "@/components/documents/DocumentsPanel";
 import { chooseOption } from "@/utils/taskDecision";
 import { HOUR_START, HOUR_END } from "@/constants/time";
@@ -56,6 +58,7 @@ export default function App() {
   const isMobile = useIsMobile();
   const [sheet, setSheet] = useState<ItinerarySheet | null>(null);
   const [agentMessages, setAgentMessages] = useState<AgentChatMessage[]>([]);
+  const start = useStartChoices({ roomCode, mobile: isMobile, canUseAssistant: canUseAgent && !localMode, chatLength: agentMessages.length, setActiveTab, setSheet, share: shared.share });
 
   const { snack, notify, dismiss: dismissSnack } = useSnackbar();
   const data = useTripData(roomCode, session?.access_token, localMode, () => setRoomCode(null), notify);
@@ -153,6 +156,7 @@ export default function App() {
           removeRoom={removeRoom}
           onEnterLocal={LOCAL_MODE_ENABLED ? enterLocal : undefined}
           invite={invite}
+          onCreated={start.markCreated}
         />
       </>
     );
@@ -189,6 +193,7 @@ export default function App() {
       setMessages={setAgentMessages}
       className={isMobile ? "h-[75dvh] rounded-none border-x-0 border-b-0" : "rounded-2xl border-0 shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-border/70"}
       embedded={isMobile}
+      initialDraft={start.agentDraft}
     />
   );
 
@@ -236,6 +241,7 @@ export default function App() {
           selectedId={selectedId}
           detail={detail || null}
           agent={agentPanel}
+          focusAgent={!!start.agentDraft}
           sheet={sheet}
           onOpenSheet={setSheet}
           onCloseSheet={() => { setSheet(null); setSelectedId(null); }}
@@ -362,6 +368,7 @@ export default function App() {
         />
       )}
 
+      {start.choices && <StartChoices {...start.choices} />}
       <Snackbar snack={snack} onDismiss={dismissSnack} />
       <SyncNotice message={ops.notice} onDismiss={ops.dismissNotice} />
       {ops.maintenance && <MaintenanceBanner />}

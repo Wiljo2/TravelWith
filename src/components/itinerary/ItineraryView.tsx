@@ -25,6 +25,8 @@ interface ItineraryViewProps {
   sheet: ItinerarySheet | null;
   onOpenSheet: (sheet: ItinerarySheet) => void;
   onCloseSheet: () => void;
+  // Desktop: show the assistant in the side panel (on mount, or when it turns true).
+  focusAgent?: boolean;
 }
 
 function readMode(): Mode {
@@ -44,14 +46,19 @@ const SHEET_TITLE: Record<ItinerarySheet, string> = {
 // Itinerary section: agenda list by default, hour grid on demand. The detail /
 // assistant live in a side panel on desktop and in bottom sheets on phones.
 export default function ItineraryView({
-  mobile, selectedId, agenda, grid, detail, settings, agent, sheet, onOpenSheet, onCloseSheet,
+  mobile, selectedId, agenda, grid, detail, settings, agent, sheet, onOpenSheet, onCloseSheet, focusAgent,
 }: ItineraryViewProps) {
   const [mode, setMode] = useState<Mode>(readMode);
-  const [panel, setPanel] = useState<"detail" | "agent">("detail");
+  const [panel, setPanel] = useState<"detail" | "agent">(focusAgent ? "agent" : "detail");
   const [prevSelected, setPrevSelected] = useState(selectedId);
   if (selectedId !== prevSelected) {
     setPrevSelected(selectedId);
     if (selectedId) setPanel("detail");
+  }
+  const [prevFocusAgent, setPrevFocusAgent] = useState(focusAgent);
+  if (focusAgent !== prevFocusAgent) {
+    setPrevFocusAgent(focusAgent);
+    if (focusAgent) setPanel("agent");
   }
   // Keep the last sheet's content while it animates closed.
   const [shownSheet, setShownSheet] = useState<ItinerarySheet>("detail");

@@ -20,7 +20,7 @@ needs a dashboard or account action outside the repo goes under "Owner actions" 
       The sandbox lasts for the browser tab; open `?local=new` again to start over.
 - [x] 4. **Onboarding 1 — welcome for a first-time creator** (`first-run-onboarding.md` step 1).
 - [x] 5. **Onboarding 2 — short creation wizard** (step 2).
-- [ ] 6. **Onboarding 3 — "¿Cómo quieres empezar?"** invite / TikTok / AI (step 3).
+- [x] 6. **Onboarding 3 — "¿Cómo quieres empezar?"** invite / TikTok / AI (step 3).
 - [x] 7. **Onboarding 4 — invite link, WhatsApp, visible "Invitar"** (step 4).
 - [ ] 8. **Onboarding 5 — "Primeros pasos" card on Inicio** (step 5).
 - [ ] 9. **Onboarding 6 — teaching empty states** (step 6).
@@ -46,6 +46,8 @@ For item 7 (needs a real database — staging or production with a test trip):
 - [ ] Same link signed out → banner → sign in (Google and email) → joins automatically.
 - [ ] `/?join=` with a made-up code → "No encontramos ese viaje. Pide un enlace nuevo."
 - [ ] "Enviar por WhatsApp" on a phone opens WhatsApp with the message and link.
+- [ ] Item 6 on a real trip you own: "Contarle a la IA" opens the assistant (desktop panel and phone
+      sheet) with the draft filled in, not sent.
 
 ## Log
 
@@ -71,3 +73,9 @@ For item 7 (needs a real database — staging or production with a test trip):
   (`usePendingJoin`) and joins through `lib/joinTrip.ts` before auto-resume. Walked in the sandbox:
   sheet in the demo trip, banner when signed out, sandbox message after sign-in. A real join needs a
   database → owner checks above.
+- 2026-10-22 — Item 6 done: after creating a trip, `StartChoices` ("Tu viaje está listo 🎉 ·
+  ¿Cómo quieres empezar?"): Invitar (opens `InviteSheet`), Pegar un TikTok o reel (→ Ideas with the
+  form prefilled via `useSharedLink.share`), Contarle a la IA (assistant with a prefilled draft,
+  owner only, hidden in local mode). Trigger is in memory (`useStartChoices`, RoomGate `onCreated`).
+  Walked in the sandbox: choices appear after creating; reel link lands on Ideas prefilled. Fixed on
+  the way: a long link pushed "Nueva idea" out of its dialog (`wrap-anywhere`).

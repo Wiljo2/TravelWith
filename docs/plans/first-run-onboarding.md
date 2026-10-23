@@ -67,6 +67,8 @@ together.
 - AI → open the assistant with a prefilled draft built from the wizard answers; add an optional
   `initialDraft` prop to `src/components/agent/AgentPanel.tsx`. Hidden in local mode (no agent).
 - Cards not chosen become steps in "Primeros pasos" (step 5).
+- Built: the trigger is in memory (`useStartChoices` + RoomGate `onCreated`), so a reload doesn't
+  bring the choices back; the AI draft comes from the wizard's `NewTrip`.
 
 ### 4. Invite: link, WhatsApp and visible entry point
 - Share sheet: link `/?join=<CODE>` (`code` is taken by the PKCE OAuth redirect), copy code,
@@ -118,6 +120,8 @@ together.
   CTA "Ver el viaje". Seen-flag per trip in localStorage.
 
 ### Backlog (not in this loop)
+- The assistant chat (`agentMessages` in `App.tsx`) is not cleared when switching trips, so one
+  trip's chat shows in the next.
 - "Ver un viaje de ejemplo" in production (read-only public demo; `mockRoom` is dev-only today).
 - Editing trip dates of a trip that already has activities (no UI today; `trip.update` exists).
 - Calendar-availability voting (Doodle style).

@@ -34,10 +34,12 @@ interface RoomGateProps {
   onEnterLocal?: (variant: LocalVariant) => void;
   // An invitation link waiting for sign-in, being joined, or failed.
   invite?: InviteState;
+  // Called right before entering a trip this browser just created.
+  onCreated?: (code: string, trip: NewTrip) => void;
 }
 
 export default function RoomGate({
-  onEnter, user, session, authLoading, signIn, signOut, rooms, addRoom, removeRoom, onEnterLocal, invite,
+  onEnter, user, session, authLoading, signIn, signOut, rooms, addRoom, removeRoom, onEnterLocal, invite, onCreated,
 }: RoomGateProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -75,6 +77,7 @@ export default function RoomGate({
     if (isSandbox()) {
       setSandboxTrip(trip);
       addRoom(LOCAL_ROOM_CODE, "owner", trip.name);
+      onCreated?.(LOCAL_ROOM_CODE, trip);
       onEnter(LOCAL_ROOM_CODE);
       return;
     }
@@ -93,6 +96,7 @@ export default function RoomGate({
     }
     const { code } = await res.json();
     addRoom(code, "owner", trip.name);
+    onCreated?.(code, trip);
     onEnter(code);
   }
 
