@@ -2,9 +2,9 @@
 import { useState } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import type { UserRoom } from "@/hooks/useUserRooms";
+import type { TripInfo } from "@/types";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -12,7 +12,12 @@ import {
 import { loadSnapshot } from "@/lib/offline";
 import { LOCAL_ROOM_CODE, type LocalVariant } from "@/data/localMode";
 import { isSandbox, setSandboxTrip } from "@/data/localSandbox";
+import { firstName } from "@/utils/userName";
 import SignInOptions, { type SignInOptionsProps } from "@/components/auth/SignInOptions";
+import TripList from "@/components/gate/TripList";
+import JoinByCode from "@/components/gate/JoinByCode";
+import CreateTripForm from "@/components/gate/CreateTripForm";
+import WelcomeFirstTrip from "@/components/gate/WelcomeFirstTrip";
 
 interface RoomGateProps {
   onEnter: (code: string) => void;
@@ -30,22 +35,17 @@ interface RoomGateProps {
 export default function RoomGate({
   onEnter, user, session, authLoading, signIn, signOut, rooms, addRoom, removeRoom, onEnterLocal,
 }: RoomGateProps) {
-  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showJoin, setShowJoin] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [tripName, setTripName] = useState("");
-  const [tripDestination, setTripDestination] = useState("");
-  const [tripStart, setTripStart] = useState("");
-  const [tripEnd, setTripEnd] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ code: string; name: string | null } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // Reading a room requires membership, so joining registers first; the
   // members endpoint answers 404 for unknown codes.
-  async function join(code?: string) {
-    const c = (code ?? input).trim().toUpperCase();
+  async function join(code: string) {
+    const c = code.trim().toUpperCase();
     if (!c) return;
     if (isSandbox()) {
       if (c === LOCAL_ROOM_CODE) onEnter(c);
@@ -70,14 +70,10 @@ export default function RoomGate({
     onEnter(c);
   }
 
-  const canCreate = tripName.trim().length > 0 && !!tripStart && !!tripEnd && tripStart <= tripEnd;
-
-  async function create() {
-    if (!canCreate) return;
+  async function create(trip: TripInfo) {
     if (isSandbox()) {
-      const name = tripName.trim();
-      setSandboxTrip({ name, destination: tripDestination.trim() || undefined, startDate: tripStart, endDate: tripEnd });
-      addRoom(LOCAL_ROOM_CODE, "owner", name);
+      setSandboxTrip(trip);
+      addRoom(LOCAL_ROOM_CODE, "owner", trip.name);
       onEnter(LOCAL_ROOM_CODE);
       return;
     }
@@ -86,12 +82,7 @@ export default function RoomGate({
     const res = await apiFetch("/api/rooms", session?.access_token, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: tripName.trim(),
-        destination: tripDestination.trim() || undefined,
-        startDate: tripStart,
-        endDate: tripEnd,
-      }),
+      body: JSON.stringify(trip),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => null);
@@ -100,7 +91,7 @@ export default function RoomGate({
       return;
     }
     const { code } = await res.json();
-    addRoom(code, "owner", tripName.trim());
+    addRoom(code, "owner", trip.name);
     onEnter(code);
   }
 
@@ -113,6 +104,24 @@ export default function RoomGate({
     setDeleting(false);
     setDeleteTarget(null);
   }
+
+  function openPanel(panel: "create" | "join") {
+    setError("");
+    setShowCreate(panel === "create");
+    setShowJoin(panel === "join");
+  }
+
+  function closePanel() {
+    setShowCreate(false);
+    setShowJoin(false);
+    setError("");
+  }
+
+  const panel = showCreate ? (
+    <CreateTripForm loading={loading} error={error} onSubmit={create} onCancel={closePanel} />
+  ) : showJoin ? (
+    <JoinByCode loading={loading} error={error} onSubmit={join} onCancel={closePanel} />
+  ) : null;
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-secondary px-4 pb-[max(20px,env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))]">
@@ -160,124 +169,33 @@ export default function RoomGate({
               </Button>
             </div>
 
-            <div className="mb-4">
-              <p className="mb-2.5 text-[11px] font-semibold tracking-[.07em] text-muted-foreground">
-                MIS VIAJES
-              </p>
-
-              {rooms.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border bg-card p-[22px] text-center text-[13px] text-muted-foreground">
-                  Aún no tienes viajes. Crea uno o únete con un código.
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {rooms.map((r) => (
-                    <div
-                      key={r.room_code}
-                      className="flex items-center overflow-hidden rounded-xl border border-border bg-card"
-                    >
-                      <button
-                        onClick={() => join(r.room_code)}
-                        disabled={loading}
-                        className="flex flex-1 cursor-pointer items-center justify-between px-4 py-3.5 text-left text-foreground hover:bg-secondary"
-                      >
-                        <div>
-                          <div className="text-[15px] font-semibold">
-                            {r.name ?? <span className="font-mono tracking-[.08em]">{r.room_code}</span>}
-                          </div>
-                          <div className="mt-0.5 text-[11px] text-muted-foreground">
-                            <span className="font-mono tracking-wider">{r.room_code}</span>
-                            {" · "}{r.role === "owner" ? "Creador" : "Miembro"}
-                            {r.trip?.destination && <> · {r.trip.destination}</>}
-                          </div>
-                        </div>
-                        <span className="text-xl opacity-35">→</span>
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget({ code: r.room_code, name: r.name })}
-                        title="Quitar de mi lista"
-                        className="flex h-full min-w-12 cursor-pointer items-center justify-center self-stretch border-l border-border px-3.5 text-base text-muted-foreground hover:bg-secondary"
-                      >
-                        🗑
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {showCreate ? (
-              <Card className="rounded-xl py-4">
-                <CardContent className="flex flex-col gap-2.5 px-4">
-                  <div className="text-[11px] font-semibold tracking-[.06em] text-muted-foreground">NUEVO VIAJE</div>
-                  <Input
-                    autoFocus
-                    value={tripName}
-                    onChange={(e) => setTripName(e.target.value)}
-                    placeholder="Nombre del viaje (ej. Vacaciones 2027)"
-                    maxLength={80}
-                    className="bg-secondary text-sm"
-                  />
-                  <Input
-                    value={tripDestination}
-                    onChange={(e) => setTripDestination(e.target.value)}
-                    placeholder="Destino (opcional)"
-                    maxLength={80}
-                    className="bg-secondary text-sm"
-                  />
-                  <div className="flex gap-2">
-                    <label className="flex-1 text-[11px] text-secondary-foreground">
-                      Inicio
-                      <Input type="date" value={tripStart} onChange={(e) => setTripStart(e.target.value)} className="mt-1 bg-secondary text-[13px]" />
-                    </label>
-                    <label className="flex-1 text-[11px] text-secondary-foreground">
-                      Fin
-                      <Input type="date" value={tripEnd} min={tripStart || undefined} onChange={(e) => setTripEnd(e.target.value)} className="mt-1 bg-secondary text-[13px]" />
-                    </label>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={create} disabled={loading || !canCreate} className="flex-1 font-semibold">
-                      {loading ? "Creando..." : "Crear viaje"}
-                    </Button>
-                    <Button variant="outline" onClick={() => { setShowCreate(false); setError(""); }} className="text-muted-foreground">
-                      ×
-                    </Button>
-                  </div>
-                  {error && <p className="text-xs text-destructive">{error}</p>}
-                </CardContent>
-              </Card>
-            ) : showJoin ? (
-              <Card className="rounded-xl py-4">
-                <CardContent className="px-4">
-                  <div className="flex gap-2">
-                    <Input
-                      autoFocus
-                      value={input}
-                      onChange={(e) => setInput(e.target.value.toUpperCase())}
-                      onKeyDown={(e) => e.key === "Enter" && join()}
-                      placeholder="Código de sala"
-                      maxLength={12}
-                      className="flex-1 bg-secondary font-mono text-[15px] tracking-[.1em]"
-                    />
-                    <Button onClick={() => join()} disabled={loading || !input.trim()} className="font-semibold">
-                      Entrar
-                    </Button>
-                    <Button variant="outline" onClick={() => { setShowJoin(false); setError(""); }} className="text-muted-foreground">
-                      ×
-                    </Button>
-                  </div>
-                  {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
-                </CardContent>
-              </Card>
+            {rooms.length === 0 ? (
+              <WelcomeFirstTrip
+                name={firstName(user)}
+                panel={panel}
+                onCreate={() => openPanel("create")}
+                onJoin={() => openPanel("join")}
+              />
             ) : (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setShowJoin(true)} className="flex-1 bg-card">
-                  Unirse con código
-                </Button>
-                <Button onClick={() => setShowCreate(true)} className="flex-1 font-semibold">
-                  Nuevo viaje
-                </Button>
-              </div>
+              <>
+                <TripList
+                  rooms={rooms}
+                  disabled={loading}
+                  error={panel ? "" : error}
+                  onOpen={join}
+                  onRemove={setDeleteTarget}
+                />
+                {panel ?? (
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => openPanel("join")} className="flex-1 bg-card">
+                      Unirse con código
+                    </Button>
+                    <Button onClick={() => openPanel("create")} className="flex-1 font-semibold">
+                      Nuevo viaje
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

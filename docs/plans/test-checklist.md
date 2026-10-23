@@ -18,7 +18,7 @@ needs a dashboard or account action outside the repo goes under "Owner actions" 
       "Unirse con código" says there are no other people's trips locally; the created trip shows
       in "Mis viajes". Known limit: leaving the trip and re-entering starts it empty again.
       The sandbox lasts for the browser tab; open `?local=new` again to start over.
-- [ ] 4. **Onboarding 1 — welcome for a first-time creator** (`first-run-onboarding.md` step 1).
+- [x] 4. **Onboarding 1 — welcome for a first-time creator** (`first-run-onboarding.md` step 1).
 - [ ] 5. **Onboarding 2 — short creation wizard** (step 2).
 - [ ] 6. **Onboarding 3 — "¿Cómo quieres empezar?"** invite / TikTok / AI (step 3).
 - [ ] 7. **Onboarding 4 — invite link, WhatsApp, visible "Invitar"** (step 4).
@@ -50,3 +50,7 @@ For item 1 (Supabase dashboard → Authentication):
   a real sign-up was not run (dev shares the production project). Waiting on owner actions.
 - 2026-10-22 — Item 3 done: walked landing → local sign-in (random email/password) → empty
   "Mis viajes" → "Nuevo viaje" (Viaje a Cartagena, Dec 10–13) → trip with those dates, in the browser.
+- 2026-10-22 — Item 4 done: `RoomGate` split into `components/gate/` (TripList, JoinByCode,
+  CreateTripForm, WelcomeFirstTrip) + `utils/userName.ts`; zero trips shows "Hola, <nombre> 👋" with
+  "Crear mi primer viaje" / "Tengo un código de invitación"; list errors now show without a form open.
+  Walked in the sandbox: welcome → create → leave → list → remove → welcome again.
