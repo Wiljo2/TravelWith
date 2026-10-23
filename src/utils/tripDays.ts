@@ -46,6 +46,8 @@ export function generateDays(startDate: string, endDate: string): Day[] | null {
   return days;
 }
 
+export const hasActivities = (days: Pick<Day, "events">[]) => days.some((d) => d.events.length > 0);
+
 // Next free slot for a quick "+ Actividad": right after the day's last activity.
 export function nextFreeHour(day: Day): number {
   const lastEnd = Math.max(0, ...day.events.map((e) => e.end));

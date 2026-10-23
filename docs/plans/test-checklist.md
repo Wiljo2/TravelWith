@@ -23,7 +23,7 @@ needs a dashboard or account action outside the repo goes under "Owner actions" 
 - [x] 6. **Onboarding 3 — "¿Cómo quieres empezar?"** invite / TikTok / AI (step 3).
 - [x] 7. **Onboarding 4 — invite link, WhatsApp, visible "Invitar"** (step 4).
 - [x] 8. **Onboarding 5 — "Primeros pasos" card on Inicio** (step 5).
-- [ ] 9. **Onboarding 6 — teaching empty states** (step 6).
+- [x] 9. **Onboarding 6 — teaching empty states** (step 6).
 - [ ] 10. **Group voting on dates/destination via "Por decidir"** (step 7; design note first).
 - [ ] 11. **Welcome for someone joining by invitation** (step 8).
 
@@ -85,3 +85,8 @@ For item 7 (needs a real database — staging or production with a test trip):
   Per trip and device: dismissed stays dismissed; a trip that already has 2+ steps done when first seen
   never shows it (lowered from 3 after the demo trip — activities + expenses — still showed it).
   Walked in the sandbox: new trip shows 0 de 5, "Gastos" jumps to Gastos, demo trip shows no card.
+- 2026-10-22 — Item 9 done: empty states that teach — Itinerario intro card ("Arma el día a día" +
+  "Agregar la primera actividad" → new-activity window at the first day 9:00, agenda and hours views),
+  Mapa card with "Ir al itinerario" (hidden offline so the map's own error shows), Gastos explains
+  global vs per-day and group vs per-person, Pendientes empty state with "Escribir la primera tarea".
+  Ideas and Documentos already explained themselves. Walked all four tabs in the sandbox.

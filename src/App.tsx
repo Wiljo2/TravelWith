@@ -308,9 +308,9 @@ export default function App() {
           roomCode={roomCode}
           accessToken={session?.access_token}
           localMode={localMode}
-          currentPayload={payloadNow}
-          save={save}
+          currentPayload={payloadNow} save={save}
           onOpenEvent={(id) => { setActiveTab("calendar"); handleSelect(id); }}
+          onOpenItinerary={() => setActiveTab("calendar")}
         />
       )}
 

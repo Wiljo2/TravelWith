@@ -1,4 +1,5 @@
 import { ESTABLISHED_TRIP_STEPS, FIRST_STEPS, FIRST_STEP_KEYS, type FirstStepKey } from "@/constants/firstSteps";
+import { hasActivities } from "@/utils/tripDays";
 import type { Tab } from "@/components/TabBar";
 import type { Day } from "@/types";
 
@@ -27,7 +28,7 @@ export type FirstStepsVisibility = "shown" | "dismissed";
 
 const IS_DONE: Record<FirstStepKey, (data: FirstStepsData) => boolean> = {
   invite:   (d) => d.members > 1,
-  activity: (d) => d.days.some((day) => day.events.length > 0),
+  activity: (d) => hasActivities(d.days),
   idea:     (d) => d.ideas > 0,
   expense:  (d) => d.expenses > 0,
   document: (d) => d.documents > 0,

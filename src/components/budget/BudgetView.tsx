@@ -77,6 +77,12 @@ export default function BudgetView({
               className="w-[64px] border-none bg-transparent text-right text-[13px] font-semibold text-foreground outline-none" />
           </label>
         </div>
+        {extras.length === 0 && (
+          <p className="mt-3 border-t border-foreground/10 pt-3 text-[13px] text-secondary-foreground">
+            Anota abajo los gastos globales (tiquetes, hoteles) o por días (comidas, excursiones); cada uno puede ser
+            grupal, dividido entre todos, o por persona.
+          </p>
+        )}
         {optionTasks.length > 0 && (
           <p className="mt-3 border-t border-foreground/10 pt-3 text-[13px] text-secondary-foreground">
             Con lo pendiente por decidir quedaría entre{" "}

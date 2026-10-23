@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import type { Day, CalendarEvent, DragPreview, TripSpan, Task } from "@/types";
 import { cssZoom } from "@/utils/zoom";
 import { resolveForDay } from "@/utils/spans";
+import { hasActivities, nextFreeHour } from "@/utils/tripDays";
+import ItineraryIntro from "@/components/itinerary/ItineraryIntro";
 import { useIsMobile, useIsTouch } from "@/hooks/useMediaQuery";
 import { useTouchDrag } from "@/hooks/useTouchDrag";
 
@@ -161,8 +163,13 @@ export default function CalendarGrid({
     );
   });
 
+  const firstVisible = slice[0];
+
   return (
     <GridStartContext.Provider value={gridStart}>
+    {firstVisible && !hasActivities(days) && (
+      <ItineraryIntro view="grid" className="mb-4" onAdd={(x, y) => onAddEvent(firstVisible.id, nextFreeHour(firstVisible), x, y)} />
+    )}
     <div
       ref={containerRef}
       className="flex min-w-0 flex-1 flex-col overflow-clip rounded-2xl bg-card shadow-[0_1px_2px_rgba(0,0,0,.04)] ring-1 ring-border/70"

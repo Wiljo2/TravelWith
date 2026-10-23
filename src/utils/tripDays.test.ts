@@ -1,5 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { generateDays, parseISODate, fmtTripDates, tripPhase, MAX_TRIP_DAYS } from "./tripDays";
+import { generateDays, parseISODate, fmtTripDates, tripPhase, hasActivities, MAX_TRIP_DAYS } from "./tripDays";
+
+describe("hasActivities", () => {
+  it("is false for an empty or activity-free itinerary", () => {
+    expect(hasActivities([])).toBe(false);
+    expect(hasActivities(generateDays("2026-11-26", "2026-11-28")!)).toBe(false);
+  });
+
+  it("finds an activity in any day", () => {
+    const ev = { id: "e1", start: 9, end: 10, title: "Museo del Oro", cat: "cultura", note: "" };
+    expect(hasActivities([{ events: [] }, { events: [ev] }])).toBe(true);
+  });
+});
 
 describe("parseISODate", () => {
   it("parses valid ISO dates as local dates", () => {

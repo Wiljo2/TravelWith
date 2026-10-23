@@ -124,10 +124,17 @@ export default function TasksView({ days, tasks, people, exchangeRate, onAdd, on
           )}
 
           {tasks.length === 0 && (
-            <div className="px-5 py-14 text-center text-sm leading-loose text-muted-foreground">
-              <div className="mb-3 text-[32px]">✓</div>
-              Sin tareas aún.<br />
-              Añade cosas por decidir, confirmar o recordar.
+            <div className="flex flex-col items-center gap-3 px-5 py-14 text-center">
+              <div className="text-[32px] text-muted-foreground">✓</div>
+              <div>
+                <h2 className="text-[15px] font-semibold">Sin tareas aún</h2>
+                <p className="mx-auto mt-1 max-w-sm text-[13px] text-muted-foreground">
+                  Anoten lo que falta reservar, confirmar o decidir; a cada tarea le pueden sumar opciones con precio para comparar.
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => inputRef.current?.focus()} className="rounded-full px-5 font-semibold">
+                Escribir la primera tarea
+              </Button>
             </div>
           )}
         </div>

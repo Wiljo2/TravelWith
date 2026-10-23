@@ -5,10 +5,11 @@ import { CATEGORIES } from "@/constants/categories";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT } from "@/constants/taskCategories";
 import { fmtHour } from "@/utils/time";
 import { eventIcon, taskIcon } from "@/utils/itemIcon";
-import { nextFreeHour } from "@/utils/tripDays";
+import { hasActivities, nextFreeHour } from "@/utils/tripDays";
 import { daySpanLabels } from "@/utils/spans";
 import { PANEL } from "@/components/home/shared";
 import DaySubtitle from "@/components/itinerary/DaySubtitle";
+import ItineraryIntro from "@/components/itinerary/ItineraryIntro";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Day, Task, TripSpan } from "@/types";
 
@@ -36,9 +37,13 @@ export default function ItineraryAgenda({
   useEffect(() => {
     todayRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, []);
+  const firstDay = days[todayIdx ?? 0] ?? days[0];
 
   return (
     <div className="flex flex-col gap-4">
+      {firstDay && !hasActivities(days) && (
+        <ItineraryIntro view="agenda" onAdd={(x, y) => onAdd(firstDay.id, nextFreeHour(firstDay), x, y)} />
+      )}
       {days.map((day, i) => {
         const [weekday, date] = day.label.split("·").map((s) => s.trim());
         const isToday = i === todayIdx;
