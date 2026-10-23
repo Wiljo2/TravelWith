@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import type { useItinerary } from "@/hooks/useItinerary";
 import type { useTasks } from "@/hooks/useTasks";
@@ -7,9 +8,12 @@ import CalendarGrid from "@/components/calendar/CalendarGrid";
 import ItineraryView from "@/components/itinerary/ItineraryView";
 import type { ItinerarySheet } from "@/components/itinerary/ItineraryView";
 import ItineraryAgenda from "@/components/itinerary/ItineraryAgenda";
+import MonthView from "@/components/itinerary/MonthView";
 import SpansManager from "@/components/itinerary/SpansManager";
 import DatesPending from "@/components/itinerary/DatesPending";
+import { useItineraryMode, type ItineraryMode } from "@/hooks/useItineraryMode";
 import { hasDates } from "@/utils/tripDays";
+import { spansSeveralWeeks } from "@/utils/tripWeeks";
 import { openVote } from "@/utils/votes";
 import type { Task, TaskDecides, TripInfo } from "@/types";
 
@@ -44,7 +48,7 @@ interface ItineraryTabProps {
   onOpenVotes: () => void;
 }
 
-// The Itinerario tab: agenda or hour grid, with the detail, assistant and calendar
+// The Itinerario tab: agenda, hour grid or month, with the detail, assistant and calendar
 // backgrounds; "Primero decidamos las fechas" while the trip has no dates or days.
 export default function ItineraryTab({
   mobile, trip, itinerary, taskState, drag, todayIdx, tipsByEvent, detail, agent, focusAgent, sheet, onSheet, onSelect, slotDraft, onSlotDraft,
@@ -52,6 +56,22 @@ export default function ItineraryTab({
 }: ItineraryTabProps) {
   const { days, tripSpans, selectedId, setSelectedId, swapDays, setDaySub, removeDaySpan, updateDaySpan, removeTripSpan, updateTripSpan } = itinerary;
   const { tasks, toggleTask, swapTaskDays } = taskState;
+  // The month view is offered only for dated trips that don't fit in one Mon–Sun week.
+  const monthTrip = hasDates(trip) && days.length > 0 && spansSeveralWeeks(trip.startDate, trip.endDate) ? trip : null;
+  const [mode, setMode] = useItineraryMode(!!monthTrip);
+  // A day opened from the month view: the agenda scrolls to it instead of today.
+  const [focusDayId, setFocusDayId] = useState<string | null>(null);
+
+  function changeMode(next: ItineraryMode) {
+    if (next === mode) return;
+    setFocusDayId(null);
+    setMode(next);
+  }
+
+  function openDay(dayId: string) {
+    setFocusDayId(dayId);
+    setMode("agenda");
+  }
 
   // Swap the whole contents of two days (events + spans) and their scheduled tasks.
   function swapDaysWithTasks(aId: string, bId: string) {
@@ -79,6 +99,8 @@ export default function ItineraryTab({
     <ItineraryView
       mobile={mobile}
       selectedId={selectedId}
+      mode={mode}
+      onModeChange={changeMode}
       detail={detail || null}
       agent={agent}
       focusAgent={focusAgent}
@@ -109,8 +131,20 @@ export default function ItineraryTab({
           onToggleTask={toggleTask}
           onSetDaySub={setDaySub}
           tipsByEvent={tipsByEvent}
+          compact={!mobile}
+          focusDayId={focusDayId}
         />
       }
+      month={monthTrip ? (
+        <MonthView
+          startDate={monthTrip.startDate}
+          endDate={monthTrip.endDate}
+          days={days}
+          tripSpans={tripSpans}
+          todayIdx={todayIdx}
+          onOpenDay={openDay}
+        />
+      ) : undefined}
       grid={
         <CalendarGrid
           days={days}

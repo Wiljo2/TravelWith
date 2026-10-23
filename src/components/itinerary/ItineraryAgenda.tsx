@@ -7,9 +7,12 @@ import { fmtHour } from "@/utils/time";
 import { eventIcon, taskIcon } from "@/utils/itemIcon";
 import { hasActivities, nextFreeHour } from "@/utils/tripDays";
 import { daySpanLabels } from "@/utils/spans";
+import { agendaRows } from "@/utils/agendaRows";
 import { PANEL } from "@/components/home/shared";
 import DaySubtitle from "@/components/itinerary/DaySubtitle";
 import ItineraryIntro from "@/components/itinerary/ItineraryIntro";
+import AgendaCard from "@/components/itinerary/AgendaCard";
+import { DaySpanChips, TaskCheck } from "@/components/itinerary/agendaParts";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Day, Task, TripSpan } from "@/types";
 
@@ -25,40 +28,66 @@ interface ItineraryAgendaProps {
   onToggleTask: (id: string) => void;
   onSetDaySub: (dayId: string, sub: string) => void;
   tipsByEvent?: Record<string, number>;   // video advice placed on each activity
+  // Desktop: compact cards in columns instead of the phone's full-width cards.
+  compact?: boolean;
+  // Scrolled into view on mount instead of today (a day opened from the month view).
+  focusDayId?: string | null;
 }
-
-type Row = { kind: "event"; ev: CalendarEvent; start: number } | { kind: "task"; task: Task; start: number };
 
 // The whole trip as a list of day cards — the default, low-noise itinerary view.
 export default function ItineraryAgenda({
-  days, tripSpans, tasks, selectedId, todayIdx, onSelect, onAdd, onEditTask, onToggleTask, onSetDaySub, tipsByEvent,
+  days, tripSpans, tasks, selectedId, todayIdx, onSelect, onAdd, onEditTask, onToggleTask, onSetDaySub, tipsByEvent, compact, focusDayId,
 }: ItineraryAgendaProps) {
-  const todayRef = useRef<HTMLElement>(null);
+  const scrollRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    todayRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
-  }, []);
+    scrollRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [focusDayId]);
+  const scrollDayId = focusDayId ?? (todayIdx !== undefined ? days[todayIdx]?.id : undefined);
   const firstDay = days[todayIdx ?? 0] ?? days[0];
+  const intro = firstDay && !hasActivities(days) && (
+    <ItineraryIntro view="agenda" onAdd={(x, y) => onAdd(firstDay.id, nextFreeHour(firstDay), x, y)} />
+  );
+
+  if (compact) {
+    return (
+      <div className="@container flex flex-col gap-4">
+        {intro}
+        <div className="grid gap-4 @xl:grid-cols-2 @3xl:grid-cols-3">
+          {days.map((day, i) => (
+            <AgendaCard
+              key={day.id}
+              ref={day.id === scrollDayId ? scrollRef : undefined}
+              day={day}
+              tasks={tasks}
+              chips={daySpanLabels(day, days, tripSpans)}
+              isToday={i === todayIdx}
+              selectedId={selectedId}
+              tipsByEvent={tipsByEvent}
+              onSelect={onSelect}
+              onAdd={onAdd}
+              onEditTask={onEditTask}
+              onToggleTask={onToggleTask}
+              onSetDaySub={onSetDaySub}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      {firstDay && !hasActivities(days) && (
-        <ItineraryIntro view="agenda" onAdd={(x, y) => onAdd(firstDay.id, nextFreeHour(firstDay), x, y)} />
-      )}
+      {intro}
       {days.map((day, i) => {
         const [weekday, date] = day.label.split("·").map((s) => s.trim());
         const isToday = i === todayIdx;
         const chips = daySpanLabels(day, days, tripSpans);
-        const rows: Row[] = [
-          ...day.events.map((ev) => ({ kind: "event" as const, ev, start: ev.start })),
-          ...tasks
-            .filter((t) => t.dayId === day.id && t.start != null)
-            .map((task) => ({ kind: "task" as const, task, start: task.start! })),
-        ].sort((a, b) => a.start - b.start);
+        const rows = agendaRows(day, tasks);
 
         return (
           <section
             key={day.id}
-            ref={isToday ? todayRef : undefined}
+            ref={day.id === scrollDayId ? scrollRef : undefined}
             className={cn(PANEL, "scroll-mt-4", isToday && "ring-2 ring-primary")}
           >
             <div className="mb-2 flex items-start justify-between gap-3">
@@ -68,16 +97,7 @@ export default function ItineraryAgenda({
                   {isToday && <span className="rounded-full bg-primary px-2 py-px text-[11px] font-semibold text-primary-foreground">Hoy</span>}
                 </h3>
                 <DaySubtitle value={day.sub ?? ""} onCommit={(sub) => onSetDaySub(day.id, sub)} className="text-[13px] text-muted-foreground" />
-                {chips.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {chips.map((c) => (
-                      <span key={c.label} className="flex items-center gap-1.5 rounded-full bg-secondary px-2 py-0.5 text-[11px] text-secondary-foreground ring-1 ring-border">
-                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: c.color }} />
-                        {c.label}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <DaySpanChips chips={chips} />
               </div>
               <button
                 onClick={(e) => onAdd(day.id, nextFreeHour(day), e.clientX, e.clientY)}
@@ -136,16 +156,7 @@ function TaskRow({ task, onEdit, onToggle }: { task: Task; onEdit: (t: Task, x: 
   return (
     <li className="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-secondary">
       <span className="w-[68px] shrink-0 pt-px text-[13px] tabular-nums text-muted-foreground">{fmtHour(task.start ?? 0)}</span>
-      <button
-        onClick={onToggle}
-        aria-label={task.done ? "Marcar pendiente" : "Marcar hecha"}
-        className="mt-0.5 flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded border-2"
-        style={{ borderColor: cat.border, background: task.done ? cat.border : "transparent" }}
-      >
-        {task.done && (
-          <svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4L4 7L9 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        )}
-      </button>
+      <TaskCheck task={task} color={cat.border} onToggle={onToggle} className="mt-0.5" />
       <button onClick={(e) => onEdit(task, e.clientX, e.clientY)} className="min-w-0 flex-1 cursor-pointer text-left">
         <span className={cn("block text-sm leading-snug text-foreground", task.done && "text-muted-foreground line-through")}>
           <span aria-hidden className="mr-1">{taskIcon(task)}</span>{task.title}

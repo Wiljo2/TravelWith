@@ -1,22 +1,24 @@
 "use client";
 import { useState } from "react";
-import { CalendarClock, Layers, LayoutList, Sparkles } from "lucide-react";
+import { CalendarClock, CalendarDays, Layers, LayoutList, Sparkles } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Disclosure } from "@/components/ui/disclosure";
 import { PANEL } from "@/components/home/shared";
 import { cn } from "@/lib/utils";
+import type { ItineraryMode } from "@/hooks/useItineraryMode";
 
 export type ItinerarySheet = "detail" | "agent" | "settings";
-type Mode = "agenda" | "grid";
-
-const MODE_KEY = "tw.itineraryMode";
 
 interface ItineraryViewProps {
   mobile: boolean;
   selectedId: string | null;
+  mode: ItineraryMode;
+  onModeChange: (mode: ItineraryMode) => void;
   agenda: React.ReactNode;
   grid: React.ReactNode;
+  // Month calendar; its toggle shows only when given (trips longer than one week).
+  month?: React.ReactNode;
   // ActivityDetail for the selected activity, or null when nothing is selected.
   detail: React.ReactNode | null;
   settings: React.ReactNode;
@@ -31,26 +33,17 @@ interface ItineraryViewProps {
   pending?: React.ReactNode;
 }
 
-function readMode(): Mode {
-  try {
-    return localStorage.getItem(MODE_KEY) === "grid" ? "grid" : "agenda";
-  } catch {
-    return "agenda";
-  }
-}
-
 const SHEET_TITLE: Record<ItinerarySheet, string> = {
   detail: "Actividad",
   agent: "✨ Asistente",
   settings: "Fondos del calendario",
 };
 
-// Itinerary section: agenda list by default, hour grid on demand. The detail /
+// Itinerary section: agenda list by default, hour grid or month on demand. The detail /
 // assistant live in a side panel on desktop and in bottom sheets on phones.
 export default function ItineraryView({
-  mobile, selectedId, agenda, grid, detail, settings, agent, sheet, onOpenSheet, onCloseSheet, focusAgent, pending,
+  mobile, selectedId, mode, onModeChange, agenda, grid, month, detail, settings, agent, sheet, onOpenSheet, onCloseSheet, focusAgent, pending,
 }: ItineraryViewProps) {
-  const [mode, setMode] = useState<Mode>(readMode);
   const [panel, setPanel] = useState<"detail" | "agent">(focusAgent ? "agent" : "detail");
   const [prevSelected, setPrevSelected] = useState(selectedId);
   if (selectedId !== prevSelected) {
@@ -66,30 +59,29 @@ export default function ItineraryView({
   const [shownSheet, setShownSheet] = useState<ItinerarySheet>("detail");
   if (sheet && sheet !== shownSheet) setShownSheet(sheet);
 
-  function changeMode(next: Mode) {
-    setMode(next);
-    try { localStorage.setItem(MODE_KEY, next); } catch { /* storage unavailable */ }
-  }
-
+  // Three toggles and "Fondos" only fit a phone row with tighter buttons and an icon-only "Fondos".
+  const tight = mobile && !!month;
   const toolbar = (
     <div className="mb-4 flex items-center justify-between gap-3">
       <div className="inline-flex gap-1 rounded-full bg-muted p-1">
-        <ModeButton icon={LayoutList} label="Agenda" active={mode === "agenda"} onClick={() => changeMode("agenda")} />
-        <ModeButton icon={CalendarClock} label="Horas" active={mode === "grid"} onClick={() => changeMode("grid")} />
+        <ModeButton icon={LayoutList} label="Agenda" active={mode === "agenda"} tight={tight} onClick={() => onModeChange("agenda")} />
+        <ModeButton icon={CalendarClock} label="Horas" active={mode === "grid"} tight={tight} onClick={() => onModeChange("grid")} />
+        {month && <ModeButton icon={CalendarDays} label="Mes" active={mode === "month"} tight={tight} onClick={() => onModeChange("month")} />}
       </div>
       {mobile && (
         <button
           onClick={() => onOpenSheet("settings")}
+          title={tight ? "Fondos del calendario" : undefined}
           className="flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-secondary-foreground hover:bg-secondary"
         >
           <Layers className="size-4" />
-          Fondos
+          <span className={cn(tight && "sr-only")}>Fondos</span>
         </button>
       )}
     </div>
   );
 
-  const main = mode === "agenda" ? agenda : grid;
+  const main = mode === "grid" ? grid : mode === "month" && month ? month : agenda;
 
   if (mobile) {
     return (
@@ -157,13 +149,16 @@ export default function ItineraryView({
   );
 }
 
-function ModeButton({ icon: Icon, label, active, onClick }: { icon?: LucideIcon; label: string; active: boolean; onClick: () => void }) {
+function ModeButton({ icon: Icon, label, active, tight, onClick }: {
+  icon?: LucideIcon; label: string; active: boolean; tight?: boolean; onClick: () => void;
+}) {
   return (
     <button
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors",
+        "flex cursor-pointer items-center gap-1.5 rounded-full py-1.5 text-[13px] font-medium transition-colors",
+        tight ? "px-3" : "px-3.5",
         active ? "bg-card text-foreground shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "text-muted-foreground hover:text-foreground",
       )}
     >

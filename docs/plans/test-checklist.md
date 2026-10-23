@@ -26,7 +26,7 @@ needs a dashboard or account action outside the repo goes under "Owner actions" 
 - [x] 9. **Onboarding 6 — teaching empty states** (step 6).
 - [x] 10. **Group voting on dates/destination via "Por decidir"** (step 7; design note first).
 - [x] 11. **Welcome for someone joining by invitation** (step 8).
-- [ ] 12. **Agenda in compact day cards + "Mes" view** (desktop; the phone Agenda stays as it is).
+- [x] 12. **Agenda in compact day cards + "Mes" view** (desktop; the phone Agenda stays as it is).
       Cards: 2–3 columns on desktop; each day shows its label/subtitle and one line per activity
       (time · emoji · title), the first 4–5 then "+N más", which expands that card in place;
       "+ Actividad" per card; tapping an activity opens its detail as today.
@@ -176,3 +176,10 @@ For item 11 (welcome for invited people) — needs two accounts:
   to invite → undated Inicio with both votes → Itinerario "Primero decidamos las fechas" → propose two
   ranges → vote → owner closes (no activity warning) → header dates + days; `/?local=1&welcome` sheet →
   "Agrega tus ideas" closes it. Real-database checks stay under Owner actions.
+- 2026-10-23 — Item 12 done: desktop Agenda in compact cards (`AgendaCard`; 1–3 columns by the main
+  column's width via container queries, first 5 lines + "+N más" / "Ver menos"); "Mes" (`MonthView`,
+  `utils/tripWeeks.ts`) only when the trip crosses a Mon–Sun week, showing just the weeks it touches,
+  titles on wide / dots on narrow, span bars across days; tapping a day opens it in Agenda. Phone
+  Agenda unchanged. Walked: demo trip in Chrome (3 columns, no "Mes" for a one-week trip; after moving
+  it to Mar 4–13, "Mes" with 2 week rows, tap Mar 11 → Agenda at that day) and a phone at 360 px with
+  Playwright (toggles fit, no overflow). Fixed on the way: "10:00 am" wrapped in the card.
