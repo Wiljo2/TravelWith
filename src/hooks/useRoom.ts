@@ -20,6 +20,8 @@ export interface RoomHandlers {
 
 interface UseRoomResult {
   connected: boolean;
+  // The open room's data came from the server (not the previous room's, nor an offline copy).
+  loaded: boolean;
   // Set while the room couldn't be reached and the device's last copy is shown:
   // when that copy was taken (ISO).
   offlineSince: string | null;
@@ -34,7 +36,7 @@ const RESYNC_RETRY_MS = 1000;
 // and applies live changes from the private trip channel. Writes go through
 // useTripOps.
 export function useRoom(code: string | null, accessToken: string | undefined, handlers: RoomHandlers): UseRoomResult {
-  const [loaded, setLoaded] = useState(false);
+  const [loadedCode, setLoadedCode] = useState<string | null>(null);
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [offlineSince, setOfflineSince] = useState<string | null>(null);
   // Tokens refresh about hourly; refs keep requests current without resubscribing.
@@ -62,12 +64,12 @@ export function useRoom(code: string | null, accessToken: string | undefined, ha
         }
         setMembers(roster);
         setOfflineSince(null);
-        setLoaded(true);
+        setLoadedCode(code);
       })
       .catch(() => {
         // No network: show this device's last copy and load the room again
         // once the network is back.
-        setLoaded(false);
+        setLoadedCode(null);
         const snap = loadSnapshot(code);
         if (!snap) return;
         h.current.onLoad(snap.payload);
@@ -94,7 +96,7 @@ export function useRoom(code: string | null, accessToken: string | undefined, ha
     reload();
     return () => {
       if (resyncTimer.current) clearTimeout(resyncTimer.current);
-      setLoaded(false);
+      setLoadedCode(null);
     };
   }, [code, hasToken, reload]);
 
@@ -120,5 +122,6 @@ export function useRoom(code: string | null, accessToken: string | undefined, ha
     onDenied: () => h.current.onGone(),
   });
 
-  return { connected: loaded && subscribed, offlineSince, members, reload };
+  const loaded = !!code && loadedCode === code;
+  return { connected: loaded && subscribed, loaded, offlineSince, members, reload };
 }

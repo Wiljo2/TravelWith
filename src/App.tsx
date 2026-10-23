@@ -222,6 +222,7 @@ export default function App() {
 
       {activeTab === "home" && (
         <HomeView
+          roomCode={roomCode} loaded={data.room.loaded} memberCount={members.length} expenseCount={extras.length} documentCount={documents.length}
           trip={trip}
           days={days}
           tasks={tasks}

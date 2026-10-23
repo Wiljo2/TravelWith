@@ -1,10 +1,11 @@
 "use client";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import DayAgenda from "@/components/itinerary/DayAgenda";
 import TodayCard from "@/components/home/TodayCard";
 import VideoTipsPanel from "@/components/home/VideoTipsPanel";
-import { PANEL, SectionTitle } from "@/components/home/shared";
+import FirstStepsCard from "@/components/home/FirstStepsCard";
+import { PANEL, Progress, SectionTitle } from "@/components/home/shared";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT } from "@/constants/taskCategories";
 import { fmtUSD, optionGroupUSD, fmtUSDNum } from "@/utils/currency";
 import { fmtHour } from "@/utils/time";
@@ -18,6 +19,13 @@ import type { Tab } from "@/components/TabBar";
 import type { PlacedInsight } from "@/utils/insights";
 
 interface HomeViewProps {
+  roomCode: string;
+  // The open trip's data arrived from the server (see useRoom).
+  loaded: boolean;
+  // People who joined the trip; placeholder travelers are not counted.
+  memberCount: number;
+  expenseCount: number;
+  documentCount: number;
   trip: TripInfo | null;
   days: Day[];
   tasks: Task[];
@@ -42,8 +50,12 @@ function heroCopy(phase: TripPhase | null, dayCount: number) {
 
 // Adapts to the moment: countdown and decisions before the trip, "now / next"
 // while it's underway, and a wrap-up once it's over.
-export default function HomeView({ trip, days, tasks, ideas, grandTotal, people, exchangeRate, onNavigate, documents, placed = [] }: HomeViewProps) {
+export default function HomeView({
+  roomCode, loaded, memberCount, expenseCount, documentCount,
+  trip, days, tasks, ideas, grandTotal, people, exchangeRate, onNavigate, documents, placed = [],
+}: HomeViewProps) {
   const now = useNow();
+  const documentsRef = useRef<HTMLDivElement>(null);
   const phase = trip ? tripPhase(trip.startDate, days.length, now) : null;
   const during = phase?.phase === "during" ? phase : null;
   const after = phase?.phase === "after";
@@ -61,10 +73,24 @@ export default function HomeView({ trip, days, tasks, ideas, grandTotal, people,
   const unsortedIdeas = openIdeas.filter((i) => !i.place || !i.cat).length;
   const toItinerary = () => onNavigate("calendar");
   const toTasks = () => onNavigate("tasks");
+  function toDocuments() {
+    const panel = documentsRef.current;
+    panel?.scrollIntoView({ behavior: "smooth", block: "center" });
+    panel?.querySelector("input")?.focus({ preventScroll: true });
+  }
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-[minmax(0,1fr)_340px] md:gap-5">
       <div className="flex min-w-0 flex-col gap-4 md:gap-5">
+        <FirstStepsCard
+          roomCode={roomCode}
+          trip={trip}
+          loaded={loaded}
+          data={{ members: memberCount, days, ideas: ideas.length, expenses: expenseCount, documents: documentCount }}
+          onNavigate={onNavigate}
+          onOpenDocuments={toDocuments}
+        />
+
         {during && today ? (
           <TodayCard
             day={today}
@@ -142,7 +168,7 @@ export default function HomeView({ trip, days, tasks, ideas, grandTotal, people,
           </div>
         </section>
 
-        {documents}
+        {documents && <div ref={documentsRef}>{documents}</div>}
       </div>
     </div>
   );
@@ -161,18 +187,6 @@ function Hero({ phase, days, people }: { phase: TripPhase | null; days: Day[]; p
         <span><strong className="font-semibold text-foreground">{people}</strong> {people === 1 ? "viajero" : "viajeros"}</span>
       </div>
     </section>
-  );
-}
-
-function Progress({ done, total }: { done: number; total: number }) {
-  if (total === 0) return null;
-  return (
-    <div className="mb-3">
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(done / total) * 100}%` }} />
-      </div>
-      <div className="mt-1.5 text-xs text-muted-foreground">{done} de {total} listos</div>
-    </div>
   );
 }
 

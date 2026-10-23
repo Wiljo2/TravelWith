@@ -26,3 +26,15 @@ export function SectionTitle({ title, count, action, onAction }: {
     </div>
   );
 }
+
+export function Progress({ done, total }: { done: number; total: number }) {
+  if (total === 0) return null;
+  return (
+    <div className="mb-3">
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(done / total) * 100}%` }} />
+      </div>
+      <div className="mt-1.5 text-xs text-muted-foreground">{done} de {total} listos</div>
+    </div>
+  );
+}

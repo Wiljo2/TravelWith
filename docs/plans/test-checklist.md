@@ -22,7 +22,7 @@ needs a dashboard or account action outside the repo goes under "Owner actions" 
 - [x] 5. **Onboarding 2 — short creation wizard** (step 2).
 - [x] 6. **Onboarding 3 — "¿Cómo quieres empezar?"** invite / TikTok / AI (step 3).
 - [x] 7. **Onboarding 4 — invite link, WhatsApp, visible "Invitar"** (step 4).
-- [ ] 8. **Onboarding 5 — "Primeros pasos" card on Inicio** (step 5).
+- [x] 8. **Onboarding 5 — "Primeros pasos" card on Inicio** (step 5).
 - [ ] 9. **Onboarding 6 — teaching empty states** (step 6).
 - [ ] 10. **Group voting on dates/destination via "Por decidir"** (step 7; design note first).
 - [ ] 11. **Welcome for someone joining by invitation** (step 8).
@@ -79,3 +79,9 @@ For item 7 (needs a real database — staging or production with a test trip):
   owner only, hidden in local mode). Trigger is in memory (`useStartChoices`, RoomGate `onCreated`).
   Walked in the sandbox: choices appear after creating; reel link lands on Ideas prefilled. Fixed on
   the way: a long link pushed "Nueva idea" out of its dialog (`wrap-anywhere`).
+- 2026-10-22 — Item 8 done: "Primeros pasos" card at the top of Inicio (`FirstStepsCard`,
+  `useFirstSteps`, pure `utils/firstSteps.ts`): invite / first activity / idea / expense / document,
+  "n de 5", each pending step jumps to its tab (invite opens the sheet, documents scrolls to the panel).
+  Per trip and device: dismissed stays dismissed; a trip that already has 2+ steps done when first seen
+  never shows it (lowered from 3 after the demo trip — activities + expenses — still showed it).
+  Walked in the sandbox: new trip shows 0 de 5, "Gastos" jumps to Gastos, demo trip shows no card.
