@@ -59,6 +59,7 @@ together.
   (`src/data/freshRoom.ts`) accept the travelers and tasks.
 
 ### 3. "¿Cómo quieres empezar?" (right after creation)
+**Order (2026-10-22):** built after step 4, because its invite card opens step 4's share sheet.
 - Three cards + "Saltar": 👥 Invitar a mi grupo · 🎬 Pegar un TikTok o reel · ✨ Contarle a la IA.
   The invite card is highlighted when dates/destination are left to a vote.
 - TikTok/reel → Ideas tab with the paste field focused; reuse `useSharedLink`
