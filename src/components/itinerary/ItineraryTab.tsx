@@ -133,6 +133,7 @@ export default function ItineraryTab({
           tipsByEvent={tipsByEvent}
           compact={!mobile}
           focusDayId={focusDayId}
+          drag={drag}
         />
       }
       month={monthTrip ? (

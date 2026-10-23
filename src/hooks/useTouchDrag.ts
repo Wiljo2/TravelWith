@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { HOUR_START, PX_PER_HOUR } from "@/constants/time";
-import { cssZoom } from "@/utils/zoom";
+import type { RefObject } from "react";
 import type { CalendarEvent } from "@/types";
 
 const HOLD_MS = 350;
@@ -11,36 +10,51 @@ const SCROLL_TOP_ZONE = 72;
 const SCROLL_BOTTOM_ZONE = 120;
 const SCROLL_STEP = 9;
 
-interface TouchDragHandlers {
-  onStart: (ev: CalendarEvent, fromDayId: string, grabOffsetHours: number) => void;
-  onEnter: (dayId: string) => void;
-  onMove: (dayId: string, cursorHour: number) => void;
-  onDrop: (dayId: string, droppedHour: number) => void;
-  onCancel: () => void;
-  // Holding the finger near a horizontal edge pages the calendar one day.
-  onEdge: (dir: -1 | 1) => void;
-  getEdges: () => { left: number; right: number } | null;
+export interface TouchPoint {
+  x: number;
+  y: number;
 }
 
-// Day grids are tagged with data-day-grid={day.id}. x is clamped into the
-// columns so a finger resting over the hour gutter still targets a day.
-function locate(x: number, y: number, edges: { left: number; right: number } | null) {
-  const cx = edges ? Math.min(Math.max(x, edges.left + 1), edges.right - 1) : x;
-  const grid = document.elementFromPoint(cx, y)?.closest<HTMLElement>("[data-day-grid]");
-  if (!grid?.dataset.dayGrid) return null;
-  const rect = grid.getBoundingClientRect();
-  const gridStart = Number(grid.dataset.gridStart ?? HOUR_START);
-  return { dayId: grid.dataset.dayGrid, hour: gridStart + (y - rect.top) / (PX_PER_HOUR * cssZoom(grid)) };
+interface TouchDragOptions<Hit extends { dayId: string }> {
+  // Presses start inside this element; it must be mounted before the first touch.
+  surface: RefObject<HTMLElement | null>;
+  enabled: boolean;
+  // The drop target under the finger, in viewport coordinates.
+  locate: (p: TouchPoint) => Hit | null;
+  // The hold became a drag of `block` (the pressed element); `at` is where the finger went down.
+  onStart: (ev: CalendarEvent, fromDayId: string, block: HTMLElement, at: TouchPoint) => void;
+  onEnter: (dayId: string) => void;
+  onMove?: (hit: Hit) => void;
+  // Every finger move while dragging, over a target or not.
+  onPoint?: (p: TouchPoint) => void;
+  onDrop: (hit: Hit, ev: CalendarEvent, fromDayId: string) => void;
+  onCancel: () => void;
+  // Holding the finger near a horizontal edge pages the view one day.
+  paging?: {
+    edges: () => { left: number; right: number } | null;
+    onEdge: (dir: -1 | 1) => void;
+  };
 }
+
+// WebKit fixes at touchstart whether a touch's moves can be cancelled, from the non-passive
+// listeners already under the finger; the ones startPress adds would come too late.
+function keepMovesCancelable() {}
 
 // Long-press drag for touch screens, where HTML5 drag and drop doesn't work.
-// Feeds the same useDragDrop pipeline (ghost preview, snap, undo toast).
-export function useTouchDrag(handlers: TouchDragHandlers) {
-  const ref = useRef(handlers);
-  useEffect(() => { ref.current = handlers; });
+export function useTouchDrag<Hit extends { dayId: string }>(options: TouchDragOptions<Hit>) {
+  const ref = useRef(options);
+  useEffect(() => { ref.current = options; });
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => () => cleanupRef.current?.(), []);
+
+  const { surface, enabled } = options;
+  useEffect(() => {
+    const el = surface.current;
+    if (!enabled || !el) return;
+    el.addEventListener("touchmove", keepMovesCancelable, { passive: false });
+    return () => el.removeEventListener("touchmove", keepMovesCancelable);
+  }, [surface, enabled]);
 
   function startPress(e: React.TouchEvent<HTMLElement>, ev: CalendarEvent, dayId: string) {
     if (e.touches.length !== 1) return;
@@ -53,19 +67,19 @@ export function useTouchDrag(handlers: TouchDragHandlers) {
     const t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     let point = t0;
     let active = false;
-    let last: { dayId: string; hour: number } | null = null;
+    let last: Hit | null = null;
     let edgeDir: -1 | 0 | 1 = 0;
     let edgeTimer: ReturnType<typeof setTimeout> | null = null;
     let raf = 0;
 
     function update() {
-      const edges = ref.current.getEdges();
-      const hit = locate(point.x, point.y, edges);
+      const hit = ref.current.locate(point);
       if (hit) {
         if (hit.dayId !== last?.dayId) ref.current.onEnter(hit.dayId);
         last = hit;
-        ref.current.onMove(hit.dayId, hit.hour);
+        ref.current.onMove?.(hit);
       }
+      const edges = ref.current.paging?.edges() ?? null;
       const dir = !edges ? 0 : point.x < edges.left + EDGE_PX ? -1 : point.x > edges.right - EDGE_PX ? 1 : 0;
       if (dir !== edgeDir) {
         edgeDir = dir;
@@ -78,7 +92,7 @@ export function useTouchDrag(handlers: TouchDragHandlers) {
     function armEdge() {
       edgeTimer = setTimeout(() => {
         if (!edgeDir) return;
-        ref.current.onEdge(edgeDir);
+        ref.current.paging?.onEdge(edgeDir);
         setTimeout(update, 60);
         armEdge();
       }, EDGE_HOLD_MS);
@@ -97,9 +111,7 @@ export function useTouchDrag(handlers: TouchDragHandlers) {
     const holdTimer = setTimeout(() => {
       active = true;
       navigator.vibrate?.(12);
-      const rect = block.getBoundingClientRect();
-      const grab = (t0.y - rect.top) / (PX_PER_HOUR * cssZoom(block));
-      ref.current.onStart(ev, dayId, grab);
+      ref.current.onStart(ev, dayId, block, t0);
       setDraggingId(ev.id);
       update();
       raf = requestAnimationFrame(autoScroll);
@@ -109,19 +121,23 @@ export function useTouchDrag(handlers: TouchDragHandlers) {
       const t = te.touches[0];
       if (!t) return;
       if (!active) {
-        if (Math.hypot(t.clientX - t0.x, t.clientY - t0.y) > MOVE_TOLERANCE) cleanup();
+        // An uncancelable move means the browser has already taken the touch as a scroll.
+        if (!te.cancelable || Math.hypot(t.clientX - t0.x, t.clientY - t0.y) > MOVE_TOLERANCE) cleanup();
         return;
       }
-      te.preventDefault();
+      if (te.cancelable) te.preventDefault();
       point = { x: t.clientX, y: t.clientY };
+      ref.current.onPoint?.(point);
       update();
     }
 
     function onEnd(te: TouchEvent) {
       if (active) {
-        // Swallow the synthetic click so dropping doesn't also open the editor.
+        // No synthetic click (it would open the detail), and swipe handlers above
+        // must not take the drop for a swipe.
         te.preventDefault();
-        if (last) ref.current.onDrop(last.dayId, last.hour);
+        te.stopPropagation();
+        if (last) ref.current.onDrop(last, ev, dayId);
         else ref.current.onCancel();
       }
       cleanup();

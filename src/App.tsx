@@ -114,6 +114,7 @@ export default function App() {
     (fromDayId, toDayId, ev, droppedHour) => {
       const dur = ev.end - ev.start;
       const newStart = snapHour(droppedHour, dur, HOUR_START, HOUR_END);
+      if (toDayId === fromDayId && newStart === ev.start) return;
       const newEnd = newStart + dur;
       moveEvent(fromDayId, toDayId, ev, newStart);
       notify({

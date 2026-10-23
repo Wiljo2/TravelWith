@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateDays, parseISODate, fmtTripDates, tripPhase, hasActivities, hasDates, MAX_TRIP_DAYS } from "./tripDays";
+import { generateDays, parseISODate, fmtTripDates, tripPhase, hasActivities, hasDates, moveStartHour, MAX_TRIP_DAYS } from "./tripDays";
 
 describe("hasDates", () => {
   it("is true only with both dates", () => {
@@ -111,5 +111,36 @@ describe("fmtTripDates", () => {
 
   it("shows both months when they differ", () => {
     expect(fmtTripDates("2026-11-26", "2026-12-04")).toBe("Nov 26 – Dic 4, 2026");
+  });
+});
+
+describe("moveStartHour", () => {
+  const ev = (id: string, start: number, end: number) => ({ id, start, end });
+  const day = (...events: ReturnType<typeof ev>[]) => ({ events });
+
+  it("keeps the hours on a free day", () => {
+    expect(moveStartHour(ev("a", 10.5, 12), day())).toBe(10.5);
+    expect(moveStartHour(ev("a", 10, 12), day(ev("b", 8, 10), ev("c", 12, 13)))).toBe(10);
+  });
+
+  it("moves to the next whole hour that fits when the hours are taken", () => {
+    expect(moveStartHour(ev("a", 10, 11), day(ev("b", 10.5, 12)))).toBe(12);
+    expect(moveStartHour(ev("a", 9.5, 10.5), day(ev("b", 9, 10)))).toBe(10);
+    expect(moveStartHour(ev("a", 9, 11), day(ev("b", 10, 12), ev("c", 13, 14)))).toBe(14);
+  });
+
+  it("ignores the activity itself", () => {
+    expect(moveStartHour(ev("a", 10, 11), day(ev("a", 10, 11)))).toBe(10);
+  });
+
+  it("gives punctual activities a quarter hour", () => {
+    expect(moveStartHour(ev("a", 15, 15), day(ev("b", 15, 15)))).toBe(16);
+    expect(moveStartHour(ev("a", 15, 15), day(ev("b", 14, 15)))).toBe(15);
+    expect(moveStartHour(ev("a", 14.75, 15.25), day(ev("b", 15, 15)))).toBe(16);
+  });
+
+  it("keeps the hours as a conflict when nothing fits before the day ends", () => {
+    expect(moveStartHour(ev("a", 22, 25), day(ev("b", 21, 26)))).toBe(22);
+    expect(moveStartHour(ev("a", 23, 25), day(ev("b", 23, 24)))).toBe(24);
   });
 });

@@ -35,7 +35,7 @@ needs a dashboard or account action outside the repo goes under "Owner actions" 
       greyed), each day with its first activity titles on desktop / category dots on phone and a
       count, trip/day spans as bars across days; tapping a day opens it in Agenda. View only (no
       drag) in v1. Default view stays Agenda.
-- [ ] 13. **Move activities on the phone with long-press + drag.**
+- [x] 13. **Move activities on the phone with long-press + drag.**
       **Bug (Horas, phone):** the owner couldn't move an activity at all. The long-press drag exists
       (`src/hooks/useTouchDrag.ts`: `HOLD_MS` 350, `MOVE_TOLERANCE` 10 px, vibrate) but fails on a
       real phone. Hypotheses to check first: the 10 px tolerance cancels the hold with normal finger
@@ -79,6 +79,10 @@ For item 10 (group voting) — migration `supabase/migrations/027_group_votes.sq
 - [ ] A trip created before the change loads and edits as before, with 0 votes.
 - [ ] Create a trip with "lo votamos" for dates and destination → undated trip with both votes;
       propose dates, close as owner → days appear for every member live.
+
+For item 13 (phone drag) — needs real phones:
+- [ ] On an iPhone and an Android phone, in Agenda and in Horas: hold an activity ~half a second and
+      drag it to another day; then a quick swipe that starts on an activity must scroll, not drag.
 
 For item 11 (welcome for invited people) — needs two accounts:
 - [ ] Account A creates a trip; account B opens `/?join=CODE` → after joining, "¡Bienvenido a
@@ -183,3 +187,11 @@ For item 11 (welcome for invited people) — needs two accounts:
   Agenda unchanged. Walked: demo trip in Chrome (3 columns, no "Mes" for a one-week trip; after moving
   it to Mar 4–13, "Mes" with 2 week rows, tap Mar 11 → Agenda at that day) and a phone at 360 px with
   Playwright (toggles fit, no overflow). Fixed on the way: "10:00 am" wrapped in the card.
+- 2026-10-23 — Item 13 done: root causes in Horas — the non-passive touchmove listener was added during
+  touchstart (iOS Safari then ignores preventDefault and scrolls; reasoned, not reproducible in
+  Chromium), the day swipe flipped the view after a sideways drop (reproduced, fixed), and Android
+  scrolling could start inside the hold; `useTouchDrag` now registers the listener on mount and is
+  shared. Phone Agenda: long-press lifts a ghost, target card highlights, auto-scroll, drop moves the
+  activity keeping its hours or at the next free hour (`moveStartHour`). Same-spot drops are no-ops.
+  Walked with Playwright touch emulation (iPhone 390×844, Pixel 412×915), 13 scenarios each, all pass
+  (re-run by the orchestrator). Real-device check → owner actions above.

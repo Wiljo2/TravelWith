@@ -1,10 +1,9 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { Plus } from "lucide-react";
-import { CATEGORIES } from "@/constants/categories";
 import { TASK_CATEGORIES, DEFAULT_TASK_CAT } from "@/constants/taskCategories";
 import { fmtHour } from "@/utils/time";
-import { eventIcon, taskIcon } from "@/utils/itemIcon";
+import { taskIcon } from "@/utils/itemIcon";
 import { hasActivities, nextFreeHour } from "@/utils/tripDays";
 import { daySpanLabels } from "@/utils/spans";
 import { agendaRows } from "@/utils/agendaRows";
@@ -12,7 +11,10 @@ import { PANEL } from "@/components/home/shared";
 import DaySubtitle from "@/components/itinerary/DaySubtitle";
 import ItineraryIntro from "@/components/itinerary/ItineraryIntro";
 import AgendaCard from "@/components/itinerary/AgendaCard";
-import { DaySpanChips, TaskCheck } from "@/components/itinerary/agendaParts";
+import AgendaDragGhost from "@/components/itinerary/AgendaDragGhost";
+import { DaySpanChips, EventRowBody, TaskCheck } from "@/components/itinerary/agendaParts";
+import { useIsTouch } from "@/hooks/useMediaQuery";
+import { useAgendaDrag, type AgendaDragApi } from "@/hooks/useAgendaDrag";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, Day, Task, TripSpan } from "@/types";
 
@@ -32,12 +34,16 @@ interface ItineraryAgendaProps {
   compact?: boolean;
   // Scrolled into view on mount instead of today (a day opened from the month view).
   focusDayId?: string | null;
+  // Phone with a touch screen: long-press an activity and drop it on another day.
+  drag?: AgendaDragApi;
 }
 
 // The whole trip as a list of day cards — the default, low-noise itinerary view.
 export default function ItineraryAgenda({
-  days, tripSpans, tasks, selectedId, todayIdx, onSelect, onAdd, onEditTask, onToggleTask, onSetDaySub, tipsByEvent, compact, focusDayId,
+  days, tripSpans, tasks, selectedId, todayIdx, onSelect, onAdd, onEditTask, onToggleTask, onSetDaySub, tipsByEvent, compact, focusDayId, drag,
 }: ItineraryAgendaProps) {
+  const touch = useIsTouch();
+  const { surfaceRef, lift, liftedId, overDayId, startPress, bindGhost } = useAgendaDrag(days, compact ? undefined : drag, touch);
   const scrollRef = useRef<HTMLElement>(null);
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
@@ -76,7 +82,7 @@ export default function ItineraryAgenda({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div ref={surfaceRef} className="flex flex-col gap-4">
       {intro}
       {days.map((day, i) => {
         const [weekday, date] = day.label.split("·").map((s) => s.trim());
@@ -88,7 +94,12 @@ export default function ItineraryAgenda({
           <section
             key={day.id}
             ref={day.id === scrollDayId ? scrollRef : undefined}
-            className={cn(PANEL, "scroll-mt-4", isToday && "ring-2 ring-primary")}
+            data-agenda-day={day.id}
+            className={cn(
+              PANEL, "scroll-mt-4 transition-colors",
+              isToday && "ring-2 ring-primary",
+              overDayId === day.id && "bg-accent ring-2 ring-primary",
+            )}
           >
             <div className="mb-2 flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -114,7 +125,13 @@ export default function ItineraryAgenda({
               <ul className="-mx-2 flex flex-col">
                 {rows.map((r) =>
                   r.kind === "event"
-                    ? <EventRow key={r.ev.id} ev={r.ev} selected={r.ev.id === selectedId} tips={tipsByEvent?.[r.ev.id]} onClick={() => onSelect(r.ev.id)} />
+                    ? (
+                      <EventRow
+                        key={r.ev.id} ev={r.ev} selected={r.ev.id === selectedId} tips={tipsByEvent?.[r.ev.id]} onClick={() => onSelect(r.ev.id)}
+                        onTouchStart={startPress && ((e) => startPress(e, r.ev, day.id))}
+                        lifted={liftedId === r.ev.id}
+                      />
+                    )
                     : <TaskRow key={r.task.id} task={r.task} onEdit={onEditTask} onToggle={() => onToggleTask(r.task.id)} />,
                 )}
               </ul>
@@ -122,30 +139,36 @@ export default function ItineraryAgenda({
           </section>
         );
       })}
+      {lift && <AgendaDragGhost lift={lift} tips={tipsByEvent?.[lift.ev.id]} bind={bindGhost} />}
     </div>
   );
 }
 
-function EventRow({ ev, selected, tips, onClick }: { ev: CalendarEvent; selected: boolean; tips?: number; onClick: () => void }) {
-  const cat = CATEGORIES[ev.cat] ?? CATEGORIES.logist;
+interface EventRowProps {
+  ev: CalendarEvent;
+  selected: boolean;
+  tips?: number;
+  onClick: () => void;
+  // Set when the row can be long-pressed to drag it to another day.
+  onTouchStart?: (e: React.TouchEvent<HTMLElement>) => void;
+  lifted?: boolean;
+}
+
+function EventRow({ ev, selected, tips, onClick, onTouchStart, lifted }: EventRowProps) {
   return (
     <li>
       <button
         onClick={onClick}
+        onTouchStart={onTouchStart}
+        onContextMenu={onTouchStart && ((e) => e.preventDefault())}
         className={cn(
-          "flex w-full cursor-pointer items-start gap-3 rounded-lg px-2 py-2 text-left transition-colors",
+          "flex w-full cursor-pointer items-start gap-3 rounded-lg px-2 py-2 text-left transition",
           selected ? "bg-accent" : "hover:bg-secondary",
+          onTouchStart && "select-none [-webkit-touch-callout:none]",
+          lifted && "opacity-30",
         )}
       >
-        <span className="w-[68px] shrink-0 pt-px tabular-nums">
-          <span className="block text-[13px] text-foreground">{fmtHour(ev.start)}</span>
-          {ev.end > ev.start && <span className="block text-[11px] text-muted-foreground">{fmtHour(ev.end)}</span>}
-        </span>
-        <span className="mt-[7px] h-2 w-2 shrink-0 rounded-full" style={{ background: cat.dot }} />
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium leading-snug text-foreground"><span aria-hidden className="mr-1">{eventIcon(ev)}</span>{ev.title}{!!tips && <span className="ml-1.5 text-xs font-semibold text-muted-foreground">💡{tips}</span>}</span>
-          {ev.note && <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">{ev.note}</span>}
-        </span>
+        <EventRowBody ev={ev} tips={tips} />
       </button>
     </li>
   );

@@ -11,7 +11,8 @@ import { resolveForDay } from "@/utils/spans";
 import { hasActivities, nextFreeHour } from "@/utils/tripDays";
 import ItineraryIntro from "@/components/itinerary/ItineraryIntro";
 import { useIsMobile, useIsTouch } from "@/hooks/useMediaQuery";
-import { useTouchDrag } from "@/hooks/useTouchDrag";
+import { useTouchDrag, type TouchPoint } from "@/hooks/useTouchDrag";
+import { HOUR_START, PX_PER_HOUR } from "@/constants/time";
 
 const GUTTER_W = 56;
 const GUTTER_W_MOBILE = 44;
@@ -22,6 +23,17 @@ const SWIPE_MIN_PX = 50;
 function calcVisible(containerWidth: number): number {
   const available = containerWidth - GUTTER_W;
   return Math.max(1, Math.min(MAX_DAYS, Math.floor(available / DAY_MIN)));
+}
+
+// Day grids are tagged with data-day-grid={day.id}. x is clamped into the
+// columns so a finger resting over the hour gutter still targets a day.
+function locateHour({ x, y }: TouchPoint, edges: { left: number; right: number } | null) {
+  const cx = edges ? Math.min(Math.max(x, edges.left + 1), edges.right - 1) : x;
+  const grid = document.elementFromPoint(cx, y)?.closest<HTMLElement>("[data-day-grid]");
+  if (!grid?.dataset.dayGrid) return null;
+  const rect = grid.getBoundingClientRect();
+  const gridStart = Number(grid.dataset.gridStart ?? HOUR_START);
+  return { dayId: grid.dataset.dayGrid, hour: gridStart + (y - rect.top) / (PX_PER_HOUR * cssZoom(grid)) };
 }
 
 interface CalendarGridProps {
@@ -95,22 +107,30 @@ export default function CalendarGrid({
   const goLeft  = useCallback(() => goTo(idx - 1), [goTo, idx]);
   const goRight = useCallback(() => goTo(idx + 1), [goTo, idx]);
 
+  function gridEdges() {
+    const el = bodyRef.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return { left: rect.left + gutterW * cssZoom(el), right: rect.right };
+  }
+
   const touchDrag = useTouchDrag({
-    onStart: onTouchDragStart,
-    onEnter: onDragEnter,
-    onMove: onDragMove,
-    onDrop,
-    onCancel: onTouchDragCancel,
-    onEdge: (dir) => (dir < 0 ? goLeft() : goRight()),
-    getEdges: () => {
-      const el = bodyRef.current;
-      if (!el) return null;
-      const rect = el.getBoundingClientRect();
-      return { left: rect.left + gutterW * cssZoom(el), right: rect.right };
+    surface: bodyRef,
+    enabled: touch,
+    locate: (p) => locateHour(p, gridEdges()),
+    onStart: (ev, dayId, block, at) => {
+      const rect = block.getBoundingClientRect();
+      onTouchDragStart(ev, dayId, (at.y - rect.top) / (PX_PER_HOUR * cssZoom(block)));
     },
+    onEnter: onDragEnter,
+    onMove: (hit) => onDragMove(hit.dayId, hit.hour),
+    onDrop: (hit) => onDrop(hit.dayId, hit.hour),
+    onCancel: onTouchDragCancel,
+    paging: { edges: gridEdges, onEdge: (dir) => (dir < 0 ? goLeft() : goRight()) },
   });
 
-  // Horizontal swipe on the phone layout pages between days.
+  // Horizontal swipe on the phone layout pages between days. A touch drag's drop never gets
+  // here: useTouchDrag stops its touchend.
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   function onSwipeStart(e: React.TouchEvent) {
     swipeStart.current = mobile && e.touches.length === 1
@@ -120,7 +140,7 @@ export default function CalendarGrid({
   function onSwipeEnd(e: React.TouchEvent) {
     const start = swipeStart.current;
     swipeStart.current = null;
-    if (!start || touchDrag.draggingId) return;
+    if (!start) return;
     const dx = e.changedTouches[0].clientX - start.x;
     const dy = e.changedTouches[0].clientY - start.y;
     if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * 1.5) return;
