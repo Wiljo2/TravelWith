@@ -26,6 +26,28 @@ needs a dashboard or account action outside the repo goes under "Owner actions" 
 - [x] 9. **Onboarding 6 — teaching empty states** (step 6).
 - [x] 10. **Group voting on dates/destination via "Por decidir"** (step 7; design note first).
 - [x] 11. **Welcome for someone joining by invitation** (step 8).
+- [ ] 12. **Agenda in compact day cards + "Mes" view** (desktop; the phone Agenda stays as it is).
+      Cards: 2–3 columns on desktop; each day shows its label/subtitle and one line per activity
+      (time · emoji · title), the first 4–5 then "+N más", which expands that card in place;
+      "+ Actividad" per card; tapping an activity opens its detail as today.
+      "Mes" as a third toggle next to Agenda / Horas, shown only when the trip doesn't fit in one
+      Mon–Sun week; it renders only the weeks the trip touches (Mon–Sun rows, days outside the trip
+      greyed), each day with its first activity titles on desktop / category dots on phone and a
+      count, trip/day spans as bars across days; tapping a day opens it in Agenda. View only (no
+      drag) in v1. Default view stays Agenda.
+- [ ] 13. **Move activities on the phone with long-press + drag.**
+      **Bug (Horas, phone):** the owner couldn't move an activity at all. The long-press drag exists
+      (`src/hooks/useTouchDrag.ts`: `HOLD_MS` 350, `MOVE_TOLERANCE` 10 px, vibrate) but fails on a
+      real phone. Hypotheses to check first: the 10 px tolerance cancels the hold with normal finger
+      jitter; no `touch-action` / `-webkit-touch-callout: none` / `user-select: none` on the blocks,
+      so the browser scrolls or opens its long-press menu first; the grid's day-swipe handler
+      (`CalendarGrid` `onTouchStart={onSwipeStart}`) competes; `useIsTouch` misdetects and falls back
+      to HTML5 drag. Reproduce with Playwright touch emulation (iPhone/Android device descriptors,
+      `hasTouch`) and, if possible, a real phone; fix the cause, not just the timing.
+      **New (Agenda, phone) — option A:** long-press (same feel: ~350 ms + vibrate) lifts the
+      activity, drag it onto another day card (the list auto-scrolls near the edges), drop to move
+      it to that day keeping its hours, or at the next free hour if it collides (decided 2026-10-23); a short tap
+      still opens the detail; scrolling the list with a quick swipe must keep working.
 
 ## Owner actions
 
