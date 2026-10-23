@@ -24,6 +24,11 @@ describe("shouldEnterApp", () => {
     expect(shouldEnterApp({ ...base, search: "?code=abc" })).toBe(true);
   });
 
+  it("enters on an invitation link", () => {
+    expect(shouldEnterApp({ ...base, search: "?join=ABC123" })).toBe(true);
+    expect(shouldEnterApp({ ...base, search: "?join=" })).toBe(true);
+  });
+
   it("enters on OAuth errors", () => {
     expect(shouldEnterApp({ ...base, search: "?error=access_denied" })).toBe(true);
     expect(shouldEnterApp({ ...base, search: "?error_description=nope" })).toBe(true);

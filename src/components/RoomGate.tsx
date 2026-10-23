@@ -2,14 +2,15 @@
 import { useState } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import type { UserRoom } from "@/hooks/useUserRooms";
+import type { InviteState } from "@/hooks/useTripSession";
 import type { NewTrip } from "@/types";
 import { apiFetch } from "@/lib/api";
+import { joinTrip } from "@/lib/joinTrip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { loadSnapshot } from "@/lib/offline";
 import { LOCAL_ROOM_CODE, type LocalVariant } from "@/data/localMode";
 import { isSandbox, setSandboxTrip } from "@/data/localSandbox";
 import { firstName } from "@/utils/userName";
@@ -18,6 +19,7 @@ import TripList from "@/components/gate/TripList";
 import JoinByCode from "@/components/gate/JoinByCode";
 import CreateTripWizard from "@/components/gate/CreateTripWizard";
 import WelcomeFirstTrip from "@/components/gate/WelcomeFirstTrip";
+import InviteBanner from "@/components/gate/InviteBanner";
 
 interface RoomGateProps {
   onEnter: (code: string) => void;
@@ -30,10 +32,12 @@ interface RoomGateProps {
   addRoom: (code: string, role?: "owner" | "member", name?: string | null) => void;
   removeRoom: (code: string, accessToken: string) => Promise<void>;
   onEnterLocal?: (variant: LocalVariant) => void;
+  // An invitation link waiting for sign-in, being joined, or failed.
+  invite?: InviteState;
 }
 
 export default function RoomGate({
-  onEnter, user, session, authLoading, signIn, signOut, rooms, addRoom, removeRoom, onEnterLocal,
+  onEnter, user, session, authLoading, signIn, signOut, rooms, addRoom, removeRoom, onEnterLocal, invite,
 }: RoomGateProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -42,8 +46,6 @@ export default function RoomGate({
   const [deleteTarget, setDeleteTarget] = useState<{ code: string; name: string | null } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Reading a room requires membership, so joining registers first; the
-  // members endpoint answers 404 for unknown codes.
   async function join(code: string) {
     const c = code.trim().toUpperCase();
     if (!c) return;
@@ -54,15 +56,14 @@ export default function RoomGate({
     }
     setLoading(true);
     setError("");
-    const res = await apiFetch(`/api/rooms/${c}/members`, session?.access_token, { method: "POST" }).catch(() => null);
-    // Offline: open this device's last copy of the trip, if it has one.
-    if (!res && loadSnapshot(c)) {
+    const outcome = await joinTrip(c, session?.access_token);
+    if (outcome === "offline") {
       setLoading(false);
       onEnter(c);
       return;
     }
-    if (!res?.ok) {
-      setError(res?.status === 404 ? "Sala no encontrada." : "No se pudo entrar al viaje.");
+    if (outcome !== "joined") {
+      setError(outcome === "notFound" ? "Sala no encontrada." : "No se pudo entrar al viaje.");
       setLoading(false);
       return;
     }
@@ -136,14 +137,17 @@ export default function RoomGate({
         {authLoading ? (
           <div className="text-center text-[13px] text-muted-foreground">Cargando...</div>
         ) : !user ? (
-          <Card className="rounded-[14px]">
-            <CardContent className="px-7 py-2 text-center">
-              <p className="mb-5 text-sm leading-relaxed text-secondary-foreground">
-                Inicia sesión o crea tu cuenta para ver tus viajes y colaborar en tiempo real con tu grupo.
-              </p>
-              <SignInOptions {...signIn} />
-            </CardContent>
-          </Card>
+          <>
+            {invite && <InviteBanner invite={invite} signedIn={false} />}
+            <Card className="rounded-[14px]">
+              <CardContent className="px-7 py-2 text-center">
+                <p className="mb-5 text-sm leading-relaxed text-secondary-foreground">
+                  Inicia sesión o crea tu cuenta para ver tus viajes y colaborar en tiempo real con tu grupo.
+                </p>
+                <SignInOptions {...signIn} />
+              </CardContent>
+            </Card>
+          </>
 
         ) : (
           <>
@@ -166,6 +170,8 @@ export default function RoomGate({
                 Salir
               </Button>
             </div>
+
+            {invite && <InviteBanner invite={invite} signedIn />}
 
             {showCreate ? (
               <CreateTripWizard loading={loading} error={error} onSubmit={create} onCancel={closePanel} />

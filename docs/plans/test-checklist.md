@@ -21,7 +21,7 @@ needs a dashboard or account action outside the repo goes under "Owner actions" 
 - [x] 4. **Onboarding 1 — welcome for a first-time creator** (`first-run-onboarding.md` step 1).
 - [x] 5. **Onboarding 2 — short creation wizard** (step 2).
 - [ ] 6. **Onboarding 3 — "¿Cómo quieres empezar?"** invite / TikTok / AI (step 3).
-- [ ] 7. **Onboarding 4 — invite link, WhatsApp, visible "Invitar"** (step 4).
+- [x] 7. **Onboarding 4 — invite link, WhatsApp, visible "Invitar"** (step 4).
 - [ ] 8. **Onboarding 5 — "Primeros pasos" card on Inicio** (step 5).
 - [ ] 9. **Onboarding 6 — teaching empty states** (step 6).
 - [ ] 10. **Group voting on dates/destination via "Por decidir"** (step 7; design note first).
@@ -40,6 +40,12 @@ For item 1 (Supabase dashboard → Authentication):
 - [ ] **Apple** (optional): Apple Developer Program, a Services ID + Sign in with Apple key, then
       **Providers → Apple** in Supabase; finally `NEXT_PUBLIC_AUTH_APPLE=1` in `.env.local` / Vercel.
 - [ ] Verify end to end: create an account, confirm by email, sign in, sign out, reset the password.
+
+For item 7 (needs a real database — staging or production with a test trip):
+- [ ] Open `/?join=<CODE of a test trip>` signed in with a second account → it joins and opens the trip.
+- [ ] Same link signed out → banner → sign in (Google and email) → joins automatically.
+- [ ] `/?join=` with a made-up code → "No encontramos ese viaje. Pide un enlace nuevo."
+- [ ] "Enviar por WhatsApp" on a phone opens WhatsApp with the message and link.
 
 ## Log
 
@@ -60,3 +66,8 @@ For item 1 (Supabase dashboard → Authentication):
   Walked in the sandbox: Cartagena, Dec 4–7, friends ×4, flights resolved → "Cartagena con amigos ·
   Dic 2026" with "Reservar alojamiento" in Por decidir. Sandbox-only difference: Inicio counts 3
   travelers (the sandbox user is not a room member; in production the creator is, so 4).
+- 2026-10-22 — Item 7 done: "Invitar" in the trip header opens `InviteSheet` (link `/?join=CODE`,
+  WhatsApp, share, copy code); `?join=` enters the app, is kept 24 h in localStorage across sign-in
+  (`usePendingJoin`) and joins through `lib/joinTrip.ts` before auto-resume. Walked in the sandbox:
+  sheet in the demo trip, banner when signed out, sandbox message after sign-in. A real join needs a
+  database → owner checks above.

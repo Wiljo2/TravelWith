@@ -40,7 +40,7 @@ import SpansManager from "@/components/itinerary/SpansManager";
 import PasswordRecoveryDialog from "@/components/auth/PasswordRecoveryDialog";
 
 export default function App() {
-  const { roomCode, setRoomCode, resumeAttempted, localMode, auth, userRooms: rooms } = useTripSession();
+  const { roomCode, setRoomCode, resumeAttempted, localMode, auth, userRooms: rooms, invite } = useTripSession();
   const { user, session, loading: authLoading, recovering, updatePassword, signOut } = auth;
   const recoveryDialog = <PasswordRecoveryDialog open={recovering} onSubmit={updatePassword} />;
   const { rooms: userRooms, addRoom, removeRoom } = rooms;
@@ -152,6 +152,7 @@ export default function App() {
           addRoom={addRoom}
           removeRoom={removeRoom}
           onEnterLocal={LOCAL_MODE_ENABLED ? enterLocal : undefined}
+          invite={invite}
         />
       </>
     );

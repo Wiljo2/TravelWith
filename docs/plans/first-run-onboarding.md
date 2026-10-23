@@ -74,6 +74,9 @@ together.
 - `?join=` enters the app (`src/components/landing/entry.ts` + `entryScript.ts`), survives the
   sign-in redirect in sessionStorage (same pattern as `useSharedLink`), then joins through the
   existing `POST /api/rooms/[code]/members` and opens the trip (`src/hooks/useTripSession.ts`).
+  **Decision (2026-10-22):** the pending join lives in localStorage with a 24 h expiry
+  (`src/hooks/usePendingJoin.ts`), not sessionStorage, so email-confirmation links opened in a new
+  tab still join; it takes priority over the auto-resume.
 - Visible "Invitar" button in `src/components/AppHeader.tsx` (keep "Copiar código" in ⋯).
 
 ### 5. "Primeros pasos" card on Inicio
