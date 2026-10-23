@@ -29,6 +29,7 @@ together.
   general-purpose subagent with the step spec, the repo rules (CLAUDE.md, GUIDELINES.md §2–4) and
   the files named here → review the diff → verify (below) → log in the checklist → commit on branch
   `feat/first-run-onboarding` (no push, no PR, no production migration without asking).
+- Subagents don't use browser tools (one hung on them); the orchestrator does the browser walk.
 - Every new flow must work in the local sandbox (`?local=new`, in memory) so it can be checked in
   the browser without touching production (local dev shares the production database).
 - Blocked on an owner action (apply a migration, Supabase setting) → write exact steps under
@@ -51,8 +52,10 @@ together.
   4. ¿Qué ya tienen resuelto? chips (vuelos, alojamiento, nada) → starter tasks
      ("Reservar vuelos", "Reservar alojamiento") via the existing task ops (`useTasks`)
 - Name suggested from answers ("Cartagena con amigos · Dic 2026"), editable.
-- Creation still goes through `POST /api/rooms` (`src/app/api/rooms/route.ts`); seeding uses ops
-  after creation (no server change). Sandbox: `RoomGate` sandbox branch + `freshRoomPayload`
+- Creation still goes through `POST /api/rooms` (`src/app/api/rooms/route.ts`). **Decision
+  (2026-10-22):** seeding happens server-side in that route (optional `travelers` and `tasks`), not
+  as client ops after creation — it is atomic with creation, reuses the room cleanup on failure, and
+  matches how the route already calls `joinRoom` / `resetItinerary`. Sandbox: `RoomGate` sandbox branch + `freshRoomPayload`
   (`src/data/freshRoom.ts`) accept the travelers and tasks.
 
 ### 3. "¿Cómo quieres empezar?" (right after creation)
