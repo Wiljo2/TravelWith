@@ -72,7 +72,7 @@ export function Features() {
         </div>
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map(({ icon: Icon, title, description }) => (
-            <li key={title} className="flex">
+            <li key={title} data-reveal className="flex">
               <Card className="w-full rounded-2xl">
                 <CardHeader className="gap-3">
                   <span className="flex size-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
