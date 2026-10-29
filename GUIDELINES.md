@@ -19,7 +19,9 @@ src/
 │                         useTasks, useTripInfo (header/travelers), useTripOps (writes),
 │                         useRoom (load + live changes via useTripChannel), useDragDrop, useAuth.
 ├── components/
-│   ├── landing/          Public landing page and the EntryGate (landing vs app)
+│   ├── landing/          Public landing page and the EntryGate (landing vs app). `globe/` is the hero's
+│   │                     three.js globe, loaded on idle and never for visitors entering the app;
+│   │                     its land dots come from `scripts/build-land-dots.mjs`.
 │   ├── calendar/         Grid, day columns, blocks, slot-create modal
 │   ├── budget/           Budget view and side panel
 │   ├── tasks/            Tasks view

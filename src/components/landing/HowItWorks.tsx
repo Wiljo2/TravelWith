@@ -10,7 +10,7 @@ export function HowItWorks() {
       <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">Cómo funciona</h2>
       <ol className="mt-10 grid gap-6 md:mt-14 md:grid-cols-3">
         {STEPS.map((s, i) => (
-          <li key={s.title} className="rounded-2xl border border-border bg-card p-6">
+          <li key={s.title} data-reveal className="rounded-2xl border border-border bg-card p-6">
             <span className="flex size-10 items-center justify-center rounded-full bg-primary text-base font-semibold text-primary-foreground">
               {i + 1}
             </span>

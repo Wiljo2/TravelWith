@@ -17,7 +17,7 @@ export function AssistantShowcase() {
             presupuesto o los pendientes. Nada se aplica hasta que tú lo apruebas.
           </p>
         </div>
-        <div aria-hidden className="mx-auto flex w-full max-w-md flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-lg sm:p-5">
+        <div aria-hidden data-reveal className="mx-auto flex w-full max-w-md flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-lg sm:p-5">
           <div className="ml-8 rounded-2xl rounded-br-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground">
             Agrega una cena el sábado a las 8pm y divide $120 entre todos
           </div>
